@@ -3,7 +3,7 @@ import { currentMap, user } from "../state";
 import { Page, usePageLoad } from "./Page";
 
 /** When the statement last changed in substance; update it with the text. */
-const UPDATED = "11 November 2026";
+const UPDATED = "20 November 2026";
 
 /** A contact that looks like an e-mail address or a web address becomes a link. */
 function Contact(props: { value: string }) {
@@ -88,10 +88,10 @@ export function PrivacyPage() {
 						apart.
 					</li>
 					<li>
-						Your settings (appearance, preferences) and where you last were on
-						the map are saved in <b>your own browser</b> (local storage). They
-						are never sent to the server; clearing your browser's site data
-						removes them.
+						Your settings (appearance, preferences), which layers you chose to
+						show or hide, and where you last were on the map are saved in{" "}
+						<b>your own browser</b> (local storage). They are never sent to the
+						server; clearing your browser's site data removes them.
 					</li>
 				</ul>
 			</Section>
