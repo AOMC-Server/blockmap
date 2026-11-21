@@ -11,7 +11,8 @@
 			"**",
 			"!web/public/static",
 			"!server/src/db/migrations",
-			"!bun.lock"
+			"!bun.lock",
+			"!block-ui"
 		]
 	},
 	"formatter": {

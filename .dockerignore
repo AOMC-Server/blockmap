@@ -3,3 +3,4 @@ data
 .env
 .git
 web/dist
+block-ui/demo/dist

@@ -20,8 +20,6 @@ export default defineConfig({
 			],
 		},
 	],
-	// The library ships TS source and takes its preact from here: there must be one copy.
-	resolve: { dedupe: ["preact", "@preact/signals"] },
 	server: {
 		proxy: {
 			"/api": backend,

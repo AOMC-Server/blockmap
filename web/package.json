@@ -10,7 +10,7 @@
 		"@blockmap/shared": "workspace:*"
 	},
 	"devDependencies": {
-		"@aomc-server/block-ui": "file:../../block-ui",
+		"@aomc-server/block-ui": "workspace:*",
 		"@preact/preset-vite": "^2.10.6",
 		"@preact/signals": "^2.11.4",
 		"hono": "^4.6.0",

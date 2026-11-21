@@ -4,16 +4,17 @@ COPY package.json bun.lock ./
 COPY server/package.json server/
 COPY shared/package.json shared/
 COPY web/package.json web/
+COPY block-ui/package.json block-ui/
 RUN bun install --frozen-lockfile --production
 
 FROM oven/bun:1-alpine AS web
 WORKDIR /app
-# web/package.json refers to the UI library as file:../../block-ui.
-COPY --from=block-ui . /block-ui
 COPY package.json bun.lock ./
 COPY server/package.json server/
 COPY shared/package.json shared/
 COPY web/package.json web/
+# The UI library is a git submodule and a workspace package.
+COPY block-ui block-ui
 RUN bun install --frozen-lockfile
 COPY tsconfig.base.json ./
 COPY shared shared

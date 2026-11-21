@@ -4,13 +4,14 @@
 	"workspaces": [
 		"server",
 		"web",
-		"shared"
+		"shared",
+		"block-ui"
 	],
 	"scripts": {
 		"dev": "bun --watch server/src/index.ts",
 		"dev:web": "bun run --cwd web dev",
 		"build": "bun run --cwd web build",
-		"test": "bun test",
+		"test": "bun test server web shared scripts",
 		"lint": "biome check .",
 		"typecheck": "tsc --noEmit -p server && tsc --noEmit -p shared && tsc --noEmit -p web && tsc --noEmit -p scripts",
 		"backup": "bun scripts/backup.ts",
