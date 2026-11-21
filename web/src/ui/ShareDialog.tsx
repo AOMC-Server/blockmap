@@ -1,4 +1,4 @@
-import { copyText, Modal } from "@aomc-server/block-ui";
+import { copyText, Modal, Toggle } from "@aomc-server/block-ui";
 import type { ShareView } from "@blockmap/shared/schemas";
 import { signal } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
@@ -99,15 +99,12 @@ export function ShareDialog() {
 						: "Each layer's default"}
 				</dd>
 			</dl>
-			<label class="check">
-				<input
-					type="checkbox"
-					class="switch"
-					checked={includeLayers}
-					onChange={(e) => setIncludeLayers(e.currentTarget.checked)}
-				/>
-				Show the same layers I have on
-			</label>
+			<Toggle
+				inline
+				checked={includeLayers}
+				onChange={setIncludeLayers}
+				label="Show the same layers I have on"
+			/>
 			<div class="copy-row share-link">
 				<input
 					type="text"

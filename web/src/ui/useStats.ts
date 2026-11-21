@@ -1,4 +1,4 @@
-import { useAsync } from "@aomc-server/block-ui";
+import { useAsync } from "@aomc-server/block-ui/hooks";
 import { attempt, type Res, type Success } from "../api";
 
 /** Loads statistics whenever `deps` change; the previous result stays until the next arrives. */

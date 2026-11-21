@@ -9,6 +9,9 @@
 	--above-hotbar: calc(var(--safe-bottom) + var(--hotbar-h) + 16px);
 	--panel-w: min(400px, calc(100vw - 16px));
 
+	/* The library gives every .muted and .hint this margin, not only those on paragraphs. */
+	--note-gap: 4px;
+
 	/* Toasts sit above the hotbar, centred. */
 	--toast-left: 8px;
 	--toast-right: 8px;
@@ -400,66 +403,6 @@ img.banner,
 .palette-scope.strong,
 .preview-select-list [data-palette^="dye-"] {
 	--dye-k: 1.85;
-}
-
-/* ---------------------------------------------------------------------------------------------
- * The library's components, as this app lays them out
- * ------------------------------------------------------------------------------------------- */
-/* Fields stack their label, control and hint as blocks, each with its own margin. */
-.field {
-	display: block;
-	margin: 14px 0;
-}
-
-.field > .label {
-	margin-bottom: 6px;
-}
-
-/* The library gives .muted and .hint their margin on paragraphs only. */
-.muted,
-.hint {
-	margin: 4px 0;
-}
-
-.tiles {
-	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-}
-
-.tile {
-	box-shadow: none;
-}
-
-.tile-label {
-	margin-bottom: 6px;
-	font-weight: 600;
-}
-
-/* The library focuses a select or textarea with the same outline as a button; the border does it here. */
-select:focus-visible,
-textarea:focus-visible {
-	outline: none;
-}
-
-/* Tables sit straight in a page section: no frame of their own, and plain headers. */
-.table-wrap {
-	background: none;
-	border: 0;
-}
-
-.table th,
-.table td {
-	vertical-align: middle;
-}
-
-.table tbody tr:hover {
-	background: none;
-}
-
-.table th {
-	position: static;
-	font-size: inherit;
-	color: inherit;
-	background: none;
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -1153,10 +1096,6 @@ textarea:focus-visible {
 
 .style-controls .slider input[type="range"] {
 	margin: 6px 0 2px;
-}
-
-.style-controls .check {
-	margin-top: 8px;
 }
 
 .style-controls .sublabel {
@@ -2129,110 +2068,6 @@ textarea:focus-visible {
 	margin-top: 24px;
 }
 
-/* Appearance settings: a card per style, each with a small window drawn in that style. */
-.style-picker {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-	gap: 8px;
-	min-width: 0;
-	margin: 14px 0;
-	padding: 0;
-	border: 0;
-}
-
-.style-picker legend,
-.mode-picker legend {
-	padding: 0;
-}
-
-.mode-picker {
-	min-width: 0;
-	margin: 14px 0;
-	padding: 0;
-	border: 0;
-}
-
-.style-option {
-	border-radius: var(--radius);
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	padding: 8px 8px 12px;
-	background: var(--s2);
-	border: var(--bw) solid var(--line);
-	box-shadow:
-		inset var(--edge-lo) 0 var(--card-lo),
-		inset var(--edge-hi) 0 var(--sheen);
-	cursor: pointer;
-}
-
-.style-option:hover {
-	background: var(--s3);
-}
-
-.style-option.selected {
-	outline: 4px solid var(--focus);
-	outline-offset: -6px;
-}
-
-.style-option:has(:focus-visible) {
-	outline: 2px solid var(--focus);
-	outline-offset: 2px;
-}
-
-.style-option .hint {
-	margin: 0;
-}
-
-.style-name {
-	font-weight: 600;
-}
-
-/* Previews set their own data-style, so they pick up that style's fonts and shapes. */
-.style-preview {
-	display: block;
-	margin-bottom: 6px;
-	padding: 10px;
-	font-family: var(--sans);
-	color: var(--text);
-	background: var(--well);
-	pointer-events: none;
-}
-
-.preview-window {
-	border-radius: var(--radius);
-	overflow: hidden;
-	display: block;
-	background: var(--s1);
-	border: var(--bw) solid var(--line);
-	box-shadow: var(--surface-shadow);
-}
-
-.preview-head {
-	display: block;
-	padding: 6px 8px 4px;
-	font-family: var(--display);
-	font-size: var(--display-size);
-	font-weight: var(--display-weight);
-	line-height: 1.1;
-	text-shadow: var(--text-shadow);
-	color: var(--head-fg);
-	background: var(--head-bg);
-	border-bottom: var(--bw) solid var(--line);
-}
-
-.preview-body {
-	display: flex;
-	gap: 6px;
-	padding: 8px;
-}
-
-.preview-body .btn {
-	flex: 1;
-	padding-left: 4px;
-	padding-right: 4px;
-}
-
 /* ---------------------------------------------------------------------------------------------
  * Small screens
  * ------------------------------------------------------------------------------------------- */
@@ -2662,14 +2497,12 @@ textarea:focus-visible {
 	.invite-card,
 	.popup,
 	.measure-card,
-	.context-menu,
-	.preview-window {
+	.context-menu {
 		padding: 3px;
 	}
 
 	.popup h3,
-	.menu-head,
-	.preview-head {
+	.menu-head {
 		min-height: 0;
 		padding: 4px 4px 4px 8px;
 		box-shadow: none;
@@ -2699,8 +2532,7 @@ textarea:focus-visible {
 	.member-list li,
 	.dimension-list li,
 	.invite-list li,
-	.feature-history li,
-	.style-option {
+	.feature-history li {
 		box-shadow: var(--bevel-out);
 	}
 
@@ -2709,10 +2541,6 @@ textarea:focus-visible {
 	.dye-picker,
 	.points-list {
 		box-shadow: var(--bevel-in);
-	}
-
-	.tile {
-		box-shadow: none;
 	}
 
 	.slot-tip {
@@ -2729,15 +2557,13 @@ textarea:focus-visible {
 	.invite-card,
 	.popup,
 	.measure-card,
-	.context-menu,
-	.preview-window {
+	.context-menu {
 		border: 3px solid var(--chrome);
 		border-radius: 8px 8px 0 0;
 	}
 
 	.popup h3,
-	.menu-head,
-	.preview-head {
+	.menu-head {
 		text-shadow: 1px 1px 0 color-mix(in srgb, var(--chrome), #000 55%);
 		border-bottom-color: transparent;
 	}

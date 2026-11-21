@@ -64,7 +64,7 @@ function SettingsTab() {
 	return (
 		<>
 			<form class="settings-form" onSubmit={save}>
-				<label class="field">
+				<label class="field flow">
 					<span class="label">Map name</span>
 					<input
 						type="text"

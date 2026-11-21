@@ -1,10 +1,10 @@
 import {
-	createWidthStore,
 	isModeChoice,
 	isStyle,
 	type ModeChoice,
 	type StyleId,
-} from "@aomc-server/block-ui";
+} from "@aomc-server/block-ui/theme";
+import { createWidthStore } from "@aomc-server/block-ui/width";
 import type { View } from "@blockmap/shared/view";
 import { signal } from "@preact/signals";
 

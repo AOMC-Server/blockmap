@@ -260,7 +260,7 @@ export function FeatureEditor() {
 			}
 		>
 			{layers.length > 1 ? (
-				<div class="field editor-layer-pick">
+				<div class="field flow editor-layer-pick">
 					<span class="label">Layer</span>
 					<LayerSelect
 						options={layers}
@@ -283,7 +283,7 @@ export function FeatureEditor() {
 				</p>
 			)}
 
-			<div class="field">
+			<div class="field flow">
 				<span class="label">Type</span>
 				<div class="segmented">
 					{TYPES.map((t) => (
@@ -300,7 +300,7 @@ export function FeatureEditor() {
 				</div>
 			</div>
 
-			<div class="field draw-controls">
+			<div class="field flow draw-controls">
 				<span class="label">Location</span>
 				<p class="hint">{drawHint(d, type)}</p>
 				<ShapeStats />
@@ -331,7 +331,7 @@ export function FeatureEditor() {
 				<PointsList />
 			</div>
 
-			<label class="field">
+			<label class="field flow">
 				<span class="label">Name</span>
 				<input
 					type="text"
@@ -342,7 +342,7 @@ export function FeatureEditor() {
 				/>
 			</label>
 
-			<div class="field">
+			<div class="field flow">
 				<span class="label">
 					Popup{" "}
 					<small>
@@ -385,7 +385,7 @@ export function FeatureEditor() {
 			</div>
 
 			{type !== "pin" && (
-				<div class="field">
+				<div class="field flow">
 					<span class="label">Style</span>
 					<StyleControls
 						kind={type}
@@ -397,7 +397,7 @@ export function FeatureEditor() {
 				</div>
 			)}
 
-			<div class="field">
+			<div class="field flow">
 				<span class="label">Colour</span>
 				<DyePicker
 					label="Colour"

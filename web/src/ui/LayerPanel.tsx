@@ -1,4 +1,5 @@
-import { type CrossDrop, Grip, moveItem } from "@aomc-server/block-ui";
+import { Grip, Toggle } from "@aomc-server/block-ui";
+import { type CrossDrop, moveItem } from "@aomc-server/block-ui/reorder";
 import type { Dye } from "@blockmap/shared/colors";
 import {
 	cleanStyle,
@@ -151,32 +152,24 @@ function LayerForm(props: {
 					onChange={setStyle}
 				/>
 			</details>
-			<label class="check">
-				<input
-					type="checkbox"
-					class="switch"
-					checked={hidden}
-					onChange={(e) => setHidden(e.currentTarget.checked)}
-				/>
-				Hidden by default
-			</label>
-			<label
-				class="check"
+			<Toggle
+				inline
+				checked={hidden}
+				onChange={setHidden}
+				label="Hidden by default"
+			/>
+			<Toggle
+				inline
+				checked={priv}
+				disabled={!canSetVisibility}
+				onChange={setPriv}
+				label="Private (only invited members and moderators)"
 				title={
 					canSetVisibility
 						? undefined
 						: "Only the layer's creator or a moderator can change this"
 				}
-			>
-				<input
-					type="checkbox"
-					class="switch"
-					checked={priv}
-					disabled={!canSetVisibility}
-					onChange={(e) => setPriv(e.currentTarget.checked)}
-				/>
-				Private (only invited members and moderators)
-			</label>
+			/>
 			<div class="group">
 				<button
 					type="submit"

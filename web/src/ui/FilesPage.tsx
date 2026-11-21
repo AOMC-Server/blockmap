@@ -1,4 +1,4 @@
-import { Modal, PopupText } from "@aomc-server/block-ui";
+import { Modal, PopupText, Toggle } from "@aomc-server/block-ui";
 import { formatEta, formatTime } from "@aomc-server/block-ui/format";
 import { type FileConflictMode, fileNameKey } from "@blockmap/shared/files";
 import type { ComponentChildren } from "preact";
@@ -483,7 +483,7 @@ function Library(props: { names: string[]; go: Go }) {
 					</p>
 				) : (
 					<div>
-						<table class="table compact nowrap file-table">
+						<table class="table plain compact nowrap file-table">
 							<thead>
 								<tr>
 									<th>Name</th>
@@ -921,7 +921,7 @@ function TextDialog(props: {
 				}}
 			>
 				{props.multiline ? (
-					<label class="field">
+					<label class="field flow">
 						<span class="label">{props.label}</span>
 						<textarea
 							rows={6}
@@ -930,7 +930,7 @@ function TextDialog(props: {
 						/>
 					</label>
 				) : (
-					<label class="field">
+					<label class="field flow">
 						<span class="label">{props.label}</span>
 						<input
 							type="text"
@@ -974,15 +974,12 @@ function ConflictDialog(props: {
 				Replacing keeps the existing link and download count. Keeping both
 				uploads this one with a number added to its name.
 			</p>
-			<label class="check">
-				<input
-					type="checkbox"
-					class="switch"
-					checked={forAll}
-					onChange={(e) => setForAll(e.currentTarget.checked)}
-				/>
-				Do the same for the rest of these uploads
-			</label>
+			<Toggle
+				inline
+				checked={forAll}
+				onChange={setForAll}
+				label="Do the same for the rest of these uploads"
+			/>
 			<div class="modal-actions">
 				{!props.folder && (
 					<button

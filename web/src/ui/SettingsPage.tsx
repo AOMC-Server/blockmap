@@ -1,5 +1,9 @@
-import { Toggle } from "@aomc-server/block-ui";
-import { MODES, STYLES } from "@aomc-server/block-ui/theme";
+import {
+	ChoicePicker,
+	ModePicker,
+	StylePicker,
+	Toggle,
+} from "@aomc-server/block-ui";
 import { useEffect, useState } from "preact/hooks";
 import { api, attempt, loginUrl } from "../api";
 import {
@@ -37,70 +41,21 @@ function SettingToggle(props: {
 	);
 }
 
-function ModePicker() {
-	const current = settings.value.mode;
-	return (
-		<fieldset class="mode-picker">
-			<legend class="label">Colours</legend>
-			<div class="segmented">
-				{MODES.map((m) => (
-					<button
-						key={m.id}
-						type="button"
-						class={`btn ${m.id === current ? "active" : ""}`}
-						aria-pressed={m.id === current}
-						onClick={() => updateSettings({ mode: m.id })}
-					>
-						{m.name}
-					</button>
-				))}
-			</div>
-		</fieldset>
-	);
-}
-
-function StylePicker() {
-	const current = settings.value.style;
-	return (
-		<fieldset class="style-picker">
-			<legend class="label">Style</legend>
-			{STYLES.map((st) => (
-				<label
-					key={st.id}
-					class={`style-option ${st.id === current ? "selected" : ""}`}
-				>
-					<input
-						class="visually-hidden"
-						type="radio"
-						name="style"
-						value={st.id}
-						checked={st.id === current}
-						onChange={() => updateSettings({ style: st.id })}
-					/>
-					<span class="style-preview" data-style={st.id} aria-hidden="true">
-						<span class="preview-window">
-							<span class="preview-head">Layers</span>
-							<span class="preview-body">
-								<span class="btn small">Edit</span>
-								<span class="btn small primary">Save</span>
-							</span>
-						</span>
-					</span>
-					<span class="style-name">{st.name}</span>
-					<span class="muted hint">{st.hint}</span>
-				</label>
-			))}
-		</fieldset>
-	);
-}
-
 function Appearance() {
 	return (
 		<section class="page-section">
 			<h2>Appearance</h2>
 			<p class="muted">Saved in this browser only.</p>
-			<ModePicker />
-			<StylePicker />
+			<ModePicker
+				value={settings.value.mode}
+				onChange={(mode) => updateSettings({ mode })}
+			/>
+			<StylePicker
+				value={settings.value.style}
+				onChange={(style) => updateSettings({ style })}
+				previewTitle="Layers"
+				previewButtons={["Edit", "Save"]}
+			/>
 			<SettingToggle
 				field="dimensionColours"
 				label="Colour the map by dimension"
@@ -111,28 +66,14 @@ function Appearance() {
 }
 
 function TransitionPicker() {
-	const current = settings.value.transitionSpeed;
 	return (
-		<fieldset class="mode-picker">
-			<legend class="label">Camera transitions</legend>
-			<div class="segmented">
-				{TRANSITION_SPEEDS.map((t) => (
-					<button
-						key={t.id}
-						type="button"
-						class={`btn ${t.id === current ? "active" : ""}`}
-						aria-pressed={t.id === current}
-						onClick={() => updateSettings({ transitionSpeed: t.id })}
-					>
-						{t.name}
-					</button>
-				))}
-			</div>
-			<span class="muted hint">
-				How quickly the map moves and zooms to a place, for example when you
-				open an upload. Instant skips the animation.
-			</span>
-		</fieldset>
+		<ChoicePicker
+			label="Camera transitions"
+			value={settings.value.transitionSpeed}
+			options={TRANSITION_SPEEDS}
+			onChange={(transitionSpeed) => updateSettings({ transitionSpeed })}
+			hint="How quickly the map moves and zooms to a place, for example when you open an upload. Instant skips the animation."
+		/>
 	);
 }
 
@@ -144,7 +85,7 @@ function Preferences() {
 			<h2>Preferences</h2>
 			<p class="muted">Saved in this browser only.</p>
 
-			<label class="field">
+			<label class="field flow">
 				<span class="label">Open the map in</span>
 				<select
 					value={current ?? ""}
@@ -189,7 +130,7 @@ function Preferences() {
 				label="Show the zoom scale"
 				hint="For example “1 px = 4 blocks”."
 			/>
-			<label class="field">
+			<label class="field flow">
 				<span class="label">
 					Pin clustering distance: {settings.value.pinClusterDistance}
 				</span>
@@ -221,7 +162,7 @@ function Preferences() {
 				label="Preload the area around spawn"
 				hint="Load low resolution images of the area around spawn in the background, so there is always something to show there while the detailed ones load. Turn off to save data on a slow or metered connection."
 			/>
-			<label class="field">
+			<label class="field flow">
 				<span class="label">Cache lines and areas while moving</span>
 				<select
 					value={settings.value.shapeCache}

@@ -106,6 +106,7 @@ function Storage(props: { data: Body }) {
 				point is added after each upload, deletion and cleanup.
 			</p>
 			<TileGrid
+				plain
 				tiles={[
 					{
 						label: "Tile images",
@@ -194,6 +195,7 @@ function Traffic(props: { data: Body }) {
 				almost no data.
 			</p>
 			<TileGrid
+				plain
 				tiles={[
 					{
 						label: "Sent in this period",
@@ -231,8 +233,8 @@ function Traffic(props: { data: Body }) {
 					}
 				/>
 			</div>
-			<div class="table-wrap">
-				<table class="table compact nowrap">
+			<div class="table-wrap flush">
+				<table class="table plain compact nowrap">
 					<thead>
 						<tr>
 							<th>Kind</th>
@@ -314,8 +316,8 @@ function Domains(props: { data: Body }) {
 			{rows.length === 0 ? (
 				<p class="muted">No tile requests in this period.</p>
 			) : (
-				<div class="table-wrap">
-					<table class="table compact nowrap">
+				<div class="table-wrap flush">
+					<table class="table plain compact nowrap">
 						<thead>
 							<tr>
 								<th>Domain</th>
@@ -374,6 +376,7 @@ function Overview(props: { data: Body }) {
 		<>
 			<h2>Server</h2>
 			<TileGrid
+				plain
 				tiles={[
 					{
 						label: "Users",

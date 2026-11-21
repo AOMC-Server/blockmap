@@ -1,4 +1,4 @@
-import { PreviewSelect } from "@aomc-server/block-ui";
+import { PreviewSelect, Toggle } from "@aomc-server/block-ui";
 import type { Dye } from "@blockmap/shared/colors";
 import {
 	AREA_FILLS,
@@ -74,7 +74,7 @@ export function StyleControls(props: {
 
 	return (
 		<div class="style-controls">
-			<div class="field">
+			<div class="field flow">
 				<span class="sublabel">{area ? "Outline" : "Line"}</span>
 				<PreviewSelect
 					label="Line style"
@@ -123,15 +123,12 @@ export function StyleControls(props: {
 					onInput={(e) => set("opacity", Number(e.currentTarget.value) / 100)}
 				/>
 			</label>
-			<label class="check">
-				<input
-					type="checkbox"
-					class="switch"
-					checked={shown.smooth}
-					onChange={(e) => set("smooth", e.currentTarget.checked)}
-				/>
-				Smooth curves
-			</label>
+			<Toggle
+				inline
+				checked={shown.smooth}
+				onChange={(smooth) => set("smooth", smooth)}
+				label="Smooth curves"
+			/>
 			{area && (
 				<>
 					<span class="sublabel">

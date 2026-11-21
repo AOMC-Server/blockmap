@@ -106,6 +106,7 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 	return (
 		<>
 			<TileGrid
+				plain
 				tiles={[
 					{ label: "Uploads", value: formatNumber(s.uploads) },
 					{ label: "Tiles uploaded", value: formatNumber(s.tiles) },
@@ -134,6 +135,7 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 				The part of the above that was sent by the in-game mod.
 			</p>
 			<TileGrid
+				plain
 				tiles={[
 					{
 						label: "AOMC Webmapper uploads",
@@ -219,8 +221,8 @@ function Leaderboard(props: { rows: Row[]; me: string | null }) {
 	if (rows.length === 0)
 		return <p class="muted">Nobody has contributed in this period.</p>;
 	return (
-		<div class="table-wrap">
-			<table class="table compact nowrap">
+		<div class="table-wrap flush">
+			<table class="table plain compact nowrap">
 				<thead>
 					<tr>
 						<th class="rank">#</th>
