@@ -8,6 +8,8 @@ RUN bun install --frozen-lockfile --production
 
 FROM oven/bun:1-alpine AS web
 WORKDIR /app
+# web/package.json refers to the UI library as file:../../block-ui.
+COPY --from=block-ui . /block-ui
 COPY package.json bun.lock ./
 COPY server/package.json server/
 COPY shared/package.json shared/
