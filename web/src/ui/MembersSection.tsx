@@ -1,4 +1,4 @@
-import { ROLES_DESCENDING, type Role } from "@aomc/shared";
+import { ROLES_DESCENDING, type Role } from "@blockmap/shared";
 import { useEffect, useState } from "preact/hooks";
 import { showNotice } from "../api";
 import type { Member, Scope } from "../sharing";

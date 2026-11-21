@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { View } from "@aomc/shared/view";
+import type { View } from "@blockmap/shared/view";
 import { FeatureLayer, type RenderLayer } from "./featureLayer";
 import { distToPolyline, type Pt } from "./geometry";
 import { smoothShape } from "./smooth";

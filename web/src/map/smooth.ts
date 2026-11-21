@@ -1,4 +1,4 @@
-import type { Point } from "@aomc/shared/features";
+import type { Point } from "@blockmap/shared/features";
 import { graphFromPaths } from "../tools/lineGraph";
 import { type Bounds, boundsOf, type Pt } from "./geometry";
 

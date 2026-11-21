@@ -1,4 +1,4 @@
-import type { DimensionTheme } from "@aomc/shared/schemas";
+import type { DimensionTheme } from "@blockmap/shared/schemas";
 import { signal } from "@preact/signals";
 
 /**

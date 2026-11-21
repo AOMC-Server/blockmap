@@ -1,4 +1,7 @@
-import { createLayerInviteSchema, createMapInviteSchema } from "@aomc/shared";
+import {
+	createLayerInviteSchema,
+	createMapInviteSchema,
+} from "@blockmap/shared";
 import { desc, eq, isNull, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { announceEverything, announceLayers } from "../announce";

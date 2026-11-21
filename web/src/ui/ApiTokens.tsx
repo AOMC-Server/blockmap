@@ -5,8 +5,8 @@ import {
 	normalizeScopes,
 	TOKEN_SCOPES,
 	type TokenScope,
-} from "@aomc/shared";
-import { MAX_NAME } from "@aomc/shared/features";
+} from "@blockmap/shared";
+import { MAX_NAME } from "@blockmap/shared/features";
 import type { InferResponseType } from "hono/client";
 import { useEffect, useState } from "preact/hooks";
 import { api, ok, run } from "../api";

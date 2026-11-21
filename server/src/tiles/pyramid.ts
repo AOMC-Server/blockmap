@@ -1,4 +1,4 @@
-import { floorDiv } from "@aomc/shared";
+import { floorDiv } from "@blockmap/shared";
 import { mapLimit } from "../concurrency";
 import type { BlobStore } from "./blobstore";
 import { composeParent, loadTile, storeTile } from "./compose";

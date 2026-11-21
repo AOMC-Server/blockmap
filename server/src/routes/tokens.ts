@@ -1,4 +1,4 @@
-import { createTokenSchema, MAX_TOKENS_PER_USER } from "@aomc/shared";
+import { createTokenSchema, MAX_TOKENS_PER_USER } from "@blockmap/shared";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { requireUser } from "../auth/session";

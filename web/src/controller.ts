@@ -1,4 +1,4 @@
-import { convertView, type View } from "@aomc/shared/view";
+import { convertView, type View } from "@blockmap/shared/view";
 import { effect, signal } from "@preact/signals";
 import type { InferResponseType } from "hono/client";
 import { api, showNotice } from "./api";

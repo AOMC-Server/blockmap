@@ -3,7 +3,7 @@ import {
 	guessDimensionTheme,
 	guessXaeroDimension,
 	updateDimensionSchema,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { announceMap } from "../announce";

@@ -1,8 +1,12 @@
-import type { Dye } from "@aomc/shared/colors";
-import type { FeatureStyle, FeatureType, Point } from "@aomc/shared/features";
-import { canEdit, canModerate, isReadOnly } from "@aomc/shared/roles";
-import type { DimensionTheme } from "@aomc/shared/schemas";
-import type { View } from "@aomc/shared/view";
+import type { Dye } from "@blockmap/shared/colors";
+import type {
+	FeatureStyle,
+	FeatureType,
+	Point,
+} from "@blockmap/shared/features";
+import { canEdit, canModerate, isReadOnly } from "@blockmap/shared/roles";
+import type { DimensionTheme } from "@blockmap/shared/schemas";
+import type { View } from "@blockmap/shared/view";
 import { batch, computed, signal } from "@preact/signals";
 import type { InferResponseType } from "hono/client";
 import type { api } from "./api";

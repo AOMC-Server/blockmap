@@ -1,4 +1,4 @@
-import { resolveStyle } from "@aomc/shared/featureStyle";
+import { resolveStyle } from "@blockmap/shared/featureStyle";
 import { mapView } from "../controller";
 import { featureStats, featureTitle, TYPE_LABEL } from "../featureInfo";
 import { deleteFeature } from "../layers";

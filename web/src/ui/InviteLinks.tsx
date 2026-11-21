@@ -1,4 +1,4 @@
-import { DEFAULT_INVITE_HOURS, MAX_INVITE_USES } from "@aomc/shared";
+import { DEFAULT_INVITE_HOURS, MAX_INVITE_USES } from "@blockmap/shared";
 import { useEffect, useState } from "preact/hooks";
 import {
 	type CreatedInvite,

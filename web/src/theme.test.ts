@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { DYE_HEX, DYES } from "@aomc/shared/colors";
-import { DIMENSION_THEMES } from "@aomc/shared/schemas";
+import { DYE_HEX, DYES } from "@blockmap/shared/colors";
+import { DIMENSION_THEMES } from "@blockmap/shared/schemas";
 import {
 	appearance,
 	dyeScope,

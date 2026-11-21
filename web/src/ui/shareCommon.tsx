@@ -1,4 +1,4 @@
-import type { Dye } from "@aomc/shared/colors";
+import type { Dye } from "@blockmap/shared/colors";
 import type { ComponentChildren } from "preact";
 import { showNotice } from "../api";
 import { currentMap, dimSlug } from "../state";

@@ -1,5 +1,5 @@
-import { DYE_HEX } from "@aomc/shared/colors";
-import type { FeatureType } from "@aomc/shared/features";
+import { DYE_HEX } from "@blockmap/shared/colors";
+import type { FeatureType } from "@blockmap/shared/features";
 import { effect } from "@preact/signals";
 import { pointsOf } from "../featureInfo";
 import { BLOCK_CENTER, MIN_CLUSTER_LEVEL } from "../map/featureLayer";

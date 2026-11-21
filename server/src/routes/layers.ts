@@ -8,7 +8,7 @@ import {
 	reorderLayersSchema,
 	reorderSchema,
 	updateLayerSchema,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { and, count, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";

@@ -1,12 +1,12 @@
 {
-	"name": "@aomc/server",
+	"name": "@blockmap/server",
 	"private": true,
 	"type": "module",
 	"scripts": {
 		"db:generate": "drizzle-kit generate"
 	},
 	"dependencies": {
-		"@aomc/shared": "workspace:*",
+		"@blockmap/shared": "workspace:*",
 		"@scalar/hono-api-reference": "^0.12.19",
 		"drizzle-orm": "^0.45.2",
 		"fflate": "^0.8.3",

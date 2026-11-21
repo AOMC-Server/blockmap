@@ -1,4 +1,4 @@
-import type { Dye } from "@aomc/shared/colors";
+import type { Dye } from "@blockmap/shared/colors";
 import {
 	AREA_FILLS,
 	cleanStyle,
@@ -10,7 +10,7 @@ import {
 	MAX_LINE_WIDTH,
 	MIN_LINE_WIDTH,
 	mergeStyle,
-} from "@aomc/shared/features";
+} from "@blockmap/shared/features";
 import { PreviewSelect } from "./PreviewSelect";
 import { DashPreview, FillPreview } from "./StylePreview";
 

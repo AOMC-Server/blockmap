@@ -1,10 +1,10 @@
-import type { Dye } from "@aomc/shared/colors";
+import type { Dye } from "@blockmap/shared/colors";
 import {
 	cleanStyle,
 	type FeatureInput,
 	type FeatureStyle,
 	MAX_NAME,
-} from "@aomc/shared/features";
+} from "@blockmap/shared/features";
 import { signal } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { showNotice } from "../api";

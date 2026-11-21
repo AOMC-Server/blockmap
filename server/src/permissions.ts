@@ -5,7 +5,7 @@ import {
 	canModerate,
 	type LayerRole,
 	type Role,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { layerMembers, layers, mapInfo, members } from "./db/schema";

@@ -1,4 +1,4 @@
-import { MAX_JSON_BYTES } from "@aomc/shared";
+import { MAX_JSON_BYTES } from "@blockmap/shared";
 import { describeRoute } from "hono-openapi";
 
 export const apiDescription = [

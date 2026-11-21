@@ -6,7 +6,7 @@ import {
 	expect,
 	test,
 } from "bun:test";
-import type { View } from "@aomc/shared/view";
+import type { View } from "@blockmap/shared/view";
 import {
 	type DragSession,
 	Input,

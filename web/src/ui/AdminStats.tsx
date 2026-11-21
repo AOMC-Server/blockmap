@@ -1,5 +1,5 @@
-import { ADMIN_STATS_RANGES, type AdminStatsRange } from "@aomc/shared";
-import { DAY, HOUR } from "@aomc/shared/time";
+import { ADMIN_STATS_RANGES, type AdminStatsRange } from "@blockmap/shared";
+import { DAY, HOUR } from "@blockmap/shared/time";
 import type { InferResponseType } from "hono/client";
 import { useState } from "preact/hooks";
 import { api } from "../api";

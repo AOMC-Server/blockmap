@@ -1,5 +1,5 @@
-import type { Dye } from "@aomc/shared/colors";
-import { MAX_NAME } from "@aomc/shared/features";
+import type { Dye } from "@blockmap/shared/colors";
+import { MAX_NAME } from "@blockmap/shared/features";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { mapView } from "../controller";
 import { createLayer } from "../layers";

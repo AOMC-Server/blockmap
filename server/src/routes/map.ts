@@ -3,7 +3,7 @@ import {
 	MAX_JSON_BYTES,
 	MAX_LAYERS_PER_USER,
 	updateMapSchema,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { Hono } from "hono";
 import { announceEverything, announceMap } from "../announce";
 import { requireUser } from "../auth/session";

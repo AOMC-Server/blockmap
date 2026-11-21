@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { DAY, FIVE_MINUTES, HOUR, MINUTE } from "@aomc/shared";
+import { DAY, FIVE_MINUTES, HOUR, MINUTE } from "@blockmap/shared";
 import { eq } from "drizzle-orm";
 import { blobFiles, storageHistory, trafficHourly } from "../src/db/schema";
 import { recordMissingBlobSizes } from "../src/storage";

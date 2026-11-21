@@ -1,4 +1,4 @@
-import type { View } from "@aomc/shared/view";
+import type { View } from "@blockmap/shared/view";
 import { effect, signal } from "@preact/signals";
 import { isModeChoice, isStyle, type ModeChoice, type StyleId } from "./theme";
 

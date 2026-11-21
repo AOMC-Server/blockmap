@@ -1,4 +1,4 @@
-import { fileNameKey, fileUrl } from "@aomc/shared";
+import { fileNameKey, fileUrl } from "@blockmap/shared";
 import { and, eq, isNull, type SQLWrapper, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { fileEntries, fileFolders, fileGrants } from "../db/schema";

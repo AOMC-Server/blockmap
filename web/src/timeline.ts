@@ -1,5 +1,5 @@
-import { DAY, HOUR } from "@aomc/shared/time";
-import { type Size, screenToBlock, type View } from "@aomc/shared/view";
+import { DAY, HOUR } from "@blockmap/shared/time";
+import { type Size, screenToBlock, type View } from "@blockmap/shared/view";
 import { type Bounds, intersects } from "./map/geometry";
 
 /** The parts of a revision the timeline and the upload log work with. */

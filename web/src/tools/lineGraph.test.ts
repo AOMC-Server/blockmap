@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Point } from "@aomc/shared/features";
+import type { Point } from "@blockmap/shared/features";
 import {
 	graphFromPaths,
 	lineGeometry,

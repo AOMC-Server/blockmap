@@ -1,4 +1,4 @@
-import { HOUR } from "@aomc/shared/time";
+import { HOUR } from "@blockmap/shared/time";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { setRev } from "../controller";
 import {

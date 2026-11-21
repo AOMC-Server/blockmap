@@ -1,4 +1,9 @@
-import { HOUR, type LayerRole, type MemberRole, type Role } from "@aomc/shared";
+import {
+	HOUR,
+	type LayerRole,
+	type MemberRole,
+	type Role,
+} from "@blockmap/shared";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { randomToken, sha256Hex } from "./auth/tokens";
 import type { Db } from "./db/client";

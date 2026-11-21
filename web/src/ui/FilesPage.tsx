@@ -1,4 +1,4 @@
-import { type FileConflictMode, fileNameKey } from "@aomc/shared/files";
+import { type FileConflictMode, fileNameKey } from "@blockmap/shared/files";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api, attempt, loginUrl, ok, showNotice } from "../api";

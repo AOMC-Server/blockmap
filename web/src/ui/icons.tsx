@@ -1,5 +1,5 @@
-import type { Dye } from "@aomc/shared/colors";
-import type { DimensionTheme } from "@aomc/shared/schemas";
+import type { Dye } from "@blockmap/shared/colors";
+import type { DimensionTheme } from "@blockmap/shared/schemas";
 
 const ICONS = {
 	layers: "layers.png",

@@ -1,4 +1,4 @@
-import { floorDiv } from "@aomc/shared";
+import { floorDiv } from "@blockmap/shared";
 import { eq } from "drizzle-orm";
 import { mapLimit } from "../concurrency";
 import { dimensions, revisions } from "../db/schema";

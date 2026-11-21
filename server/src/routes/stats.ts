@@ -6,7 +6,7 @@ import {
 	MINUTE,
 	type StatsRange,
 	statsQuerySchema,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { inArray, type SQL, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Db } from "../db/client";

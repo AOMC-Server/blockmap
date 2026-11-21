@@ -1,4 +1,4 @@
-import { type Size, screenToBlock, type View } from "@aomc/shared/view";
+import { type Size, screenToBlock, type View } from "@blockmap/shared/view";
 import type { Bounds } from "./geometry";
 
 /** The blocks in view, grown by `margin` blocks on every side. */

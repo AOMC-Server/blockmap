@@ -3,7 +3,7 @@ import {
 	type LineGeometry,
 	linePaths,
 	type Point,
-} from "@aomc/shared/features";
+} from "@blockmap/shared/features";
 
 import { polylineArea, polylineLength, smoothShape } from "./map/smooth";
 import { graphFromPaths, lineLength } from "./tools/lineGraph";

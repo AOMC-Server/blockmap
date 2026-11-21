@@ -1,10 +1,10 @@
-import type { Role } from "@aomc/shared";
+import type { Role } from "@blockmap/shared";
 import {
 	featureHistoryQuerySchema,
 	featureInputSchema,
 	featurePatchSchema,
 	MAX_FEATURES_PER_LAYER,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { and, desc, eq, isNull, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";

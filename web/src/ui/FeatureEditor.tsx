@@ -1,5 +1,5 @@
-import type { Dye } from "@aomc/shared/colors";
-import { resolveStyle } from "@aomc/shared/featureStyle";
+import type { Dye } from "@blockmap/shared/colors";
+import { resolveStyle } from "@blockmap/shared/featureStyle";
 import {
 	cleanStyle,
 	type FeatureInput,
@@ -7,7 +7,7 @@ import {
 	type FeatureType,
 	MAX_NAME,
 	MAX_POPUP,
-} from "@aomc/shared/features";
+} from "@blockmap/shared/features";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { showNotice } from "../api";
 import { pathsOf, TYPE_LABEL } from "../featureInfo";

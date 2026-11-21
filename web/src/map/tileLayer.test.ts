@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { PreloadRing } from "@aomc/shared/schemas";
-import type { View } from "@aomc/shared/view";
+import type { PreloadRing } from "@blockmap/shared/schemas";
+import type { View } from "@blockmap/shared/view";
 import { preloadHudLines } from "./debugLayer";
 import {
 	cacheBudget,

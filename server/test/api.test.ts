@@ -3,7 +3,7 @@ import {
 	DEFAULT_PRELOAD,
 	MAX_TOKENS_PER_USER,
 	type TokenScope,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { eq } from "drizzle-orm";
 import { upsertUser } from "../src/auth/discord";
 import { writeScopeFor } from "../src/auth/scopes";

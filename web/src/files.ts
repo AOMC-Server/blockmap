@@ -1,4 +1,4 @@
-import type { FileConflictMode } from "@aomc/shared/files";
+import type { FileConflictMode } from "@blockmap/shared/files";
 import type { InferResponseType } from "hono/client";
 import type { api } from "./api";
 import { type ErrorBody, failureMessage } from "./errors";

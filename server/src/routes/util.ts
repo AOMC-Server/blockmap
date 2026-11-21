@@ -1,4 +1,4 @@
-import type { Role } from "@aomc/shared";
+import type { Role } from "@blockmap/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { users } from "../db/schema";

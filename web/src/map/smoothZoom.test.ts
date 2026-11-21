@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { scaleOf } from "@aomc/shared/view";
+import { scaleOf } from "@blockmap/shared/view";
 import { easeZoom, glideZoom, snapZoomGoal, tweenView } from "./smoothZoom";
 
 describe("easeZoom", () => {

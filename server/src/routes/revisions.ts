@@ -1,4 +1,4 @@
-import { HOUR, type Role } from "@aomc/shared";
+import { HOUR, type Role } from "@blockmap/shared";
 import { and, desc, eq, inArray, lt, type SQL } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { announceUploads } from "../announce";

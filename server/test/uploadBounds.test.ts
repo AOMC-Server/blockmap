@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { MAX_COORD, UPLOAD_COORD_MARGIN } from "@aomc/shared";
-import { parseXaeroCoords } from "@aomc/shared/xaero";
+import { MAX_COORD, UPLOAD_COORD_MARGIN } from "@blockmap/shared";
+import { parseXaeroCoords } from "@blockmap/shared/xaero";
 import {
 	bootTiles,
 	cleanupTempDirs,

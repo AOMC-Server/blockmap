@@ -3,7 +3,7 @@ import {
 	type FeatureInput,
 	type FeatureStyle,
 	type FeatureType,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { featureRevisions, features, layers, revisions } from "./db/schema";

@@ -1,5 +1,5 @@
-import { blockCoord } from "@aomc/shared/schemas";
-import { MIN_ZOOM } from "@aomc/shared/view";
+import { blockCoord } from "@blockmap/shared/schemas";
+import { MIN_ZOOM } from "@blockmap/shared/view";
 import { z } from "zod";
 import type { Db } from "./db/client";
 import { defaultDimension, dimensionBySlug } from "./dimensionLookup";

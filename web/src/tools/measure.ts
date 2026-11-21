@@ -1,4 +1,4 @@
-import type { Point as BlockPoint } from "@aomc/shared/features";
+import type { Point as BlockPoint } from "@blockmap/shared/features";
 import { computed } from "@preact/signals";
 import type { MapView } from "../map/MapView";
 import {

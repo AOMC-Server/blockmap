@@ -1,4 +1,4 @@
-import { clampZoom, scaleOf, type View } from "@aomc/shared/view";
+import { clampZoom, scaleOf, type View } from "@blockmap/shared/view";
 
 /** Closer than this to the goal, the zoom snaps onto it and the animation ends. */
 const SNAP = 0.002;

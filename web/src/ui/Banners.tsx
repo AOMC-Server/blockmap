@@ -1,4 +1,4 @@
-import { canManage } from "@aomc/shared/roles";
+import { canManage } from "@blockmap/shared/roles";
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { setRev } from "../controller";

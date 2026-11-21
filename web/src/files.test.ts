@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { fileUrl, numberedFileName, splitFilePath } from "@aomc/shared/files";
+import {
+	fileUrl,
+	numberedFileName,
+	splitFilePath,
+} from "@blockmap/shared/files";
 import {
 	createSpeedMeter,
 	namesFromLocation,

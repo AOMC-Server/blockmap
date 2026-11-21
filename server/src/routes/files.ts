@@ -7,7 +7,7 @@ import {
 	splitFilePath,
 	updateFileEntrySchema,
 	updateFileFolderSchema,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";

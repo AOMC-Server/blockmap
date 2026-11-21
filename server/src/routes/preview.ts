@@ -1,4 +1,4 @@
-import { DAY, SECOND } from "@aomc/shared";
+import { DAY, SECOND } from "@blockmap/shared";
 import { Hono } from "hono";
 import { doc } from "../openapi";
 import { PreviewBusyError, PreviewLimitError } from "../preview";

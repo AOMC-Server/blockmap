@@ -7,7 +7,7 @@ import {
 	tileRect,
 	type View,
 	visibleTiles,
-} from "@aomc/shared/view";
+} from "@blockmap/shared/view";
 import sharp, { type OverlayOptions } from "sharp";
 import { randomToken } from "./auth/tokens";
 import type { Db } from "./db/client";

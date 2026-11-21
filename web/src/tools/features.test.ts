@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { DYE_HEX } from "@aomc/shared/colors";
+import { DYE_HEX } from "@blockmap/shared/colors";
 import type { MapView } from "../map/MapView";
 import { activeTool, hoverInfo } from "../state";
 import { initFeatureInteraction } from "./features";

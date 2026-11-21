@@ -6,15 +6,15 @@ import {
 	type Dye,
 	type FeatureStyle,
 	type Point,
-} from "@aomc/shared";
-import { dashPattern, resolveStyle } from "@aomc/shared/featureStyle";
-import { linePaths } from "@aomc/shared/features";
+} from "@blockmap/shared";
+import { dashPattern, resolveStyle } from "@blockmap/shared/featureStyle";
+import { linePaths } from "@blockmap/shared/features";
 import {
 	fillPatternMarkup,
 	PATTERN_SIZE,
 	type PatternFill,
-} from "@aomc/shared/fillPattern";
-import { blockToScreen, type Size, type View } from "@aomc/shared/view";
+} from "@blockmap/shared/fillPattern";
+import { blockToScreen, type Size, type View } from "@blockmap/shared/view";
 import { and, eq } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { layers } from "./db/schema";

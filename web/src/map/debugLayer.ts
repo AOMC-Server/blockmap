@@ -3,7 +3,7 @@ import {
 	type Size,
 	scaleOf,
 	type View,
-} from "@aomc/shared/view";
+} from "@blockmap/shared/view";
 import { BLOCK_CENTER } from "./featureLayer";
 import type {
 	PreloadDebugInfo,

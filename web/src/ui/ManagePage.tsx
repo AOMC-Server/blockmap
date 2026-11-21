@@ -1,5 +1,5 @@
-import { MAX_NAME } from "@aomc/shared/features";
-import { canManage, canModerate } from "@aomc/shared/roles";
+import { MAX_NAME } from "@blockmap/shared/features";
+import { canManage, canModerate } from "@blockmap/shared/roles";
 import {
 	createDimensionSchema,
 	DEFAULT_PRELOAD,
@@ -9,7 +9,7 @@ import {
 	MAX_COORD,
 	type PreloadRing,
 	xaeroDimensionSchema,
-} from "@aomc/shared/schemas";
+} from "@blockmap/shared/schemas";
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { loginUrl } from "../api";

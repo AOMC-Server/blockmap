@@ -1,4 +1,4 @@
-import type { Dye } from "@aomc/shared/colors";
+import type { Dye } from "@blockmap/shared/colors";
 import { Banner } from "./icons";
 import { PreviewSelect } from "./PreviewSelect";
 

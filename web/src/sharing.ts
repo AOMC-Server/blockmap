@@ -5,7 +5,7 @@ import {
 	layerRoleSchema,
 	memberRoleSchema,
 	type PreloadRing,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import type { InferResponseType } from "hono/client";
 import { api, ok, run } from "./api";
 import { refreshMap } from "./controller";

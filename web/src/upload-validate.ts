@@ -1,5 +1,5 @@
-import { uploadPathSchema } from "@aomc/shared/schemas";
-import { parseXaeroCoords, parseXaeroExportDate } from "@aomc/shared/xaero";
+import { uploadPathSchema } from "@blockmap/shared/schemas";
+import { parseXaeroCoords, parseXaeroExportDate } from "@blockmap/shared/xaero";
 import type { UploadLimits } from "./state";
 import { formatBytes } from "./ui/format";
 

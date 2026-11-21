@@ -1,4 +1,4 @@
-import { DAY, SECOND } from "@aomc/shared";
+import { DAY, SECOND } from "@blockmap/shared";
 import { eq, lt } from "drizzle-orm";
 import { getCookie, setCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";

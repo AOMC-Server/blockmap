@@ -3,7 +3,7 @@ import {
 	featureInputSchema,
 	MAX_FEATURES_PER_LAYER,
 	MAX_LAYERS_PER_USER,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { eq } from "drizzle-orm";
 import {
 	featureRevisions,

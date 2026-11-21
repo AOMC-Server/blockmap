@@ -1,4 +1,4 @@
-import type { Point } from "@aomc/shared/features";
+import type { Point } from "@blockmap/shared/features";
 
 /**
  * A line as the editor holds it: points, each in its own block, and the pairs of them that are

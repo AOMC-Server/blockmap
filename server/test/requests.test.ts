@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, spyOn, test } from "bun:test";
-import { MAX_JSON_BYTES } from "@aomc/shared";
+import { MAX_JSON_BYTES } from "@blockmap/shared";
 import { createRateLimiter } from "../src/ratelimit";
 import { bootTiles, call, cleanupTempDirs, json, postUpload } from "./helpers";
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Role } from "@aomc/shared";
+import type { Role } from "@blockmap/shared";
 import {
 	atLeast,
 	canEdit,

@@ -10,7 +10,7 @@ import {
 	type PreloadRing,
 	TOKEN_SCOPES,
 	type TokenScope,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import {
 	type AnySQLiteColumn,
 	index,

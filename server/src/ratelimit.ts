@@ -1,4 +1,4 @@
-import { MINUTE } from "@aomc/shared";
+import { MINUTE } from "@blockmap/shared";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { isRead } from "./auth/scopes";

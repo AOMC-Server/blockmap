@@ -6,7 +6,7 @@ import {
 	expect,
 	test,
 } from "bun:test";
-import type { Point } from "@aomc/shared/features";
+import type { Point } from "@blockmap/shared/features";
 import type { MapView } from "../map/MapView";
 import { activeTool, editor, type LayerData, layersData } from "../state";
 import { stopDraw } from "./draw";

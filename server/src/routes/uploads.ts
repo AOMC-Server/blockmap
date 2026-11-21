@@ -8,7 +8,7 @@ import {
 	parseXaeroExportDate,
 	uploadCoordsSchema,
 	uploadPathsSchema,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { unzipSync } from "fflate";
 import { Hono } from "hono";

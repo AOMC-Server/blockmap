@@ -2,7 +2,7 @@ import type {
 	CreateLayer,
 	FeatureInput,
 	UpdateLayer,
-} from "@aomc/shared/features";
+} from "@blockmap/shared/features";
 import { api, attempt, ok, type Res, run, showNotice } from "./api";
 import { moveItem } from "./reorder";
 import { dimSlug, layersData, rev } from "./state";

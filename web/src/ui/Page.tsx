@@ -1,4 +1,4 @@
-import { canManage } from "@aomc/shared/roles";
+import { canManage } from "@blockmap/shared/roles";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { loadPageData } from "../controller";

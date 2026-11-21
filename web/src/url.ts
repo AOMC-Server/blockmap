@@ -1,4 +1,4 @@
-import type { View } from "@aomc/shared/view";
+import type { View } from "@blockmap/shared/view";
 
 export type UrlState = {
 	dim: string | null;

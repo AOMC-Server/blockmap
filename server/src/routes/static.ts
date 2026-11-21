@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { viewerUrlForRoot } from "@aomc/shared/legacyLink";
+import { viewerUrlForRoot } from "@blockmap/shared/legacyLink";
 import { type Context, Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { IMMUTABLE } from "../cache";

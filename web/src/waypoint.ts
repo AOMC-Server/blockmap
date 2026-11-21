@@ -1,4 +1,4 @@
-import type { Dye } from "@aomc/shared/colors";
+import type { Dye } from "@blockmap/shared/colors";
 
 /**
  * Xaero's Minimap waypoint colours are the 16 chat colours, by index (0 black … 15 white).

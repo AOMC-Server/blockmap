@@ -1,7 +1,7 @@
-import { DYE_HEX, type Dye } from "@aomc/shared/colors";
-import { dashPattern } from "@aomc/shared/featureStyle";
-import type { AREA_FILLS, LINE_DASHES } from "@aomc/shared/features";
-import { fillPatternMarkup, PATTERN_SIZE } from "@aomc/shared/fillPattern";
+import { DYE_HEX, type Dye } from "@blockmap/shared/colors";
+import { dashPattern } from "@blockmap/shared/featureStyle";
+import type { AREA_FILLS, LINE_DASHES } from "@blockmap/shared/features";
+import { fillPatternMarkup, PATTERN_SIZE } from "@blockmap/shared/fillPattern";
 import { useId } from "preact/hooks";
 
 /** The colour of the swatches when no layer or feature colour is known. */

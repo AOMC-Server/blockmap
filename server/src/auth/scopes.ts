@@ -1,4 +1,4 @@
-import type { Role, TokenScope } from "@aomc/shared";
+import type { Role, TokenScope } from "@blockmap/shared";
 import { createMiddleware } from "hono/factory";
 import type { AppEnv } from "../types";
 

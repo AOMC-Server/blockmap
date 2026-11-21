@@ -1,4 +1,4 @@
-import { DYES, type Dye } from "@aomc/shared/colors";
+import { DYES, type Dye } from "@blockmap/shared/colors";
 import { dyeLabel } from "../featureInfo";
 import { Banner } from "./icons";
 

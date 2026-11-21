@@ -1,4 +1,4 @@
-import type { Role, TokenScope } from "@aomc/shared";
+import type { Role, TokenScope } from "@blockmap/shared";
 import type { Db } from "./db/client";
 import type { mapInfo } from "./db/schema";
 import type { Env } from "./env";

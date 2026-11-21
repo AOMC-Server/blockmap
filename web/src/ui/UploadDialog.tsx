@@ -1,4 +1,4 @@
-import { canEdit } from "@aomc/shared/roles";
+import { canEdit } from "@blockmap/shared/roles";
 import { useEffect, useState } from "preact/hooks";
 import { loginUrl } from "../api";
 import {

@@ -1,4 +1,4 @@
-import type { ShareView } from "@aomc/shared/schemas";
+import type { ShareView } from "@blockmap/shared/schemas";
 import { signal } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { api, attempt } from "../api";

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseXaeroCoords } from "@aomc/shared";
+import { parseXaeroCoords } from "@blockmap/shared";
 import {
 	downscaleInto,
 	emptyTile,

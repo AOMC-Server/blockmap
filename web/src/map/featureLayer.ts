@@ -1,19 +1,19 @@
-import { DYE_HEX, type Dye } from "@aomc/shared/colors";
+import { DYE_HEX, type Dye } from "@blockmap/shared/colors";
 import {
 	dashPattern,
 	emphasisedWidth,
 	hitTolerance,
 	type ResolvedStyle,
 	resolveStyle,
-} from "@aomc/shared/featureStyle";
-import type { FeatureStyle } from "@aomc/shared/features";
+} from "@blockmap/shared/featureStyle";
+import type { FeatureStyle } from "@blockmap/shared/features";
 import {
 	blockToScreen,
 	type Size,
 	scaleOf,
 	screenToBlock,
 	type View,
-} from "@aomc/shared/view";
+} from "@blockmap/shared/view";
 import { pathsOf } from "../featureInfo";
 import { DEFAULT_SETTINGS } from "../settings";
 import { ClusterIndex, type ClusterNode } from "./cluster";

@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { DAY, MINUTE, TOKEN_SCOPES, type TokenScope } from "@aomc/shared";
+import { DAY, MINUTE, TOKEN_SCOPES, type TokenScope } from "@blockmap/shared";
 import { and, count, eq } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { apiTokens, users } from "../db/schema";

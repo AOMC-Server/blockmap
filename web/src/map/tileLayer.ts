@@ -1,12 +1,12 @@
-import { floorDiv } from "@aomc/shared/coords";
-import type { PreloadRing } from "@aomc/shared/schemas";
+import { floorDiv } from "@blockmap/shared/coords";
+import type { PreloadRing } from "@blockmap/shared/schemas";
 import {
 	type Size,
 	tileLevel,
 	tileRect,
 	type View,
 	visibleTiles,
-} from "@aomc/shared/view";
+} from "@blockmap/shared/view";
 import { loadTile } from "./tileLoader";
 
 export type TileSource = (zoom: number, x: number, y: number) => string;

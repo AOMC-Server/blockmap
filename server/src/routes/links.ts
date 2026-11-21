@@ -1,4 +1,4 @@
-import { type ShareView, shareViewSchema } from "@aomc/shared";
+import { type ShareView, shareViewSchema } from "@blockmap/shared";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Db } from "../db/client";

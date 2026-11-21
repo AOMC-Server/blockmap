@@ -1,6 +1,6 @@
-import type { Dye } from "@aomc/shared/colors";
-import type { FeatureStyle } from "@aomc/shared/features";
-import type { PreloadRing } from "@aomc/shared/schemas";
+import type { Dye } from "@blockmap/shared/colors";
+import type { FeatureStyle } from "@blockmap/shared/features";
+import type { PreloadRing } from "@blockmap/shared/schemas";
 import {
 	blockToScreen,
 	clampZoom,
@@ -10,7 +10,7 @@ import {
 	tileLevel,
 	type View,
 	zoomAt,
-} from "@aomc/shared/view";
+} from "@blockmap/shared/view";
 import {
 	type DebugOptions,
 	drawChunkGrid,

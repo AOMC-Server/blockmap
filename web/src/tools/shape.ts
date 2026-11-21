@@ -1,4 +1,4 @@
-import type { FeatureType, Point } from "@aomc/shared/features";
+import type { FeatureType, Point } from "@blockmap/shared/features";
 import { computed, signal } from "@preact/signals";
 import {
 	type DragSession,

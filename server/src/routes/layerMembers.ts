@@ -1,4 +1,4 @@
-import { layerMemberRoleSchema, layerMemberSchema } from "@aomc/shared";
+import { layerMemberRoleSchema, layerMemberSchema } from "@blockmap/shared";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { announceLayers } from "../announce";

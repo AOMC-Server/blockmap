@@ -1,4 +1,4 @@
-import { DAY, HOUR, MINUTE } from "@aomc/shared";
+import { DAY, HOUR, MINUTE } from "@blockmap/shared";
 import { sql } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import type { Db } from "./db/client";

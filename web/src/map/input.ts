@@ -1,4 +1,4 @@
-import { panBy, zoomAt } from "@aomc/shared/view";
+import { panBy, zoomAt } from "@blockmap/shared/view";
 import type { MapView } from "./MapView";
 import { fitVelocity, type Sample } from "./velocity";
 

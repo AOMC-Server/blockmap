@@ -5,7 +5,7 @@ import {
 	FIVE_MINUTES,
 	HOUR,
 	MINUTE,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { requireUser } from "../auth/session";

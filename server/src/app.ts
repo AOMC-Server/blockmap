@@ -1,4 +1,4 @@
-import { isReadOnly, MAX_JSON_BYTES } from "@aomc/shared";
+import { isReadOnly, MAX_JSON_BYTES } from "@blockmap/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";

@@ -2,7 +2,7 @@ import {
 	type MemberRole,
 	setMemberSchema,
 	updateMemberSchema,
-} from "@aomc/shared";
+} from "@blockmap/shared";
 import { count, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { announceEverything } from "../announce";
