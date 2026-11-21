@@ -17,7 +17,7 @@ import { randomToken } from "../auth/tokens";
 import { doc } from "../openapi";
 import type { AppEnv } from "../types";
 
-const STATE_COOKIE = "aomc_oauth";
+const STATE_COOKIE = "blockmap_oauth";
 
 /**
  * Only allow same-site paths as post-login redirect targets. The value is resolved against

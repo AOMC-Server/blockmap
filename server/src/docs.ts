@@ -1,5 +1,6 @@
 import { Scalar } from "@scalar/hono-api-reference";
 import { Hono } from "hono";
+import { siteName } from "./siteName";
 import type { AppEnv } from "./types";
 
 // Scalar's own browser bundle, served locally so the page needs no CDN. The Docker image ships
@@ -17,8 +18,8 @@ const bundle = (path: string | undefined) =>
 export const docsRoutes = new Hono<AppEnv>()
 	.get(
 		"/",
-		Scalar({
-			pageTitle: "AOMC Map API",
+		Scalar<AppEnv>((c) => ({
+			pageTitle: `${siteName(c.var.db)} API`,
 			sources: [
 				{ title: "HTTP API", url: "/api/openapi.json" },
 				{ title: "Events", url: "/api/asyncapi.json" },
@@ -27,7 +28,7 @@ export const docsRoutes = new Hono<AppEnv>()
 			withDefaultFonts: false,
 			showDeveloperTools: "never",
 			telemetry: false,
-		}),
+		})),
 	)
 	.get(
 		"/standalone.js",

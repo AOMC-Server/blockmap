@@ -72,7 +72,7 @@ export function InvitePage(props: { token: string }) {
 		<main class="invite-page">
 			<div class="invite-card">
 				<header class="modal-head">
-					<h1>AOMC Map</h1>
+					<h1>{"invite" in state ? state.invite.mapName : "Blockmap"}</h1>
 				</header>
 				<div class="modal-body">
 					{state.phase === "loading" && <p class="muted">Checking invite…</p>}

@@ -33,6 +33,7 @@ import { staticRoutes } from "./routes/static";
 import { statsRoutes } from "./routes/stats";
 import { tokenRoutes } from "./routes/tokens";
 import type { Services } from "./services";
+import { displayName } from "./siteName";
 import type { AppEnv } from "./types";
 
 const isUpload = (path: string) =>
@@ -58,7 +59,8 @@ export type AppDeps = {
 export function createApp({ db, env, services, fetch: fetchFn }: AppDeps) {
 	// The spec route is registered before the static catch-all but describes the finished app.
 	let self: Hono<AppEnv>;
-	let spec: MiddlewareHandler<AppEnv> | undefined;
+	// The spec carries the map name, so it is built again when the name changes.
+	let spec: { name: string; handler: MiddlewareHandler<AppEnv> } | undefined;
 	const app = new Hono<AppEnv>()
 		.use(async (c, next) => {
 			c.set("db", db);
@@ -115,24 +117,31 @@ export function createApp({ db, env, services, fetch: fetchFn }: AppDeps) {
 		.route("/s", shortLinkRedirect)
 		.route("/api/admin", adminRoutes)
 		.route("/api/events", eventRoutes)
-		.get("/api/asyncapi.json", (c) => c.json(asyncApiDocument(env)))
+		.get("/api/asyncapi.json", (c) =>
+			c.json(asyncApiDocument(env, displayName(c.var.map.name))),
+		)
 		.route("/scalar", docsRoutes)
 		.get("/api/openapi.json", (c, next) => {
-			spec ??= openAPIRouteHandler(self, {
-				excludeStaticFile: false, // /api/preview.png is an endpoint
+			const name = displayName(c.var.map.name);
+			if (spec?.name !== name)
+				spec = {
+					name,
+					handler: openAPIRouteHandler(self, {
+						excludeStaticFile: false, // /api/preview.png is an endpoint
 
-				documentation: {
-					info: {
-						title: "AOMC Map API",
-						version: "1.0.0",
-						description: apiDescription,
-					},
-					servers: [{ url: env.PUBLIC_URL }],
-					tags,
-					components: { securitySchemes },
-				},
-			});
-			return spec(c, next);
+						documentation: {
+							info: {
+								title: `${name} API`,
+								version: "1.0.0",
+								description: apiDescription,
+							},
+							servers: [{ url: env.PUBLIC_URL }],
+							tags,
+							components: { securitySchemes },
+						},
+					}),
+				};
+			return spec.handler(c, next);
 		})
 		.route(
 			"/",

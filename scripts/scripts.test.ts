@@ -36,7 +36,7 @@ import { runImport, xaeroStamp } from "./import-v1";
 
 afterAll(cleanupTempDirs);
 
-const tmp = (name: string) => makeTempDir(`aomc-${name}-`);
+const tmp = (name: string) => makeTempDir(`blockmap-${name}-`);
 
 async function withData() {
 	const t = await bootTiles();
@@ -760,7 +760,7 @@ describe("import-v1", () => {
 				...over,
 			});
 
-		await expect(run({ token: "aomc_wrong" })).rejects.toThrow("HTTP 401");
+		await expect(run({ token: "blockmap_wrong" })).rejects.toThrow("HTTP 401");
 		await expect(run({ dimMap: { overworld: "atlantis" } })).rejects.toThrow(
 			'dimension "atlantis" not on the map',
 		);

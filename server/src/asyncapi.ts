@@ -35,7 +35,7 @@ const errorMessage = {
  * AsyncAPI 3 description of the server-sent events the API pushes, generated from the topic
  * registry so it cannot drift from what is sent.
  */
-export function asyncApiDocument(env: Env) {
+export function asyncApiDocument(env: Env, siteName: string) {
 	const url = new URL(env.PUBLIC_URL);
 	const channels: Record<string, unknown> = {};
 	const operations: Record<string, unknown> = {};
@@ -75,7 +75,7 @@ export function asyncApiDocument(env: Env) {
 	return {
 		asyncapi: "3.0.0",
 		info: {
-			title: "AOMC Map events",
+			title: `${siteName} events`,
 			version: "2.0.0",
 			description: [
 				"Server-sent events (`text/event-stream`) the API pushes, all from one stream: `GET /api/events?topics=a,b,…` follows any number of topics at once. Each topic is a channel below.",

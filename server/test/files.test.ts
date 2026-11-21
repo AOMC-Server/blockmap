@@ -212,7 +212,7 @@ describe("file library", () => {
 	});
 
 	test("folders and unknown paths are left to the web app", async () => {
-		const dist = makeTempDir("aomc-dist-");
+		const dist = makeTempDir("blockmap-dist-");
 		mkdirSync(join(dist, "assets"));
 		writeFileSync(join(dist, "index.html"), "<title>app</title>");
 		const t = await boot({ WEB_DIST: dist });
@@ -220,7 +220,7 @@ describe("file library", () => {
 		for (const path of ["/files", "/files/", "/files/voxy/", "/files/nope"]) {
 			const res = await t.app.request(path);
 			expect(res.status).toBe(200);
-			expect(await res.text()).toContain("<title>app</title>");
+			expect(await res.text()).toContain("<title>Blockmap</title>");
 		}
 	});
 

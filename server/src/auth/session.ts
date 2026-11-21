@@ -9,7 +9,7 @@ import type { AppEnv, User } from "../types";
 import { isRead } from "./scopes";
 import { randomToken, sha256Hex, verifyApiToken } from "./tokens";
 
-export const SESSION_COOKIE = "aomc_session";
+export const SESSION_COOKIE = "blockmap_session";
 export const SESSION_TTL_MS = 30 * DAY;
 const REFRESH_AFTER_MS = DAY;
 

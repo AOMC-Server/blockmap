@@ -23,7 +23,7 @@ export function cleanupTempDirs() {
 afterAll(cleanupTempDirs);
 
 /** A temp directory that is removed by `cleanupTempDirs`. */
-export function makeTempDir(prefix = "aomc-test-") {
+export function makeTempDir(prefix = "blockmap-test-") {
 	const dir = mkdtempSync(join(tmpdir(), prefix));
 	tempDirs.push(dir);
 	return dir;
@@ -56,7 +56,7 @@ export async function makeUser(db: Db, id: string, username = id) {
 }
 
 export async function makeSessionCookie(db: Db, userId: string) {
-	return `aomc_session=${await createSession(db, userId)}`;
+	return `blockmap_session=${await createSession(db, userId)}`;
 }
 
 export const json = (body: unknown) => ({

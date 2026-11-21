@@ -99,7 +99,7 @@ export function dyeScope(dye: string | undefined): Record<string, string> {
  * appearance before the first paint, when the map (and so the dimension's theme) is not
  * loaded yet.
  */
-export const PALETTE_KEY = "aomc.palette";
+export const PALETTE_KEY = "blockmap.palette";
 
 export type SavedPalette = { dim: string; palette: DimensionTheme };
 

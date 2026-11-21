@@ -351,7 +351,7 @@ if (import.meta.main) {
 		args: Bun.argv.slice(2),
 		options: {
 			url: { type: "string" },
-			token: { type: "string", default: process.env.AOMC_TOKEN },
+			token: { type: "string", default: process.env.BLOCKMAP_TOKEN },
 			file: { type: "string" },
 			sheet: { type: "string", multiple: true },
 			dimension: { type: "string", default: "overworld" },
@@ -361,9 +361,9 @@ if (import.meta.main) {
 	});
 	if (!values.url || !values.token || !values.file) {
 		console.error(
-			"usage: bun scripts/import-xlsx.ts --url https://map.example.com --token aomc_... --file features.xlsx\n" +
+			"usage: bun scripts/import-xlsx.ts --url https://map.example.com --token blockmap_... --file features.xlsx\n" +
 				"       [--sheet 'Sheet name'] [--dimension overworld] [--dim-map name=slug] [--dry-run]\n" +
-				"       (the token can also come from the AOMC_TOKEN environment variable)",
+				"       (the token can also come from the BLOCKMAP_TOKEN environment variable)",
 		);
 		process.exit(2);
 	}

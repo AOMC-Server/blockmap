@@ -136,7 +136,7 @@ describe("auth", () => {
 		expect((await viaCookie.json()).user.id).toBe("1");
 
 		const bad = await app.request("/api/me", {
-			headers: { Authorization: "Bearer aomc_nope" },
+			headers: { Authorization: "Bearer blockmap_nope" },
 		});
 		expect(bad.status).toBe(401);
 	});
@@ -205,7 +205,7 @@ describe("auth", () => {
 		expect(cb.status).toBe(302);
 		expect(cb.headers.get("location")).toBe("/foo");
 		const session = cb.headers.get("set-cookie") as string;
-		const sessionCookie = /aomc_session=[^;]+/.exec(session)?.[0] as string;
+		const sessionCookie = /blockmap_session=[^;]+/.exec(session)?.[0] as string;
 
 		const me = await t.app.request("/api/me", {
 			headers: { Cookie: sessionCookie },
@@ -255,7 +255,7 @@ describe("api tokens", () => {
 		});
 		expect(created.status).toBe(201);
 		const { id, token, expiresAt } = await created.json();
-		expect(token.startsWith("aomc_")).toBe(true);
+		expect(token.startsWith("blockmap_")).toBe(true);
 		const days = (expiresAt - Date.now()) / 86_400_000;
 		expect(days).toBeGreaterThan(179.9);
 		expect(days).toBeLessThan(180.1);
@@ -496,7 +496,7 @@ describe("map", () => {
 		const res = await call(t, null, "GET", "/api/map");
 		expect(res.status).toBe(200);
 		expect(res.body.role).toBe("viewer");
-		expect(res.body.map).toMatchObject({ name: "AOMC", headRev: 0 });
+		expect(res.body.map).toMatchObject({ name: "Blockmap", headRev: 0 });
 	});
 
 	test("a logged-in non-member is an editor and cannot manage dimensions", async () => {

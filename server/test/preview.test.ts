@@ -244,7 +244,7 @@ describe("snapParams", () => {
 
 describe("pruneCache", () => {
 	test("deletes the oldest files beyond the limit", async () => {
-		const dir = makeTempDir("aomc-prune-");
+		const dir = makeTempDir("blockmap-prune-");
 		for (let i = 0; i < 5; i++) {
 			const file = join(dir, `${i}.png`);
 			writeFileSync(file, "x");

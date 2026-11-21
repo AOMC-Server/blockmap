@@ -4,9 +4,10 @@ import { viewerUrlForRoot } from "@blockmap/shared/legacyLink";
 import { type Context, Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { IMMUTABLE } from "../cache";
-import { injectMeta, type PageMeta } from "../html";
+import { injectMeta, injectTitle, type PageMeta } from "../html";
 import { loadMap } from "../permissions";
 import { resolvePreviewTarget, viewQuerySchema } from "../previewTarget";
+import { siteName } from "../siteName";
 import type { AppEnv } from "../types";
 
 const notFound = (c: Context<AppEnv>) => c.json({ error: "not found" }, 404);
@@ -50,6 +51,7 @@ export function staticRoutes(distDir: string) {
 			return url.toString();
 		};
 		return {
+			siteName: target.mapName,
 			title: `${target.mapName}: ${target.dimensionName}`,
 			description: `${target.mapName}, ${target.dimensionName}, around x ${x}, z ${z}${query.data.rev !== undefined ? ` (revision ${rev})` : ""}`,
 			url: withBase("/v2/"),
@@ -68,7 +70,9 @@ export function staticRoutes(distDir: string) {
 			const html = await Bun.file(indexPath).text();
 			const meta = await metaFor(c);
 			c.header("Cache-Control", "no-cache");
-			return c.html(meta ? injectMeta(html, meta) : html);
+			return c.html(
+				meta ? injectMeta(html, meta) : injectTitle(html, siteName(c.var.db)),
+			);
 		})
 		.use(
 			"*",
@@ -81,14 +85,9 @@ export function staticRoutes(distDir: string) {
 				},
 			}),
 		)
-		.get("*", async (c, next) => {
-			const res = await serveStatic({
-				root,
-				path: "index.html",
-				onFound: (_path, c) => {
-					c.header("Cache-Control", "no-cache");
-				},
-			})(c, next);
-			return res ?? c.res;
+		.get("*", async (c) => {
+			const html = await Bun.file(indexPath).text();
+			c.header("Cache-Control", "no-cache");
+			return c.html(injectTitle(html, siteName(c.var.db)));
 		});
 }

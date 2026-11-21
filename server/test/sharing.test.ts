@@ -100,7 +100,7 @@ describe("map invites", () => {
 		expect(res.body.invite).toEqual({
 			kind: "map",
 			role: "moderator",
-			mapName: "AOMC",
+			mapName: "Blockmap",
 			layerName: null,
 			inviterName: "owner",
 			alreadyMember: false,

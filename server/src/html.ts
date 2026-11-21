@@ -8,6 +8,8 @@ export function escapeHtml(value: string): string {
 }
 
 export type PageMeta = {
+	/** The map's name, for og:site_name. */
+	siteName: string;
 	title: string;
 	description: string;
 	url: string;
@@ -18,11 +20,19 @@ export type PageMeta = {
 const tag = (attr: "name" | "property", key: string, value: string) =>
 	`<meta ${attr}="${key}" content="${escapeHtml(value)}">`;
 
+/** Sets the page title of index.html, escaped. */
+export function injectTitle(html: string, title: string): string {
+	return html.replace(
+		/<title>[\s\S]*?<\/title>/i,
+		() => `<title>${escapeHtml(title)}</title>`,
+	);
+}
+
 /** Adds the title and Open Graph / Twitter tags to index.html. Every value is HTML-escaped. */
 export function injectMeta(html: string, meta: PageMeta): string {
 	const lines = [
 		tag("name", "description", meta.description),
-		tag("property", "og:site_name", "AOMC Map"),
+		tag("property", "og:site_name", meta.siteName),
 		tag("property", "og:type", "website"),
 		tag("property", "og:title", meta.title),
 		tag("property", "og:description", meta.description),
@@ -40,11 +50,7 @@ export function injectMeta(html: string, meta: PageMeta): string {
 		);
 	}
 	// Function replacers: the escaped text may contain "$&" and friends.
-	const withTitle = html.replace(
-		/<title>[\s\S]*?<\/title>/i,
-		() => `<title>${escapeHtml(meta.title)}</title>`,
-	);
-	return withTitle.replace(
+	return injectTitle(html, meta.title).replace(
 		/<\/head>/i,
 		() => `\t\t${lines.join("\n\t\t")}\n\t</head>`,
 	);

@@ -8,7 +8,7 @@ afterAll(cleanupTempDirs);
 
 describe("blob store", () => {
 	test("putting a blob that vanished after the exists check writes it again", async () => {
-		const store = createBlobStore(makeTempDir("aomc-blobstore-"));
+		const store = createBlobStore(makeTempDir("blockmap-blobstore-"));
 		const data = new Uint8Array([1, 2, 3]);
 		const hash = await store.put(data);
 		await rm(store.path(hash));

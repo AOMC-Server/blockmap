@@ -55,6 +55,12 @@ effect(() => {
 	if (dim && currentMap.value) savePalette({ dim, palette });
 });
 
+// The server puts the map's name in the title; follow it when an owner renames the map.
+effect(() => {
+	const name = currentMap.value?.map.name.trim();
+	if (name) document.title = name;
+});
+
 render(
 	inviteToken ? (
 		<InvitePage token={inviteToken} />

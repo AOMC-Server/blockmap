@@ -29,7 +29,7 @@ describe("url state", () => {
 	});
 
 	test("ignores the old map parameter", () => {
-		expect(parseUrl("?map=aomc&dim=nether")).not.toHaveProperty("map");
+		expect(parseUrl("?map=blockmap&dim=nether")).not.toHaveProperty("map");
 		expect(
 			formatUrl({
 				dim: "nether",

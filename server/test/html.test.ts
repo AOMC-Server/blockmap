@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mapInfo } from "../src/db/schema";
-import { escapeHtml, injectMeta } from "../src/html";
+import { escapeHtml, injectMeta, injectTitle } from "../src/html";
 import { cleanupTempDirs, makeTempDir, makeTestApp } from "./helpers";
 
 afterAll(cleanupTempDirs);
@@ -12,7 +12,7 @@ const INDEX = `<!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
-		<title>AOMC Map</title>
+		<title>Blockmap</title>
 	</head>
 	<body><div id="app"></div></body>
 </html>`;
@@ -27,7 +27,8 @@ describe("escapeHtml", () => {
 
 describe("injectMeta", () => {
 	const meta = {
-		title: "AOMC: Nether",
+		siteName: "Blockmap",
+		title: "Blockmap: Nether",
 		description: "around x 1, z 2",
 		url: "https://m.example/?a=1&b=2",
 		image: "https://m.example/p.png",
@@ -35,8 +36,11 @@ describe("injectMeta", () => {
 
 	test("adds open graph and twitter tags and replaces the title", () => {
 		const out = injectMeta(INDEX, meta);
-		expect(out).toContain("<title>AOMC: Nether</title>");
-		expect(out).toContain('<meta property="og:title" content="AOMC: Nether">');
+		expect(out).toContain('<meta property="og:site_name" content="Blockmap">');
+		expect(out).toContain("<title>Blockmap: Nether</title>");
+		expect(out).toContain(
+			'<meta property="og:title" content="Blockmap: Nether">',
+		);
 		expect(out).toContain(
 			'<meta property="og:url" content="https://m.example/?a=1&amp;b=2">',
 		);
@@ -60,6 +64,7 @@ describe("injectMeta", () => {
 	test("hostile values are escaped everywhere, including the title", () => {
 		const evil = `"><script>alert(1)</script><x y="$& $1 $'`;
 		const out = injectMeta(INDEX, {
+			siteName: evil,
 			title: evil,
 			description: evil,
 			url: evil,
@@ -68,15 +73,23 @@ describe("injectMeta", () => {
 		expect(out).not.toContain("<script>");
 		expect(out).not.toContain('"><script');
 		expect(out).not.toContain("<x ");
-		expect(out.match(/&lt;script&gt;/g)?.length).toBeGreaterThanOrEqual(8);
+		expect(out.match(/&lt;script&gt;/g)?.length).toBeGreaterThanOrEqual(9);
 		// "$&" style replacement patterns must stay literal.
 		expect(out).toContain("$&amp;");
 		expect(out.split("</head>")).toHaveLength(2);
 	});
 });
 
+describe("injectTitle", () => {
+	test("replaces the title and escapes it", () => {
+		const out = injectTitle(INDEX, `A & <B> $&`);
+		expect(out).toContain("<title>A &amp; &lt;B&gt; $&amp;</title>");
+		expect(out).not.toContain("<title>Blockmap</title>");
+	});
+});
+
 function bootPage(env: Record<string, string> = {}) {
-	const dist = makeTempDir("aomc-dist-");
+	const dist = makeTempDir("blockmap-dist-");
 	writeFileSync(join(dist, "index.html"), INDEX);
 	const t = makeTestApp({
 		WEB_DIST: dist,
@@ -96,8 +109,8 @@ describe("share tags on /v2/", () => {
 	test("the default view gets a title, description and an absolute preview image", async () => {
 		const t = bootPage();
 		const html = await (await t.app.request("/v2/")).text();
-		expect(html).toContain("<title>AOMC: Overworld</title>");
-		expect(meta(html, "og:title")).toBe("AOMC: Overworld");
+		expect(html).toContain("<title>Blockmap: Overworld</title>");
+		expect(meta(html, "og:title")).toBe("Blockmap: Overworld");
 		expect(meta(html, "og:image")).toBe(
 			"https://map.example.com/api/preview.png?dim=overworld&amp;x=0&amp;z=0&amp;zoom=2",
 		);
@@ -113,9 +126,9 @@ describe("share tags on /v2/", () => {
 				"/v2/?dim=nether&x=-12&z=340&zoom=1.234&rev=0&embed=1&junk=<b>",
 			)
 		).text();
-		expect(meta(html, "og:title")).toBe("AOMC: Nether");
+		expect(meta(html, "og:title")).toBe("Blockmap: Nether");
 		expect(meta(html, "og:description")).toBe(
-			"AOMC, Nether, around x -12, z 340 (revision 0)",
+			"Blockmap, Nether, around x -12, z 340 (revision 0)",
 		);
 		expect(meta(html, "og:image")).toBe(
 			"https://map.example.com/api/preview.png?dim=nether&amp;x=-12&amp;z=340&amp;zoom=1.23&amp;rev=0",
@@ -133,11 +146,23 @@ describe("share tags on /v2/", () => {
 		expect(meta(html, "og:title")).toContain("&quot;&gt;&lt;script&gt;");
 	});
 
+	test("og:site_name and the generic titles follow the map name", async () => {
+		const t = bootPage();
+		await t.db.update(mapInfo).set({ name: "Cool Map" });
+		const view = await (await t.app.request("/v2/?dim=nether")).text();
+		expect(meta(view, "og:site_name")).toBe("Cool Map");
+		expect(view).toContain("<title>Cool Map: Nether</title>");
+		for (const path of ["/invite/abc", "/settings", "/files"]) {
+			const html = await (await t.app.request(path)).text();
+			expect(html).toContain("<title>Cool Map</title>");
+		}
+	});
+
 	test("unknown or invalid views keep the generic page", async () => {
 		const t = bootPage();
 		for (const q of ["?dim=nope", "?x=abc", "?zoom=NaN"]) {
 			const html = await (await t.app.request(`/v2/${q}`)).text();
-			expect(html).toContain("<title>AOMC Map</title>");
+			expect(html).toContain("<title>Blockmap</title>");
 			expect(html).not.toContain("og:");
 		}
 	});
@@ -149,7 +174,7 @@ describe("share tags on /v2/", () => {
 			"/anything/else",
 		]) {
 			const html = await (await t.app.request(path)).text();
-			expect(html).toContain("<title>AOMC Map</title>");
+			expect(html).toContain("<title>Blockmap</title>");
 			expect(html).not.toContain("og:");
 		}
 	});
@@ -162,7 +187,9 @@ describe("share tags on /v2/", () => {
 	});
 
 	test("a site without a built web app still serves the API", async () => {
-		const t = makeTestApp({ WEB_DIST: join(tmpdir(), "aomc-missing-dist") });
+		const t = makeTestApp({
+			WEB_DIST: join(tmpdir(), "blockmap-missing-dist"),
+		});
 		expect((await t.app.request("/v2/")).status).toBe(404);
 	});
 });

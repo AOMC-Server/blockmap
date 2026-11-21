@@ -7,7 +7,7 @@ import { cleanupTempDirs, makeTempDir, makeTestApp } from "./helpers";
 afterAll(cleanupTempDirs);
 
 function makeDist() {
-	const dir = makeTempDir("aomc-dist-");
+	const dir = makeTempDir("blockmap-dist-");
 	mkdirSync(join(dir, "assets"));
 	writeFileSync(join(dir, "index.html"), "<!doctype html><title>app</title>");
 	writeFileSync(join(dir, "assets", "app-abc123.js"), "console.log(1)");
@@ -21,7 +21,7 @@ describe("static web app", () => {
 		for (const path of ["/invite/abc", "/some/deep/link"]) {
 			const res = await app.request(path);
 			expect(res.status).toBe(200);
-			expect(await res.text()).toContain("<title>app</title>");
+			expect(await res.text()).toContain("<title>Blockmap</title>");
 		}
 		// The root page also gets share tags (see html.test.ts), so only its shell is checked.
 		const root = await app.request("/v2/");
@@ -83,7 +83,7 @@ describe("static web app", () => {
 
 	test("without a build the API still works and / is a 404", async () => {
 		const { app } = makeTestApp({
-			WEB_DIST: join(tmpdir(), "aomc-no-such-dist"),
+			WEB_DIST: join(tmpdir(), "blockmap-no-such-dist"),
 		});
 		expect((await app.request("/v2/")).status).toBe(404);
 		expect((await app.request("/api/me")).status).toBe(200);

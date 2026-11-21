@@ -123,7 +123,7 @@ describe("delete your account", () => {
 
 		const res = await call(t, me, "DELETE", "/api/me");
 		expect(res.status).toBe(200);
-		expect(res.headers.get("Set-Cookie")).toContain("aomc_session=;");
+		expect(res.headers.get("Set-Cookie")).toContain("blockmap_session=;");
 
 		expect(t.db.select().from(users).where(eq(users.id, "editor")).get()).toBe(
 			undefined,

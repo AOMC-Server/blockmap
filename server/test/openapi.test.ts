@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { mapInfo } from "../src/db/schema";
 import { topics } from "../src/topics";
 import { cleanupTempDirs, makeTestApp } from "./helpers";
 
@@ -76,6 +77,36 @@ describe("OpenAPI spec", () => {
 			"gone",
 			"error",
 		]);
+	});
+
+	test("titles the docs with the map name, following renames", async () => {
+		const t = makeTestApp();
+		const titles = async () => ({
+			openapi: (
+				(await (await t.app.request("/api/openapi.json")).json()) as {
+					info: { title: string };
+				}
+			).info.title,
+			asyncapi: (
+				(await (await t.app.request("/api/asyncapi.json")).json()) as {
+					info: { title: string };
+				}
+			).info.title,
+			scalar: /<title>([^<]*)<\/title>/.exec(
+				await (await t.app.request("/scalar")).text(),
+			)?.[1],
+		});
+		expect(await titles()).toEqual({
+			openapi: "Blockmap API",
+			asyncapi: "Blockmap events",
+			scalar: "Blockmap API",
+		});
+		await t.db.update(mapInfo).set({ name: "Cool Map" });
+		expect(await titles()).toEqual({
+			openapi: "Cool Map API",
+			asyncapi: "Cool Map events",
+			scalar: "Cool Map API",
+		});
 	});
 
 	test("describes request bodies from the zod schemas", async () => {

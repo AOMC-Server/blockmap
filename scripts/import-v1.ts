@@ -282,7 +282,7 @@ if (import.meta.main) {
 		args: Bun.argv.slice(2),
 		options: {
 			url: { type: "string" },
-			token: { type: "string", default: process.env.AOMC_TOKEN },
+			token: { type: "string", default: process.env.BLOCKMAP_TOKEN },
 			src: { type: "string" },
 			batch: { type: "string", default: "200" },
 			date: { type: "string" },
@@ -293,10 +293,10 @@ if (import.meta.main) {
 	});
 	if (!values.url || !values.token || !values.src) {
 		console.error(
-			"usage: bun scripts/import-v1.ts --url https://map.example.com --token aomc_... --src /path/to/v1/data/output\n" +
+			"usage: bun scripts/import-v1.ts --url https://map.example.com --token blockmap_... --src /path/to/v1/data/output\n" +
 				"       [--batch 200] [--date 2026-01-31] [--state import-state.json] [--dims overworld,nether] [--dim-map v1name=slug]\n" +
 				"       (--date: export date for every tile, UTC; default is each file's modified time)\n" +
-				"       (the token can also come from the AOMC_TOKEN environment variable)",
+				"       (the token can also come from the BLOCKMAP_TOKEN environment variable)",
 		);
 		process.exit(2);
 	}

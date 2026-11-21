@@ -182,7 +182,7 @@ export const fileRoutes = new Hono<AppEnv>()
 			tag: "Files",
 			summary: "Upload a file",
 			description: [
-				"Send the file's bytes as the request body (not multipart), with a `Content-Length`: for example `curl -T world.zip -H 'Authorization: Bearer aomc_…' '<site>/api/files/upload?path=/voxy&name=world.zip'`. `path` is the folder, which must exist; `name` is the file's name. Folders can't be uploaded: send a ZIP.",
+				"Send the file's bytes as the request body (not multipart), with a `Content-Length`: for example `curl -T world.zip -H 'Authorization: Bearer blockmap_…' '<site>/api/files/upload?path=/voxy&name=world.zip'`. `path` is the folder, which must exist; `name` is the file's name. Folders can't be uploaded: send a ZIP.",
 				"",
 				"When the folder already has something called `name` (ignoring case), `onConflict` decides: `fail` (default) answers 409 with `conflict` (`file` or `folder`); `replace` gives the existing file the new content, keeping its link and download count; `rename` keeps both, numbering the new one like `world (2).zip`.",
 				"",

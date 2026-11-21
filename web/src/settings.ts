@@ -124,8 +124,8 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 /** Also read by the inline script in index.html, which sets the theme before first paint. */
-const SETTINGS_KEY = "aomc.settings";
-const POSITION_KEY = "aomc.position";
+const SETTINGS_KEY = "blockmap.settings";
+const POSITION_KEY = "blockmap.position";
 
 /** Reads settings from stored JSON, falling back to the default for anything missing or invalid. */
 export function parseSettings(raw: string | null): Settings {
@@ -238,7 +238,7 @@ export function savePosition(position: SavedPosition) {
 	write(POSITION_KEY, JSON.stringify(position));
 }
 
-const LAYERS_KEY = "aomc.layers";
+const LAYERS_KEY = "blockmap.layers";
 /** Most layer choices that are kept; the oldest are dropped, so deleted layers don't pile up. */
 const MAX_LAYER_CHOICES = 500;
 
@@ -267,7 +267,7 @@ export function saveLayerChoices(choices: ReadonlyMap<number, boolean>) {
 	write(LAYERS_KEY, JSON.stringify(Object.fromEntries(kept)));
 }
 
-const PANEL_WIDTH_KEY = "aomc.panelWidth";
+const PANEL_WIDTH_KEY = "blockmap.panelWidth";
 export const PANEL_MIN_WIDTH = 320;
 export const PANEL_DEFAULT_WIDTH = 400;
 
