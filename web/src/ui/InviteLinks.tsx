@@ -1,3 +1,9 @@
+import {
+	type ExpiryOption,
+	ExpirySelect,
+	ShownOnce,
+} from "@aomc-server/block-ui";
+import { formatTime } from "@aomc-server/block-ui/format";
 import { DEFAULT_INVITE_HOURS, MAX_INVITE_USES } from "@blockmap/shared";
 import { useEffect, useState } from "preact/hooks";
 import {
@@ -6,8 +12,6 @@ import {
 	revokeInvite,
 	type Scope,
 } from "../sharing";
-import { formatTime } from "./format";
-import { type ExpiryOption, ExpirySelect, ShownOnce } from "./shareCommon";
 
 const EXPIRIES: ExpiryOption[] = [
 	{ label: "1 day", value: 24 },

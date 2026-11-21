@@ -1,6 +1,7 @@
+import { PreviewSelect } from "@aomc-server/block-ui";
 import type { Dye } from "@blockmap/shared/colors";
+import { dyeScope } from "../theme";
 import { Banner } from "./icons";
-import { PreviewSelect } from "./PreviewSelect";
 
 export type LayerOption = { id: number; name: string; color: Dye };
 
@@ -18,7 +19,7 @@ export function LayerSelect(props: {
 			options={props.options.map((l) => ({
 				value: l.id,
 				label: l.name,
-				dye: l.color,
+				scope: dyeScope(l.color),
 				preview: <Banner dye={l.color} size={24} />,
 			}))}
 		/>

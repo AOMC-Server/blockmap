@@ -1,3 +1,4 @@
+import { PreviewSelect } from "@aomc-server/block-ui";
 import type { Dye } from "@blockmap/shared/colors";
 import {
 	AREA_FILLS,
@@ -11,7 +12,6 @@ import {
 	MIN_LINE_WIDTH,
 	mergeStyle,
 } from "@blockmap/shared/features";
-import { PreviewSelect } from "./PreviewSelect";
 import { DashPreview, FillPreview } from "./StylePreview";
 
 const DASH_LABEL: Record<(typeof LINE_DASHES)[number], string> = {
@@ -126,6 +126,7 @@ export function StyleControls(props: {
 			<label class="check">
 				<input
 					type="checkbox"
+					class="switch"
 					checked={shown.smooth}
 					onChange={(e) => set("smooth", e.currentTarget.checked)}
 				/>

@@ -1,11 +1,10 @@
+import { copyText, Modal } from "@aomc-server/block-ui";
 import type { ShareView } from "@blockmap/shared/schemas";
 import { signal } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { api, attempt } from "../api";
 import { mapView } from "../controller";
 import { currentMap, dimSlug, isLayerHidden, layersData, rev } from "../state";
-import { Modal } from "./Modal";
-import { copyText } from "./shareCommon";
 
 export const shareOpen = signal(false);
 
@@ -103,12 +102,13 @@ export function ShareDialog() {
 			<label class="check">
 				<input
 					type="checkbox"
+					class="switch"
 					checked={includeLayers}
 					onChange={(e) => setIncludeLayers(e.currentTarget.checked)}
 				/>
 				Show the same layers I have on
 			</label>
-			<div class="link-row share-link">
+			<div class="copy-row share-link">
 				<input
 					type="text"
 					readOnly

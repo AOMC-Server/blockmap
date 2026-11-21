@@ -1,7 +1,7 @@
+import { type ErrorBody, failureMessage } from "@aomc-server/block-ui/errors";
 import type { FileConflictMode } from "@blockmap/shared/files";
 import type { InferResponseType } from "hono/client";
 import type { api } from "./api";
-import { type ErrorBody, failureMessage } from "./errors";
 
 export type FileTree = InferResponseType<typeof api.api.files.tree.$get, 200>;
 export type FileItem = FileTree["files"][number];

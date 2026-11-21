@@ -6,7 +6,7 @@ export function Tooltip() {
 	if (!h) return null;
 	return (
 		<div
-			class="dye-scope strong"
+			class="palette-scope strong"
 			{...dyeScope("mix")}
 			style={{ "--dye": h.color }}
 		>

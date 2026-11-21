@@ -1,3 +1,5 @@
+import { Modal } from "@aomc-server/block-ui";
+import { formatTime } from "@aomc-server/block-ui/format";
 import { signal } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { dyeLabel, pointsOf, TYPE_LABEL } from "../featureInfo";
@@ -7,8 +9,6 @@ import {
 	restoreFeatureRevision,
 } from "../revisions";
 import { isModerator, layersData, popup, readOnly } from "../state";
-import { formatTime } from "./format";
-import { Modal } from "./Modal";
 
 /** The feature whose revision list is open. */
 export const featureHistoryFor = signal<{

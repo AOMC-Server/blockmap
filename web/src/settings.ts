@@ -1,6 +1,12 @@
+import {
+	createWidthStore,
+	isModeChoice,
+	isStyle,
+	type ModeChoice,
+	type StyleId,
+} from "@aomc-server/block-ui";
 import type { View } from "@blockmap/shared/view";
-import { effect, signal } from "@preact/signals";
-import { isModeChoice, isStyle, type ModeChoice, type StyleId } from "./theme";
+import { signal } from "@preact/signals";
 
 /** How quickly the camera moves between views; the factor scales how long a transition takes. */
 export const TRANSITION_SPEEDS = [
@@ -267,45 +273,14 @@ export function saveLayerChoices(choices: ReadonlyMap<number, boolean>) {
 	write(LAYERS_KEY, JSON.stringify(Object.fromEntries(kept)));
 }
 
-const PANEL_WIDTH_KEY = "blockmap.panelWidth";
-export const PANEL_MIN_WIDTH = 320;
-export const PANEL_DEFAULT_WIDTH = 400;
-
-/** The widest the side panel may be: most of the window, but always leaving some map. */
-export const panelMaxWidth = (windowWidth: number) =>
-	Math.max(PANEL_MIN_WIDTH, Math.min(windowWidth - 16, windowWidth * 0.7, 900));
-
-export const clampPanelWidth = (width: number, windowWidth: number) =>
-	Math.round(
-		Math.min(Math.max(width, PANEL_MIN_WIDTH), panelMaxWidth(windowWidth)),
-	);
-
 /** Width in pixels of the right-hand side panel, which can be dragged wider or narrower. */
-export const panelWidth = signal<number>(
-	(() => {
-		const stored = Number(read(PANEL_WIDTH_KEY));
-		return Number.isFinite(stored) && stored > 0
-			? Math.max(stored, PANEL_MIN_WIDTH)
-			: PANEL_DEFAULT_WIDTH;
-	})(),
-);
-
-export function setPanelWidth(width: number, persist = true) {
-	panelWidth.value = clampPanelWidth(width, globalThis.innerWidth ?? 1280);
-	if (persist) write(PANEL_WIDTH_KEY, String(panelWidth.value));
-}
-
-export function resetPanelWidth() {
-	panelWidth.value = PANEL_DEFAULT_WIDTH;
-	write(PANEL_WIDTH_KEY, null);
-}
-
-// Everything that sits beside the panel (the boss bar, the panel itself) follows this variable.
-if (typeof document !== "undefined") {
-	effect(() => {
-		document.documentElement.style.setProperty(
-			"--panel-w",
-			`min(${panelWidth.value}px, calc(100vw - 16px))`,
-		);
-	});
-}
+export const panelWidth = createWidthStore({
+	key: "blockmap.panelWidth",
+	min: 320,
+	// The widest it may be: most of the window, but always leaving some map.
+	max: (w) => Math.max(320, Math.min(w - 16, w * 0.7, 900)),
+	default: 400,
+	// Everything that sits beside the panel (the boss bar, the panel itself) follows this variable.
+	cssVar: "--panel-w",
+	cssValue: (w) => `min(${w}px, calc(100vw - 16px))`,
+});

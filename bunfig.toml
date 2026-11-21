@@ -1,0 +1,3 @@
+# block-ui ships TSX, which Bun compiles for the tests like the web app's own files: with Preact.
+jsx = "react-jsx"
+jsxImportSource = "preact"

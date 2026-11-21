@@ -1,12 +1,23 @@
+import {
+	Chart,
+	type ChartSeries,
+	Segmented,
+	SortTh,
+	TileGrid,
+} from "@aomc-server/block-ui";
+import {
+	formatDay,
+	formatDuration,
+	formatNumber,
+	formatTime,
+} from "@aomc-server/block-ui/format";
 import { ADMIN_STATS_RANGES, type AdminStatsRange } from "@blockmap/shared";
 import { DAY, HOUR } from "@blockmap/shared/time";
 import type { InferResponseType } from "hono/client";
 import { useState } from "preact/hooks";
 import { api } from "../api";
-import { Chart, type ChartSeries } from "./Chart";
-import { formatBytes, formatDay, formatDuration, formatTime } from "./format";
-import { RangePicker } from "./RangePicker";
-import { number, SortHeader, TileGrid, useStats } from "./statsCommon";
+import { formatBytes } from "./format";
+import { useStats } from "./useStats";
 
 type Body = InferResponseType<typeof api.api.admin.stats.$get, 200>;
 type Category = keyof Body["traffic"]["range"]["byCategory"];
@@ -99,12 +110,12 @@ function Storage(props: { data: Body }) {
 					{
 						label: "Tile images",
 						value: formatBytes(cur.blobBytes),
-						hint: `${number(cur.blobCount)} images, ${formatBytes(overview.tiles.averageImageBytes)} each on average`,
+						hint: `${formatNumber(cur.blobCount)} images, ${formatBytes(overview.tiles.averageImageBytes)} each on average`,
 					},
 					{
 						label: "Used by the map",
 						value: formatBytes(cur.referencedBytes),
-						hint: `${number(cur.referencedBlobs)} images, each used ${overview.tiles.reuse}× on average`,
+						hint: `${formatNumber(cur.referencedBlobs)} images, each used ${overview.tiles.reuse}× on average`,
 					},
 					{
 						label: "Waiting for cleanup",
@@ -169,19 +180,14 @@ function Traffic(props: { data: Body }) {
 		<>
 			<div class="admin-toolbar">
 				<h2>Network traffic</h2>
-				<div class="segmented">
-					{(["bytes", "requests"] as const).map((m) => (
-						<button
-							key={m}
-							type="button"
-							class={`btn small ${m === metric ? "active" : ""}`}
-							aria-pressed={m === metric}
-							onClick={() => setMetric(m)}
-						>
-							{m === "bytes" ? "Data sent" : "Requests"}
-						</button>
-					))}
-				</div>
+				<Segmented
+					small
+					label="Metric"
+					value={metric}
+					options={["bytes", "requests"] as const}
+					names={{ bytes: "Data sent", requests: "Requests" }}
+					onChange={setMetric}
+				/>
 			</div>
 			<p class="muted">
 				What this server sent, counted as it happens. Redirects and errors carry
@@ -196,12 +202,12 @@ function Traffic(props: { data: Body }) {
 					},
 					{
 						label: "Requests in this period",
-						value: number(periodRequests),
-						hint: `${number(totalRequests)} in total`,
+						value: formatNumber(periodRequests),
+						hint: `${formatNumber(totalRequests)} in total`,
 					},
 					{
 						label: "Failed requests",
-						value: number(errors),
+						value: formatNumber(errors),
 						hint:
 							periodRequests > 0
 								? `${((errors / periodRequests) * 100).toFixed(1)}% of requests`
@@ -214,7 +220,7 @@ function Traffic(props: { data: Body }) {
 					kind="bars"
 					xs={traffic.points.map((p) => p.t)}
 					series={series}
-					formatY={metric === "bytes" ? formatBytes : number}
+					formatY={metric === "bytes" ? formatBytes : formatNumber}
 					formatTip={traffic.bucketMs < DAY ? formatTime : formatDay}
 					formatX={
 						traffic.bucketMs < HOUR
@@ -225,19 +231,17 @@ function Traffic(props: { data: Body }) {
 					}
 				/>
 			</div>
-			<div class="stats-table-wrap">
-				<table class="stats-table">
+			<div class="table-wrap">
+				<table class="table compact nowrap">
 					<thead>
 						<tr>
 							<th>Kind</th>
-							<th class="stats-num">Requests</th>
-							<th class="stats-num">Sent</th>
-							<th class="stats-num">Redirects</th>
-							<th class="stats-num">Errors</th>
-							<th class="stats-num">Sent, all time</th>
-							<th class="stats-num" style={{ textAlign: "right" }}>
-								Chart
-							</th>
+							<th class="num">Requests</th>
+							<th class="num">Sent</th>
+							<th class="num">Redirects</th>
+							<th class="num">Errors</th>
+							<th class="num">Sent, all time</th>
+							<th class="num">Chart</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -253,19 +257,20 @@ function Traffic(props: { data: Body }) {
 										/>
 										{c.label}
 									</td>
-									<td class="stats-num">{number(r.requests)}</td>
-									<td class="stats-num">{formatBytes(r.bytes)}</td>
-									<td class="stats-num">{number(r.s3xx)}</td>
-									<td class="stats-num">{number(r.s4xx + r.s5xx)}</td>
-									<td class="stats-num">
+									<td class="num">{formatNumber(r.requests)}</td>
+									<td class="num">{formatBytes(r.bytes)}</td>
+									<td class="num">{formatNumber(r.s3xx)}</td>
+									<td class="num">{formatNumber(r.s4xx + r.s5xx)}</td>
+									<td class="num">
 										{formatBytes(traffic.allTime.byCategory[c.key].bytes)}
 									</td>
 									<td
-										class="stats-num"
+										class="num"
 										style={{ textAlign: "right", verticalAlign: "middle" }}
 									>
 										<input
 											type="checkbox"
+											class="switch"
 											style={{ margin: 0, verticalAlign: "middle" }}
 											checked={on}
 											aria-label={`Show ${c.label} in chart`}
@@ -309,17 +314,21 @@ function Domains(props: { data: Body }) {
 			{rows.length === 0 ? (
 				<p class="muted">No tile requests in this period.</p>
 			) : (
-				<div class="stats-table-wrap">
-					<table class="stats-table">
+				<div class="table-wrap">
+					<table class="table compact nowrap">
 						<thead>
 							<tr>
 								<th>Domain</th>
 								{DOMAIN_COLUMNS.map((c) => (
-									<SortHeader
+									<SortTh
 										key={c.key}
-										column={c}
+										label={c.label}
+										col={c.key}
 										sort={sort}
-										onSort={setSort}
+										dir="desc"
+										onSort={(col) => setSort(col as DomainSort)}
+										num
+										hint={c.hint}
 									/>
 								))}
 								<th>Share of data</th>
@@ -335,10 +344,10 @@ function Domains(props: { data: Body }) {
 										>
 											{d.domain}
 										</td>
-										<td class="stats-num">{number(d.tileRequests)}</td>
-										<td class="stats-num">{number(d.blobRequests)}</td>
-										<td class="stats-num">{formatBytes(d.bytes)}</td>
-										<td class="stats-num">{formatTime(d.lastSeen)}</td>
+										<td class="num">{formatNumber(d.tileRequests)}</td>
+										<td class="num">{formatNumber(d.blobRequests)}</td>
+										<td class="num">{formatBytes(d.bytes)}</td>
+										<td class="num">{formatTime(d.lastSeen)}</td>
 										<td>
 											<span class="share-bar" aria-hidden="true">
 												<span
@@ -368,38 +377,38 @@ function Overview(props: { data: Body }) {
 				tiles={[
 					{
 						label: "Users",
-						value: number(o.users.total),
-						hint: `${number(o.users.active7d)} logged in this week, ${number(o.users.active30d)} this month`,
+						value: formatNumber(o.users.total),
+						hint: `${formatNumber(o.users.active7d)} logged in this week, ${formatNumber(o.users.active30d)} this month`,
 					},
 					{
 						label: "Sessions / API tokens",
-						value: `${number(o.users.sessions)} / ${number(o.users.tokens)}`,
-						hint: `${number(o.users.tokensUsed30d)} tokens used in the last 30 days`,
+						value: `${formatNumber(o.users.sessions)} / ${formatNumber(o.users.tokens)}`,
+						hint: `${formatNumber(o.users.tokensUsed30d)} tokens used in the last 30 days`,
 					},
 					{
 						label: "Uploads",
-						value: number(o.map.uploadsDone),
-						hint: `${number(o.map.uploadsViaMod)} via the mod, ${number(o.map.uploadsFailed)} failed`,
+						value: formatNumber(o.map.uploadsDone),
+						hint: `${formatNumber(o.map.uploadsViaMod)} via the mod, ${formatNumber(o.map.uploadsFailed)} failed`,
 					},
 					{
 						label: "Layers",
-						value: number(o.map.publicLayers + o.map.privateLayers),
-						hint: `${number(o.map.privateLayers)} private, in ${number(o.map.dimensions)} dimensions`,
+						value: formatNumber(o.map.publicLayers + o.map.privateLayers),
+						hint: `${formatNumber(o.map.privateLayers)} private, in ${formatNumber(o.map.dimensions)} dimensions`,
 					},
 					{
 						label: "Features",
-						value: number(o.map.features),
-						hint: `${number(o.map.featureRevisions)} versions kept`,
+						value: formatNumber(o.map.features),
+						hint: `${formatNumber(o.map.featureRevisions)} versions kept`,
 					},
 					{
 						label: "Tile versions",
-						value: number(o.tiles.tileVersions),
-						hint: `${number(o.tiles.references)} image references`,
+						value: formatNumber(o.tiles.tileVersions),
+						hint: `${formatNumber(o.tiles.references)} image references`,
 					},
 					{
 						label: "Job queue",
-						value: `${number(o.jobs.pending + o.jobs.processing)} waiting`,
-						hint: `${number(o.jobs.failed)} failed`,
+						value: `${formatNumber(o.jobs.pending + o.jobs.processing)} waiting`,
+						hint: `${formatNumber(o.jobs.failed)} failed`,
 					},
 					{
 						label: "Uptime",
@@ -422,7 +431,8 @@ export function AdminStats() {
 
 	return (
 		<div class="admin-stats">
-			<RangePicker
+			<Segmented
+				label="Time range"
 				value={range}
 				options={ADMIN_STATS_RANGES}
 				names={RANGE_NAMES}

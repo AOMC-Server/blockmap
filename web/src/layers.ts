@@ -1,10 +1,10 @@
+import { moveItem } from "@aomc-server/block-ui";
 import type {
 	CreateLayer,
 	FeatureInput,
 	UpdateLayer,
 } from "@blockmap/shared/features";
 import { api, attempt, ok, type Res, run, showNotice } from "./api";
-import { moveItem } from "./reorder";
 import { dimSlug, layersData, rev } from "./state";
 
 let loadSeq = 0;

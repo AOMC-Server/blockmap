@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fontSizeFor } from "./fontScale";
+import { fontSizeFor } from "@aomc-server/block-ui/theme";
 
 describe("fontSizeFor", () => {
 	test("keeps font pixels on whole device pixels", () => {

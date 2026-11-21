@@ -1,9 +1,9 @@
+import { Modal } from "@aomc-server/block-ui";
+import { formatTime } from "@aomc-server/block-ui/format";
 import { signal } from "@preact/signals";
 import { mapView } from "../controller";
 import { deleteUpload } from "../revisions";
 import { highlightedUpload, type RevisionInfo, user } from "../state";
-import { formatTime } from "./format";
-import { Modal } from "./Modal";
 
 /** The upload whose delete is being confirmed. */
 export const deleteUploadFor = signal<RevisionInfo | null>(null);

@@ -1,3 +1,4 @@
+import { copyText } from "@aomc-server/block-ui";
 import type { Dye } from "@blockmap/shared/colors";
 import { MAX_NAME } from "@blockmap/shared/features";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -20,7 +21,7 @@ import { stopDraw } from "../tools/draw";
 import { measureFrom } from "../tools/measure";
 import { DyePicker } from "./DyePicker";
 import { Banner } from "./icons";
-import { copyText, copyWaypoint } from "./shareCommon";
+import { copyWaypoint } from "./shareCommon";
 
 /** Space kept between the menu and the edges of the map. */
 const MARGIN = 8;

@@ -1,14 +1,19 @@
-import { effect } from "@preact/signals";
-import { render } from "preact";
-import { fontSizeFor } from "./fontScale";
-import { settings } from "./settings";
-import { currentDimensionTheme, currentMap, dimSlug } from "./state";
+import "@aomc-server/block-ui/css";
+import {
+	initToggleDrag,
+	installFontScale,
+	Toasts,
+} from "@aomc-server/block-ui";
 import {
 	applyAppearance,
 	prefersLight,
 	resolveMode,
-	savePalette,
-} from "./theme";
+} from "@aomc-server/block-ui/theme";
+import { effect } from "@preact/signals";
+import { render } from "preact";
+import { settings } from "./settings";
+import { currentDimensionTheme, currentMap, dimSlug } from "./state";
+import { savePalette } from "./theme";
 import { App } from "./ui/App";
 import { FilesPage } from "./ui/FilesPage";
 import { InvitePage, inviteTokenFromPath } from "./ui/InvitePage";
@@ -16,19 +21,11 @@ import { ManagePage } from "./ui/ManagePage";
 import { PrivacyPage } from "./ui/PrivacyPage";
 import { SettingsPage } from "./ui/SettingsPage";
 import { StatsPage } from "./ui/StatsPage";
-import { initToggleDrag } from "./ui/toggleDrag";
 import "./styles.css";
 
 initToggleDrag();
-
 // Browser zoom changes the pixel ratio, so keep the pixel font of the headings crisp as it changes.
-const applyFontSize = () =>
-	document.documentElement.style.setProperty(
-		"--fs-display",
-		`${fontSizeFor(window.devicePixelRatio || 1)}px`,
-	);
-applyFontSize();
-window.addEventListener("resize", applyFontSize);
+installFontScale();
 
 const inviteToken = inviteTokenFromPath(location.pathname);
 const path = location.pathname.replace(/\/+$/, "");
@@ -62,20 +59,23 @@ effect(() => {
 });
 
 render(
-	inviteToken ? (
-		<InvitePage token={inviteToken} />
-	) : path === "/settings" ? (
-		<SettingsPage />
-	) : path === "/manage" ? (
-		<ManagePage />
-	) : path === "/stats" ? (
-		<StatsPage />
-	) : path === "/privacy" ? (
-		<PrivacyPage />
-	) : onFiles ? (
-		<FilesPage />
-	) : (
-		<App />
-	),
+	<>
+		{inviteToken ? (
+			<InvitePage token={inviteToken} />
+		) : path === "/settings" ? (
+			<SettingsPage />
+		) : path === "/manage" ? (
+			<ManagePage />
+		) : path === "/stats" ? (
+			<StatsPage />
+		) : path === "/privacy" ? (
+			<PrivacyPage />
+		) : onFiles ? (
+			<FilesPage />
+		) : (
+			<App />
+		)}
+		<Toasts />
+	</>,
 	document.getElementById("app") as HTMLElement,
 );

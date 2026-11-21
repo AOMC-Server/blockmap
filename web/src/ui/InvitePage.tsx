@@ -69,7 +69,7 @@ export function InvitePage(props: { token: string }) {
 	const loginHref = loginUrl(`/invite/${encodeURIComponent(token)}?accept=1`);
 
 	return (
-		<main class="invite-page">
+		<main class="page-root invite-page">
 			<div class="invite-card">
 				<header class="modal-head">
 					<h1>{"invite" in state ? state.invite.mapName : "Blockmap"}</h1>

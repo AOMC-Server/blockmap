@@ -1,3 +1,4 @@
+import { copyText, PopupText } from "@aomc-server/block-ui";
 import { resolveStyle } from "@blockmap/shared/featureStyle";
 import { mapView } from "../controller";
 import { featureStats, featureTitle, TYPE_LABEL } from "../featureInfo";
@@ -8,8 +9,7 @@ import { measureFrom } from "../tools/measure";
 import { formatBlocks } from "../tools/measureMath";
 import { featureHistoryFor } from "./FeatureHistory";
 import { Banner } from "./icons";
-import { PopupText } from "./PopupText";
-import { copyText, copyWaypoint } from "./shareCommon";
+import { copyWaypoint } from "./shareCommon";
 
 /** DOM popup for the clicked feature, anchored to the map position and following pans and zooms. */
 export function Popup() {
@@ -38,7 +38,7 @@ export function Popup() {
 	);
 
 	return (
-		<div class="dye-scope" {...dyeScope(dye)}>
+		<div class="palette-scope" {...dyeScope(dye)}>
 			<div
 				class={`popup ${placeBelow ? "below" : ""}`}
 				style={{ left: `${left}px`, top: `${top}px` }}

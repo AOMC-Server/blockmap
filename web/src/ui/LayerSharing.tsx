@@ -1,9 +1,9 @@
+import { Modal } from "@aomc-server/block-ui";
 import { signal } from "@preact/signals";
 import { layerScope } from "../sharing";
 import { layersData } from "../state";
 import { InviteLinks } from "./InviteLinks";
 import { MembersSection } from "./MembersSection";
-import { Modal } from "./Modal";
 
 /** The private layer whose sharing dialog is open. */
 export const layerSharingFor = signal<{ layerId: number; name: string } | null>(

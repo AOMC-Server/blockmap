@@ -1,3 +1,4 @@
+import { formatRemaining, formatTime } from "@aomc-server/block-ui/format";
 import { effect } from "@preact/signals";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { isolateUpload, mapView, setRev } from "../controller";
@@ -30,12 +31,7 @@ import {
 	viewBounds,
 } from "../timeline";
 import { deleteUploadFor } from "./DeleteUploadDialog";
-import {
-	formatEventDay,
-	formatEventTime,
-	formatRemaining,
-	formatTime,
-} from "./format";
+import { formatEventDay, formatEventTime } from "./format";
 import { Panel } from "./Panel";
 import { pointAt, Timeline } from "./Timeline";
 

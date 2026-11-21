@@ -5,42 +5,6 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<title>Blockmap</title>
 		<link rel="icon" href="/static/pin.png" />
-		<script>
-			// Apply the saved appearance before first paint; main.tsx takes over from here (see theme.ts).
-			// The map is not loaded yet, so the palette is the one last shown for the same dimension.
-			{
-				const root = document.documentElement.dataset;
-				root.mode = "dark";
-				root.palette = "overworld";
-				root.style = "bedrock";
-				try {
-					const STYLES = ["bedrock", "win98", "xp", "modern"];
-					const PALETTES = ["overworld", "nether", "end", "unknown"];
-					const s = JSON.parse(localStorage.getItem("blockmap.settings") || "{}") || {};
-					const light = matchMedia("(prefers-color-scheme: light)").matches;
-					if (s.mode === "light" || (s.mode === "system" && light)) root.mode = "light";
-					if (STYLES.includes(s.style)) root.style = s.style;
-					const p = JSON.parse(localStorage.getItem("blockmap.palette") || "null");
-					const dim = new URLSearchParams(location.search).get("dim");
-					// Same pages as main.tsx; everything else is the map.
-					const path = location.pathname.replace(/\/+$/, "");
-					const onMap =
-						!/^\/invite\/[^/?#]+\/?$/.test(location.pathname) &&
-						path !== "/settings" &&
-						path !== "/manage" &&
-						path !== "/stats";
-					if (
-						p &&
-						PALETTES.includes(p.palette) &&
-						onMap &&
-						s.dimensionColours !== false &&
-						(!dim || dim === p.dim)
-					) {
-						root.palette = p.palette;
-					}
-				} catch {}
-			}
-		</script>
 	</head>
 	<body>
 		<div id="app"></div>

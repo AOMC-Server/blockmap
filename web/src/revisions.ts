@@ -1,3 +1,4 @@
+import { formatProgress } from "@aomc-server/block-ui/format";
 import { signal } from "@preact/signals";
 import { api, attempt, run, showNotice } from "./api";
 import { refreshMap, setRev } from "./controller";
@@ -11,7 +12,6 @@ import {
 	type RevisionInfo,
 	revisionsData,
 } from "./state";
-import { formatProgress } from "./ui/format";
 
 export type Progress = { message?: string; done?: number; total?: number };
 export type Outcome = { status: "done" | "failed"; error: string | null };

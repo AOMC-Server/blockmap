@@ -1,9 +1,9 @@
+import { formatProgress, formatTime } from "@aomc-server/block-ui/format";
 import type { InferResponseType } from "hono/client";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api, attempt, run, showNotice } from "../api";
 import { refreshMap } from "../controller";
 import { subscribe } from "../events";
-import { formatProgress, formatTime } from "./format";
 
 type Status = InferResponseType<typeof api.api.admin.history.$get, 200>;
 

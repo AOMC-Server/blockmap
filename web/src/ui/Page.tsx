@@ -1,10 +1,10 @@
+import { Page as BasePage } from "@aomc-server/block-ui";
 import { canManage } from "@blockmap/shared/roles";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { loadPageData } from "../controller";
 import { setMaintenance } from "../sharing";
 import { currentMap } from "../state";
-import { Toast } from "./Toast";
 
 /** Loads what a standalone page needs on mount; `retry` tries again after a failure. */
 export function usePageLoad() {
@@ -70,18 +70,12 @@ function MaintenanceNotice() {
 /** Layout of the standalone pages (/settings, /manage, /stats): a title bar with a way back, and the content. */
 export function Page(props: { title: string; children: ComponentChildren }) {
 	return (
-		<div class="page-root">
-			<header class="page-head">
-				<a class="btn small" href="/">
-					← Map
-				</a>
-				<h1>{props.title}</h1>
-			</header>
-			<MaintenanceNotice />
-			<main class="page">
-				<div class="page-inner">{props.children}</div>
-			</main>
-			<Toast />
-		</div>
+		<BasePage
+			title={props.title}
+			back={{ href: "/", label: "Map" }}
+			banner={<MaintenanceNotice />}
+		>
+			{props.children}
+		</BasePage>
 	);
 }

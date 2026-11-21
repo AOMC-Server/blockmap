@@ -1,7 +1,8 @@
+import { toast } from "@aomc-server/block-ui";
+import { type ErrorBody, failureMessage } from "@aomc-server/block-ui/errors";
 import { hc } from "hono/client";
 import type { AppType } from "../../server/src/app";
-import { type ErrorBody, failureMessage } from "./errors";
-import { currentMap, notice } from "./state";
+import { currentMap } from "./state";
 
 /** Typed client; request and response types come from the server's route definitions. */
 export const api = hc<AppType>("/");
@@ -16,14 +17,9 @@ export async function logout(): Promise<void> {
 	await fetch("/auth/logout", { method: "POST" });
 }
 
-let noticeTimer: ReturnType<typeof setTimeout> | undefined;
-
+/** Tells the user something in a toast, for five seconds. */
 export function showNotice(text: string, kind: "error" | "info" = "info") {
-	notice.value = { text, kind };
-	clearTimeout(noticeTimer);
-	noticeTimer = setTimeout(() => {
-		notice.value = null;
-	}, 5000);
+	toast(text, kind, 5000);
 }
 
 export type Res = { ok: boolean; status: number; json(): Promise<unknown> };

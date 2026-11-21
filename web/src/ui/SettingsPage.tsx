@@ -1,3 +1,5 @@
+import { Toggle } from "@aomc-server/block-ui";
+import { MODES, STYLES } from "@aomc-server/block-ui/theme";
 import { useEffect, useState } from "preact/hooks";
 import { api, attempt, loginUrl } from "../api";
 import {
@@ -13,7 +15,6 @@ import {
 	updateSettings,
 } from "../settings";
 import { user, visibleDimensions } from "../state";
-import { MODES, STYLES } from "../theme";
 import { ApiTokens } from "./ApiTokens";
 import { LoadFailed, Page, usePageLoad } from "./Page";
 
@@ -21,21 +22,18 @@ type BooleanSetting = {
 	[K in keyof Settings]: Settings[K] extends boolean ? K : never;
 }[keyof Settings];
 
-function Toggle(props: { field: BooleanSetting; label: string; hint: string }) {
+function SettingToggle(props: {
+	field: BooleanSetting;
+	label: string;
+	hint: string;
+}) {
 	return (
-		<label class="toggle">
-			<input
-				type="checkbox"
-				checked={settings.value[props.field]}
-				onChange={(e) =>
-					updateSettings({ [props.field]: e.currentTarget.checked })
-				}
-			/>
-			<span>
-				{props.label}
-				<span class="muted hint">{props.hint}</span>
-			</span>
-		</label>
+		<Toggle
+			checked={settings.value[props.field]}
+			onChange={(checked) => updateSettings({ [props.field]: checked })}
+			label={props.label}
+			hint={props.hint}
+		/>
 	);
 }
 
@@ -103,7 +101,7 @@ function Appearance() {
 			<p class="muted">Saved in this browser only.</p>
 			<ModePicker />
 			<StylePicker />
-			<Toggle
+			<SettingToggle
 				field="dimensionColours"
 				label="Colour the map by dimension"
 				hint="Use the viewed dimension's colours, like the Nether's reds or the End's purples. Otherwise the overworld's are used everywhere."
@@ -171,22 +169,22 @@ function Preferences() {
 
 			<TransitionPicker />
 
-			<Toggle
+			<SettingToggle
 				field="rememberPosition"
 				label="Remember where I was"
 				hint="Reopen the map at your last position and dimension when the link doesn't name one."
 			/>
-			<Toggle
+			<SettingToggle
 				field="showCoordinates"
 				label="Show cursor coordinates"
 				hint="In the bottom left corner of the map."
 			/>
-			<Toggle
+			<SettingToggle
 				field="showOverworldEquivalent"
 				label="Show overworld coordinates in other dimensions"
 				hint="In the Nether, also show the matching overworld position."
 			/>
-			<Toggle
+			<SettingToggle
 				field="showScale"
 				label="Show the zoom scale"
 				hint="For example “1 px = 4 blocks”."
@@ -218,7 +216,7 @@ function Preferences() {
 					Lower shows more individual pins; higher groups them sooner.
 				</span>
 			</label>
-			<Toggle
+			<SettingToggle
 				field="preloadSpawn"
 				label="Preload the area around spawn"
 				hint="Load low resolution images of the area around spawn in the background, so there is always something to show there while the detailed ones load. Turn off to save data on a slow or metered connection."
@@ -255,22 +253,22 @@ function Debugging() {
 		<section class="page-section">
 			<h2>Debugging</h2>
 			<p class="muted">Saved in this browser only.</p>
-			<Toggle
+			<SettingToggle
 				field="debugRender"
 				label="Debug render mode"
 				hint="Colour each map tile by how it was drawn (loaded, stale, stand-in, missing), label it, and show renderer statistics on the map."
 			/>
-			<Toggle
+			<SettingToggle
 				field="tileOutlines"
 				label="Show tile outlines"
 				hint="Draw the edges of the map tiles at the current zoom level."
 			/>
-			<Toggle
+			<SettingToggle
 				field="chunkOutlines"
 				label="Show chunk outlines"
 				hint="Draw the 16×16 block chunk grid from 1:1 zoom inwards. Zoom in further for chunk coordinates, then the block grid, then each block's coordinates."
 			/>
-			<Toggle
+			<SettingToggle
 				field="regionOutlines"
 				label="Show region outlines"
 				hint="Draw the 512×512 block region grid, labelled with each region's file name (r.X.Z)."
@@ -289,7 +287,7 @@ function Debugging() {
 						</option>
 					))}
 				</select>
-				<span>
+				<span class="toggle-text">
 					Show in-game map outlines
 					<span class="muted hint">
 						Draw the areas in-game maps of that size cover. Zoom in for each

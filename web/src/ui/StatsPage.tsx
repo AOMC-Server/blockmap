@@ -1,3 +1,11 @@
+import {
+	Chart,
+	Segmented,
+	SortTh,
+	Tabs,
+	TileGrid,
+} from "@aomc-server/block-ui";
+import { formatNumber } from "@aomc-server/block-ui/format";
 import { STATS_RANGES, type StatsRange } from "@blockmap/shared";
 import { DAY } from "@blockmap/shared/time";
 import type { InferResponseType } from "hono/client";
@@ -5,10 +13,8 @@ import { useEffect, useState } from "preact/hooks";
 import { api, loginUrl } from "../api";
 import { loadUser } from "../controller";
 import { user } from "../state";
-import { Chart } from "./Chart";
 import { Page } from "./Page";
-import { RangePicker } from "./RangePicker";
-import { number, SortHeader, TileGrid, useStats } from "./statsCommon";
+import { useStats } from "./useStats";
 
 type StatsBody = InferResponseType<typeof api.api.stats.$get, 200>;
 type UserStats = NonNullable<StatsBody["me"]>;
@@ -73,7 +79,7 @@ function formatArea(blocks: number): string {
 function cell(s: UserStats, key: Column["key"]): string {
 	if (key === "areaTiles") return formatArea(s.areaBlocks);
 	if (key === "modAreaTiles") return formatArea(s.modAreaBlocks);
-	return number(s[key]);
+	return formatNumber(s[key]);
 }
 
 function readRange(): StatsRange {
@@ -101,8 +107,8 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 		<>
 			<TileGrid
 				tiles={[
-					{ label: "Uploads", value: number(s.uploads) },
-					{ label: "Tiles uploaded", value: number(s.tiles) },
+					{ label: "Uploads", value: formatNumber(s.uploads) },
+					{ label: "Tiles uploaded", value: formatNumber(s.tiles) },
 					{
 						label: "Area uploaded",
 						value: formatArea(s.uploadedBlocks),
@@ -111,15 +117,15 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 					{
 						label: "Area mapped",
 						value: formatArea(s.areaBlocks),
-						hint: `${number(s.areaTiles)} distinct tiles`,
+						hint: `${formatNumber(s.areaTiles)} distinct tiles`,
 					},
 					{
 						label: "Features created",
-						value: number(s.featuresCreated),
-						hint: `${number(byType.pin)} pins · ${number(byType.line)} lines · ${number(byType.polygon)} areas`,
+						value: formatNumber(s.featuresCreated),
+						hint: `${formatNumber(byType.pin)} pins · ${formatNumber(byType.line)} lines · ${formatNumber(byType.polygon)} areas`,
 					},
-					{ label: "Feature edits", value: number(s.featureEdits) },
-					{ label: "Layers created", value: number(s.layersCreated) },
+					{ label: "Feature edits", value: formatNumber(s.featureEdits) },
+					{ label: "Layers created", value: formatNumber(s.layersCreated) },
 				]}
 			/>
 			<p class="muted hint">{props.note}</p>
@@ -129,7 +135,10 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 			</p>
 			<TileGrid
 				tiles={[
-					{ label: "AOMC Webmapper uploads", value: number(s.modUploads) },
+					{
+						label: "AOMC Webmapper uploads",
+						value: formatNumber(s.modUploads),
+					},
 					{
 						label: "Area uploaded by AOMC Webmapper",
 						value: formatArea(s.modUploadedBlocks),
@@ -138,7 +147,7 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 					{
 						label: "Area mapped by AOMC Webmapper",
 						value: formatArea(s.modAreaBlocks),
-						hint: `${number(s.modAreaTiles)} distinct tiles`,
+						hint: `${formatNumber(s.modAreaTiles)} distinct tiles`,
 					},
 				]}
 			/>
@@ -210,23 +219,32 @@ function Leaderboard(props: { rows: Row[]; me: string | null }) {
 	if (rows.length === 0)
 		return <p class="muted">Nobody has contributed in this period.</p>;
 	return (
-		<div class="stats-table-wrap">
-			<table class="stats-table">
+		<div class="table-wrap">
+			<table class="table compact nowrap">
 				<thead>
 					<tr>
-						<th class="stats-rank">#</th>
+						<th class="rank">#</th>
 						<th>Player</th>
 						{COLUMNS.map((c) => (
-							<SortHeader key={c.key} column={c} sort={sort} onSort={setSort} />
+							<SortTh
+								key={c.key}
+								label={c.label}
+								col={c.key}
+								sort={sort}
+								dir="desc"
+								onSort={(col) => setSort(col as Column["key"])}
+								num
+								hint={c.hint}
+							/>
 						))}
 					</tr>
 				</thead>
 				<tbody>
 					{rows.map((r, i) => (
-						<tr key={r.userId} class={r.userId === props.me ? "stats-me" : ""}>
-							<td class="stats-rank">{i + 1}</td>
+						<tr key={r.userId} class={r.userId === props.me ? "me" : ""}>
+							<td class="rank">{i + 1}</td>
 							<td>
-								<span class="stats-player">
+								<span class="player-name">
 									{r.avatarUrl ? (
 										<img
 											class="avatar"
@@ -242,7 +260,7 @@ function Leaderboard(props: { rows: Row[]; me: string | null }) {
 								</span>
 							</td>
 							{COLUMNS.map((c) => (
-								<td key={c.key} class="stats-num">
+								<td key={c.key} class="num">
 									{cell(r, c.key)}
 								</td>
 							))}
@@ -280,7 +298,8 @@ export function StatsPage() {
 	const tab: StatTab = picked ?? (data && !data.me ? "global" : "me");
 	return (
 		<Page title="Statistics">
-			<RangePicker
+			<Segmented
+				label="Time range"
 				value={range}
 				options={STATS_RANGES}
 				names={RANGE_NAMES}
@@ -288,20 +307,7 @@ export function StatsPage() {
 			/>
 			{error && <p class="muted">Could not load the statistics: {error}</p>}
 
-			<div class="tabs tabbar" role="tablist">
-				{STAT_TABS.map((t) => (
-					<button
-						key={t.id}
-						type="button"
-						role="tab"
-						aria-selected={t.id === tab}
-						class={`plain tab ${t.id === tab ? "active" : ""}`}
-						onClick={() => setPicked(t.id)}
-					>
-						{t.label}
-					</button>
-				))}
-			</div>
+			<Tabs center tabs={STAT_TABS} value={tab} onChange={setPicked} />
 
 			<section class="page-section">
 				<h2>{tab === "me" ? "Your stats" : "Global stats"}</h2>

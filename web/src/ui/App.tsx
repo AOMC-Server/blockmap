@@ -22,7 +22,6 @@ import { MeasureCard } from "./MeasureCard";
 import { Popup } from "./Popup";
 import { ShareDialog, shareOpen } from "./ShareDialog";
 import { CenterCrosshair, StatusBar } from "./StatusBar";
-import { Toast } from "./Toast";
 import { Toolbar } from "./Toolbar";
 import { Tooltip } from "./Tooltip";
 import { UploadDialog } from "./UploadDialog";
@@ -90,7 +89,6 @@ export function App() {
 					{deleteUploadFor.value && <DeleteUploadDialog />}
 				</>
 			)}
-			<Toast />
 		</div>
 	);
 }

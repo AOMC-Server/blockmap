@@ -1,3 +1,5 @@
+import { Modal } from "@aomc-server/block-ui";
+import { formatDay, formatProgress } from "@aomc-server/block-ui/format";
 import { canEdit } from "@blockmap/shared/roles";
 import { useEffect, useState } from "preact/hooks";
 import { loginUrl } from "../api";
@@ -22,8 +24,7 @@ import {
 	type UploadItem,
 } from "../upload-files";
 import { exportDates, validateFiles } from "../upload-validate";
-import { formatBytes, formatDay, formatProgress } from "./format";
-import { Modal } from "./Modal";
+import { formatBytes } from "./format";
 
 function ProgressBar(props: { percent?: number; label: string }) {
 	const p = props.percent;
@@ -139,7 +140,7 @@ export function UploadDialog() {
 							</div>
 
 							<label
-								class={`dropzone ${dragging ? "dragging" : ""}`}
+								class={`dropzone ${dragging ? "drag-over" : ""}`}
 								onDragOver={(e) => {
 									e.preventDefault();
 									setDragging(true);

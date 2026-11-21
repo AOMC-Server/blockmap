@@ -1,9 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
-	clampPanelWidth,
 	DEFAULT_SETTINGS,
 	mapOutlineScales,
-	PANEL_MIN_WIDTH,
+	panelWidth,
 	parseLayerChoices,
 	parsePosition,
 	parseSettings,
@@ -112,12 +111,12 @@ describe("parsePosition", () => {
 
 describe("panel width", () => {
 	test("is kept between the minimum and most of the window", () => {
-		expect(clampPanelWidth(100, 1400)).toBe(PANEL_MIN_WIDTH);
-		expect(clampPanelWidth(500, 1400)).toBe(500);
-		expect(clampPanelWidth(5000, 1400)).toBe(900);
-		expect(clampPanelWidth(5000, 1000)).toBe(700);
+		expect(panelWidth.clamp(100, 1400)).toBe(320);
+		expect(panelWidth.clamp(500, 1400)).toBe(500);
+		expect(panelWidth.clamp(5000, 1400)).toBe(900);
+		expect(panelWidth.clamp(5000, 1000)).toBe(700);
 		// A narrow window still gets the minimum.
-		expect(clampPanelWidth(500, 340)).toBe(PANEL_MIN_WIDTH);
+		expect(panelWidth.clamp(500, 340)).toBe(320);
 	});
 });
 

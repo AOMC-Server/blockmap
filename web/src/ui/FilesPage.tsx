@@ -1,3 +1,5 @@
+import { Modal, PopupText } from "@aomc-server/block-ui";
+import { formatEta, formatTime } from "@aomc-server/block-ui/format";
 import { type FileConflictMode, fileNameKey } from "@blockmap/shared/files";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
@@ -14,11 +16,9 @@ import {
 	secondsLeft,
 } from "../files";
 import { user } from "../state";
-import { formatBytes, formatEta, formatTime } from "./format";
+import { formatBytes } from "./format";
 import { PixelIcon } from "./icons";
-import { Modal } from "./Modal";
 import { LoadFailed, Page, usePageLoad } from "./Page";
-import { PopupText } from "./PopupText";
 
 type Go = (url: string) => void;
 
@@ -473,7 +473,7 @@ function Library(props: { names: string[]; go: Go }) {
 
 			<section
 				ref={listing}
-				class={`page-section file-listing ${dragging ? "dragging" : ""}`}
+				class={`page-section file-listing ${dragging ? "drag-over" : ""}`}
 			>
 				{empty ? (
 					<p class="muted">
@@ -483,14 +483,14 @@ function Library(props: { names: string[]; go: Go }) {
 					</p>
 				) : (
 					<div>
-						<table class="stats-table file-table">
+						<table class="table compact nowrap file-table">
 							<thead>
 								<tr>
 									<th>Name</th>
-									<th class="stats-num">Size</th>
+									<th class="num">Size</th>
 									<th class="file-meta">Updated</th>
 									<th class="file-meta">By</th>
-									<th class="stats-num file-meta">Downloads</th>
+									<th class="num file-meta">Downloads</th>
 									<th aria-label="Actions" />
 								</tr>
 							</thead>
@@ -503,7 +503,7 @@ function Library(props: { names: string[]; go: Go }) {
 												<span>{f.name}</span>
 											</FolderLink>
 										</td>
-										<td class="stats-num muted">
+										<td class="num muted">
 											{f.items === 1 ? "1 item" : `${f.items} items`}
 										</td>
 										<td class="file-meta muted">{formatTime(f.createdAt)}</td>
@@ -547,10 +547,10 @@ function Library(props: { names: string[]; go: Go }) {
 												<span>{f.name}</span>
 											</a>
 										</td>
-										<td class="stats-num">{formatBytes(f.bytes)}</td>
+										<td class="num">{formatBytes(f.bytes)}</td>
 										<td class="file-meta muted">{formatTime(f.updatedAt)}</td>
 										<td class="file-meta">
-											<span class="stats-player">
+											<span class="player-name">
 												{f.uploadedBy.avatarUrl ? (
 													<img
 														class="avatar"
@@ -565,7 +565,7 @@ function Library(props: { names: string[]; go: Go }) {
 												{f.uploadedBy.username}
 											</span>
 										</td>
-										<td class="stats-num file-meta">{f.downloads}</td>
+										<td class="num file-meta">{f.downloads}</td>
 										<td class="file-actions">
 											<RowMenu
 												actions={[
@@ -977,6 +977,7 @@ function ConflictDialog(props: {
 			<label class="check">
 				<input
 					type="checkbox"
+					class="switch"
 					checked={forAll}
 					onChange={(e) => setForAll(e.currentTarget.checked)}
 				/>

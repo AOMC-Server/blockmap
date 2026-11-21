@@ -1,3 +1,4 @@
+import { renumber, Tabs, Toggle } from "@aomc-server/block-ui";
 import { MAX_NAME } from "@blockmap/shared/features";
 import { canManage, canModerate } from "@blockmap/shared/roles";
 import {
@@ -14,7 +15,6 @@ import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { loginUrl } from "../api";
 import { MAX_PRELOAD_TILES, preloadTiles } from "../map/tileLayer";
-import { renumber } from "../reorder";
 import { describeDimensionScale, formatScale, parseScale } from "../scale";
 import {
 	addDimension,
@@ -94,31 +94,21 @@ function MaintenanceToggle() {
 	const on = currentMap.value?.map.maintenance ?? false;
 	const [busy, setBusy] = useState(false);
 	return (
-		<label class={`toggle ${on ? "maintenance-on" : ""}`}>
-			<input
-				type="checkbox"
-				checked={on}
-				disabled={busy}
-				onChange={async (e) => {
-					const input = e.currentTarget;
-					const next = input.checked;
-					setBusy(true);
-					try {
-						if (!(await setMaintenance(next))) input.checked = !next;
-					} finally {
-						setBusy(false);
-					}
-				}}
-			/>
-			<span>
-				Maintenance mode
-				<span class="muted hint">
-					Makes the map read only for everyone but owners: no uploads, drawing,
-					layer or dimension changes, deletions or invites. Everyone sees a
-					banner saying the map is in maintenance.
-				</span>
-			</span>
-		</label>
+		<Toggle
+			class={on ? "danger" : ""}
+			checked={on}
+			disabled={busy}
+			onChange={async (next) => {
+				setBusy(true);
+				try {
+					await setMaintenance(next);
+				} finally {
+					setBusy(false);
+				}
+			}}
+			label="Maintenance mode"
+			hint="Makes the map read only for everyone but owners: no uploads, drawing, layer or dimension changes, deletions or invites. Everyone sees a banner saying the map is in maintenance."
+		/>
 	);
 }
 
@@ -622,20 +612,12 @@ export function ManagePage() {
 	} else {
 		body = (
 			<>
-				<div class="tabs tabbar" role="tablist">
-					{tabs.map((t) => (
-						<button
-							key={t}
-							type="button"
-							role="tab"
-							aria-selected={t === active}
-							class={`plain tab ${t === active ? "active" : ""}`}
-							onClick={() => setTab(t)}
-						>
-							{TAB_LABELS[t]}
-						</button>
-					))}
-				</div>
+				<Tabs
+					center
+					tabs={tabs.map((t) => ({ id: t, label: TAB_LABELS[t] }))}
+					value={active}
+					onChange={setTab}
+				/>
 				<div class="page-section">
 					{active === "settings" && <SettingsTab />}
 					{active === "dimensions" && <DimensionsTab />}

@@ -1,4 +1,10 @@
 import {
+	type ExpiryOption,
+	ExpirySelect,
+	ShownOnce,
+} from "@aomc-server/block-ui";
+import { formatTime } from "@aomc-server/block-ui/format";
+import {
 	DEFAULT_TOKEN_EXPIRY_DAYS,
 	DEFAULT_TOKEN_SCOPES,
 	MAX_TOKENS_PER_USER,
@@ -10,8 +16,6 @@ import { MAX_NAME } from "@blockmap/shared/features";
 import type { InferResponseType } from "hono/client";
 import { useEffect, useState } from "preact/hooks";
 import { api, ok, run } from "../api";
-import { formatTime } from "./format";
-import { type ExpiryOption, ExpirySelect, ShownOnce } from "./shareCommon";
 
 type TokenInfo = InferResponseType<
 	typeof api.api.tokens.$get,
@@ -184,6 +188,7 @@ export function ApiTokens() {
 						<label key={s} title={SCOPE_INFO[s].hint}>
 							<input
 								type="checkbox"
+								class="switch"
 								checked={scopes.includes(s)}
 								onChange={(e) => toggleScope(s, e.currentTarget.checked)}
 							/>

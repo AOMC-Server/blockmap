@@ -75,10 +75,6 @@ export const tilesPaused = signal(false);
 /** Low resolution tiles around spawn: how many have loaded, out of how many. */
 export const preloadProgress = signal({ done: 0, failed: 0, total: 0 });
 
-export const notice = signal<{ text: string; kind: "error" | "info" } | null>(
-	null,
-);
-
 export const layersData = signal<LayerData[]>([]);
 /** Layers the user toggled away from their default during this visit (layerId -> hidden). */
 const layerOverrides = signal<Map<number, boolean>>(new Map());

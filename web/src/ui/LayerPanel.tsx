@@ -1,3 +1,4 @@
+import { type CrossDrop, Grip, moveItem } from "@aomc-server/block-ui";
 import type { Dye } from "@blockmap/shared/colors";
 import {
 	cleanStyle,
@@ -22,7 +23,6 @@ import {
 	updateLayer,
 } from "../layers";
 import { boundsOf } from "../map/geometry";
-import { type CrossDrop, moveItem } from "../reorder";
 import {
 	canEditMap,
 	currentMap,
@@ -42,7 +42,6 @@ import {
 } from "../state";
 import { openFeaturePopup } from "../tools/features";
 import { DyePicker } from "./DyePicker";
-import { Grip } from "./Grip";
 import { Banner } from "./icons";
 import { layerSharingFor } from "./LayerSharing";
 import { Panel } from "./Panel";
@@ -155,6 +154,7 @@ function LayerForm(props: {
 			<label class="check">
 				<input
 					type="checkbox"
+					class="switch"
 					checked={hidden}
 					onChange={(e) => setHidden(e.currentTarget.checked)}
 				/>
@@ -170,6 +170,7 @@ function LayerForm(props: {
 			>
 				<input
 					type="checkbox"
+					class="switch"
 					checked={priv}
 					disabled={!canSetVisibility}
 					onChange={(e) => setPriv(e.currentTarget.checked)}
@@ -360,12 +361,13 @@ function LayerRow(props: {
 	const dropOn = (f: FeatureData): CrossDrop | undefined =>
 		editable && targets.length > 0
 			? {
+					rows: ".features > li:not(.muted)",
 					accepts: (id) => {
-						const t = targets.find((x) => x.id === id);
+						const t = targets.find((x) => x.id === Number(id));
 						return !!t && !isLayerFull(t);
 					},
 					onDrop: (id, index) => {
-						const t = targets.find((x) => x.id === id);
+						const t = targets.find((x) => x.id === Number(id));
 						if (t) void moveTo(f, t, index);
 					},
 				}
@@ -374,7 +376,7 @@ function LayerRow(props: {
 	return (
 		<li
 			class={`layer ${open ? "open" : ""} ${hidden ? "hidden" : ""}`}
-			data-drop-layer={l.id}
+			data-drop-target={l.id}
 		>
 			<div class="layer-head">
 				{props.position && (
@@ -388,6 +390,7 @@ function LayerRow(props: {
 				)}
 				<input
 					type="checkbox"
+					class="switch"
 					checked={!hidden}
 					aria-label={`Show ${l.name}`}
 					onChange={() => toggleLayer(l)}
