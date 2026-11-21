@@ -1,3 +1,4 @@
+import type { PanelResize } from "@aomc-server/block-ui";
 import {
 	isModeChoice,
 	isStyle,
@@ -284,3 +285,16 @@ export const panelWidth = createWidthStore({
 	cssVar: "--panel-w",
 	cssValue: (w) => `min(${w}px, calc(100vw - 16px))`,
 });
+
+/** For the library's Panel (`resize={panelResize}`): the width above, dragged at the panel's left edge. */
+export const panelResize: PanelResize = {
+	get width() {
+		return panelWidth.width.value;
+	},
+	min: panelWidth.min,
+	get max() {
+		return panelWidth.max();
+	},
+	onChange: panelWidth.set,
+	onReset: panelWidth.reset,
+};

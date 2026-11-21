@@ -1,11 +1,4 @@
-import {
-	formatDay,
-	formatBytes as formatSize,
-	formatTime,
-} from "@aomc-server/block-ui/format";
-
-/** A size with the "KB" / "MB" labels (still binary) the app has always shown. */
-export const formatBytes = (bytes: number): string => formatSize(bytes, "kb");
+import { formatDay, formatTime } from "@aomc-server/block-ui/format";
 
 type Upload = { exportedAt: number | null; createdAt: number };
 

@@ -1,5 +1,9 @@
 import { Modal } from "@aomc-server/block-ui";
-import { formatDay, formatProgress } from "@aomc-server/block-ui/format";
+import {
+	formatBytes,
+	formatDay,
+	formatProgress,
+} from "@aomc-server/block-ui/format";
 import { canEdit } from "@blockmap/shared/roles";
 import { useEffect, useState } from "preact/hooks";
 import { loginUrl } from "../api";
@@ -24,7 +28,6 @@ import {
 	type UploadItem,
 } from "../upload-files";
 import { exportDates, validateFiles } from "../upload-validate";
-import { formatBytes } from "./format";
 
 function ProgressBar(props: { percent?: number; label: string }) {
 	const p = props.percent;

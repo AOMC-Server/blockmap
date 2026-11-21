@@ -1,4 +1,5 @@
-import { formatRemaining, formatTime } from "@aomc-server/block-ui/format";
+import { Panel } from "@aomc-server/block-ui";
+import { formatDuration, formatTime } from "@aomc-server/block-ui/format";
 import { effect } from "@preact/signals";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { isolateUpload, mapView, setRev } from "../controller";
@@ -6,7 +7,7 @@ import { subscribe } from "../events";
 import type { Bounds } from "../map/geometry";
 import { inFlight } from "../revisionLog";
 import { deleting, loadRevisions } from "../revisions";
-import { settings, updateSettings } from "../settings";
+import { panelResize, settings, updateSettings } from "../settings";
 import {
 	currentMap,
 	dimSlug,
@@ -32,7 +33,6 @@ import {
 } from "../timeline";
 import { deleteUploadFor } from "./DeleteUploadDialog";
 import { formatEventDay, formatEventTime } from "./format";
-import { Panel } from "./Panel";
 import { pointAt, Timeline } from "./Timeline";
 
 /**
@@ -172,7 +172,7 @@ function RevisionRow(props: { r: RevisionInfo; odd: boolean; now: number }) {
 					class="btn small danger"
 					title={
 						r.deletableUntil !== null
-							? `You can delete your upload for another ${formatRemaining(r.deletableUntil - props.now)}`
+							? `You can delete your upload for another ${formatDuration(Math.ceil((r.deletableUntil - props.now) / 60_000) * 60)}`
 							: "Remove this upload from the map and its history"
 					}
 					onClick={() => {
@@ -292,6 +292,7 @@ export function HistoryPanel() {
 
 	return (
 		<Panel
+			resize={panelResize}
 			title="History"
 			class="history-panel"
 			onClose={() => (sidePanel.value = null)}

@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mapInfo } from "../src/db/schema";
+import { dimensions, mapInfo } from "../src/db/schema";
 import { topics } from "../src/topics";
 import { cleanupTempDirs, makeTestApp } from "./helpers";
 
@@ -107,6 +107,23 @@ describe("OpenAPI spec", () => {
 			asyncapi: "Cool Map events",
 			scalar: "Cool Map API",
 		});
+	});
+
+	test("the docs work without a login and before a map exists", async () => {
+		const t = makeTestApp();
+		await t.db.delete(dimensions);
+		await t.db.delete(mapInfo);
+		const openapi = await t.app.request("/api/openapi.json");
+		expect(openapi.status).toBe(200);
+		expect(
+			((await openapi.json()) as { info: { title: string } }).info.title,
+		).toBe("Blockmap API");
+		const asyncapi = await t.app.request("/api/asyncapi.json");
+		expect(asyncapi.status).toBe(200);
+		expect(
+			((await asyncapi.json()) as { info: { title: string } }).info.title,
+		).toBe("Blockmap events");
+		expect((await t.app.request("/scalar")).status).toBe(200);
 	});
 
 	test("describes request bodies from the zod schemas", async () => {

@@ -33,7 +33,7 @@ import { staticRoutes } from "./routes/static";
 import { statsRoutes } from "./routes/stats";
 import { tokenRoutes } from "./routes/tokens";
 import type { Services } from "./services";
-import { displayName } from "./siteName";
+import { siteName } from "./siteName";
 import type { AppEnv } from "./types";
 
 const isUpload = (path: string) =>
@@ -77,6 +77,33 @@ export function createApp({ db, env, services, fetch: fetchFn }: AppDeps) {
 		.use(scopeMiddleware)
 		// Downloads need a login but no map; what is not a file falls through to the web app.
 		.route("/files", fileDownloadRoutes)
+		// The public docs only need the map's name, so they work before a map exists.
+		.get("/api/asyncapi.json", (c) =>
+			c.json(asyncApiDocument(env, siteName(c.var.db))),
+		)
+		.route("/scalar", docsRoutes)
+		.get("/api/openapi.json", (c, next) => {
+			const name = siteName(c.var.db);
+			if (spec?.name !== name)
+				spec = {
+					name,
+					handler: openAPIRouteHandler(self, {
+						excludeStaticFile: false, // /api/preview.png is an endpoint
+
+						documentation: {
+							info: {
+								title: `${name} API`,
+								version: "1.0.0",
+								description: apiDescription,
+							},
+							servers: [{ url: env.PUBLIC_URL }],
+							tags,
+							components: { securitySchemes },
+						},
+					}),
+				};
+			return spec.handler(c, next);
+		})
 		.use("/api/*", async (c, next) => {
 			const { map, role } = await loadAccess(db, c.var.user);
 			c.set("map", map);
@@ -117,32 +144,6 @@ export function createApp({ db, env, services, fetch: fetchFn }: AppDeps) {
 		.route("/s", shortLinkRedirect)
 		.route("/api/admin", adminRoutes)
 		.route("/api/events", eventRoutes)
-		.get("/api/asyncapi.json", (c) =>
-			c.json(asyncApiDocument(env, displayName(c.var.map.name))),
-		)
-		.route("/scalar", docsRoutes)
-		.get("/api/openapi.json", (c, next) => {
-			const name = displayName(c.var.map.name);
-			if (spec?.name !== name)
-				spec = {
-					name,
-					handler: openAPIRouteHandler(self, {
-						excludeStaticFile: false, // /api/preview.png is an endpoint
-
-						documentation: {
-							info: {
-								title: `${name} API`,
-								version: "1.0.0",
-								description: apiDescription,
-							},
-							servers: [{ url: env.PUBLIC_URL }],
-							tags,
-							components: { securitySchemes },
-						},
-					}),
-				};
-			return spec.handler(c, next);
-		})
 		.route(
 			"/",
 			staticRoutes(env.WEB_DIST ?? `${import.meta.dir}/../../web/dist`),

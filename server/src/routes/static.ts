@@ -20,6 +20,13 @@ export function staticRoutes(distDir: string) {
 	const indexPath = join(distDir, "index.html");
 	if (!existsSync(indexPath)) return app;
 
+	// The build does not change while the server runs, so read it on first use.
+	let indexHtml: Promise<string> | undefined;
+	const readIndex = () => {
+		indexHtml ??= Bun.file(indexPath).text();
+		return indexHtml;
+	};
+
 	/** Share tags for the viewer at "/v2/", from the view in the query string. */
 	async function metaFor(c: Context<AppEnv>): Promise<PageMeta | null> {
 		const { db, env } = c.var;
@@ -67,7 +74,7 @@ export function staticRoutes(distDir: string) {
 		)
 		.get("/v2", (c) => c.redirect(`/v2/${new URL(c.req.url).search}`, 302))
 		.get("/v2/", async (c) => {
-			const html = await Bun.file(indexPath).text();
+			const html = await readIndex();
 			const meta = await metaFor(c);
 			c.header("Cache-Control", "no-cache");
 			return c.html(
@@ -86,7 +93,7 @@ export function staticRoutes(distDir: string) {
 			}),
 		)
 		.get("*", async (c) => {
-			const html = await Bun.file(indexPath).text();
+			const html = await readIndex();
 			c.header("Cache-Control", "no-cache");
 			return c.html(injectTitle(html, siteName(c.var.db)));
 		});

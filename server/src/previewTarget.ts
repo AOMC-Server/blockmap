@@ -6,6 +6,7 @@ import { defaultDimension, dimensionBySlug } from "./dimensionLookup";
 import type { Env } from "./env";
 import { timeOfRev } from "./features";
 import type { PreviewParams } from "./preview";
+import { displayName } from "./siteName";
 import type { MapRow } from "./types";
 
 const coord = z.coerce.number().pipe(blockCoord);
@@ -57,7 +58,7 @@ export async function resolvePreviewTarget(
 		Math.round(Math.min(Math.max(q.zoom ?? 2, MIN_ZOOM), env.MAX_ZOOM) * 100) /
 		100;
 	return {
-		mapName: map.name,
+		mapName: displayName(map.name),
 		dimensionName: dim.name,
 		dimensionSlug: dim.slug,
 		params: {

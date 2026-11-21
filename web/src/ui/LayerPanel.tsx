@@ -1,4 +1,4 @@
-import { Grip, Toggle } from "@aomc-server/block-ui";
+import { Grip, Panel, Toggle } from "@aomc-server/block-ui";
 import { type CrossDrop, moveItem } from "@aomc-server/block-ui/reorder";
 import type { Dye } from "@blockmap/shared/colors";
 import {
@@ -24,6 +24,7 @@ import {
 	updateLayer,
 } from "../layers";
 import { boundsOf } from "../map/geometry";
+import { panelResize } from "../settings";
 import {
 	canEditMap,
 	currentMap,
@@ -45,7 +46,6 @@ import { openFeaturePopup } from "../tools/features";
 import { DyePicker } from "./DyePicker";
 import { Banner } from "./icons";
 import { layerSharingFor } from "./LayerSharing";
-import { Panel } from "./Panel";
 import { StyleControls } from "./StyleControls";
 
 /** Layers that are expanded in the list; kept when the panel is closed and reopened. */
@@ -558,7 +558,11 @@ export function LayerPanel() {
 	useEffect(() => () => hoverFeature(null), []);
 
 	return (
-		<Panel title="Layers" onClose={() => (sidePanel.value = null)}>
+		<Panel
+			title="Layers"
+			resize={panelResize}
+			onClose={() => (sidePanel.value = null)}
+		>
 			{canEditMap.value && (
 				<div class="new-layer">
 					{creating ? (

@@ -52,10 +52,17 @@ effect(() => {
 	if (dim && currentMap.value) savePalette({ dim, palette });
 });
 
-// The server puts the map's name in the title; follow it when an owner renames the map.
+// Same titles as the server's (html.ts): the map page is "Name: Dimension", other pages the name.
+// Follows a rename by an owner and the dimension being viewed.
 effect(() => {
-	const name = currentMap.value?.map.name.trim();
-	if (name) document.title = name;
+	const detail = currentMap.value;
+	const name = detail?.map.name.trim();
+	if (!detail || !name) return;
+	const dim = onMap
+		? detail.dimensions.find((d) => d.slug === dimSlug.value)
+		: undefined;
+	const title = dim ? `${name}: ${dim.name}` : name;
+	if (document.title !== title) document.title = title;
 });
 
 render(

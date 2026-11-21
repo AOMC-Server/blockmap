@@ -1,7 +1,7 @@
+import { formatBytes } from "@aomc-server/block-ui/format";
 import { uploadPathSchema } from "@blockmap/shared/schemas";
 import { parseXaeroCoords, parseXaeroExportDate } from "@blockmap/shared/xaero";
 import type { UploadLimits } from "./state";
-import { formatBytes } from "./ui/format";
 
 export type FileInfo = {
 	name: string;

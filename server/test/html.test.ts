@@ -146,6 +146,39 @@ describe("share tags on /v2/", () => {
 		expect(meta(html, "og:title")).toContain("&quot;&gt;&lt;script&gt;");
 	});
 
+	test("hostile and replacement-pattern map names are escaped in the title and og:site_name", async () => {
+		const names: [string, string][] = [
+			[
+				"</title><script>alert(1)</script>",
+				"&lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;",
+			],
+			["Tom $& $1 $' $`", "Tom $&amp; $1 $&#39; $`"],
+		];
+		for (const [name, escaped] of names) {
+			const t = bootPage();
+			await t.db.update(mapInfo).set({ name });
+			const map = await (await t.app.request("/v2/")).text();
+			expect(map).toContain(`<title>${escaped}: Overworld</title>`);
+			expect(meta(map, "og:site_name")).toBe(escaped);
+			const page = await (await t.app.request("/settings")).text();
+			expect(page).toContain(`<title>${escaped}</title>`);
+			for (const html of [map, page]) {
+				expect(html).not.toContain("<script>");
+				expect(html.match(/<title>/g)).toHaveLength(1);
+				expect(html.split("</head>")).toHaveLength(2);
+			}
+		}
+	});
+
+	test("a blank map name falls back to the site name in the share tags", async () => {
+		const t = bootPage();
+		await t.db.update(mapInfo).set({ name: "  " });
+		const html = await (await t.app.request("/v2/")).text();
+		expect(html).toContain("<title>Blockmap: Overworld</title>");
+		expect(meta(html, "og:site_name")).toBe("Blockmap");
+		expect(meta(html, "og:description")).toStartWith("Blockmap, Overworld");
+	});
+
 	test("og:site_name and the generic titles follow the map name", async () => {
 		const t = bootPage();
 		await t.db.update(mapInfo).set({ name: "Cool Map" });

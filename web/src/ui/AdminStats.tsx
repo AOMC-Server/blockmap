@@ -6,6 +6,7 @@ import {
 	TileGrid,
 } from "@aomc-server/block-ui";
 import {
+	formatBytes,
 	formatDay,
 	formatDuration,
 	formatNumber,
@@ -16,7 +17,6 @@ import { DAY, HOUR } from "@blockmap/shared/time";
 import type { InferResponseType } from "hono/client";
 import { useState } from "preact/hooks";
 import { api } from "../api";
-import { formatBytes } from "./format";
 import { useStats } from "./useStats";
 
 type Body = InferResponseType<typeof api.api.admin.stats.$get, 200>;

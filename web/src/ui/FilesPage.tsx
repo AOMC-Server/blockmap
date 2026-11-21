@@ -1,5 +1,9 @@
 import { Modal, PopupText, Toggle } from "@aomc-server/block-ui";
-import { formatEta, formatTime } from "@aomc-server/block-ui/format";
+import {
+	formatBytes,
+	formatElapsed,
+	formatTime,
+} from "@aomc-server/block-ui/format";
 import { type FileConflictMode, fileNameKey } from "@blockmap/shared/files";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
@@ -16,7 +20,6 @@ import {
 	secondsLeft,
 } from "../files";
 import { user } from "../state";
-import { formatBytes } from "./format";
 import { PixelIcon } from "./icons";
 import { LoadFailed, Page, usePageLoad } from "./Page";
 
@@ -800,12 +803,15 @@ function RowMenu(props: { actions: [string, () => void][] }) {
 	);
 }
 
-/** "1.2 GB of 4 GB · 25 MB/s · 2 min 10 s left" */
+/** "1.2 GiB of 4 GiB · 25 MiB/s · 2m 10s left" */
 function uploadStatus(j: Job, speed: number | null): string {
 	const parts = [`${formatBytes(j.loaded)} of ${formatBytes(j.file.size)}`];
 	const left = secondsLeft(j.file.size - j.loaded, speed);
 	if (speed !== null && left !== null)
-		parts.push(`${formatBytes(speed)}/s`, `${formatEta(left)} left`);
+		parts.push(
+			`${formatBytes(speed)}/s`,
+			`${formatElapsed(Math.ceil(left))} left`,
+		);
 	return parts.join(" · ");
 }
 
@@ -844,7 +850,7 @@ function UploadList(props: {
 				{allLeft !== null && (
 					<span class="muted upload-eta">
 						{" "}
-						· about {formatEta(allLeft)} left for all
+						· about {formatElapsed(Math.ceil(allLeft))} left for all
 					</span>
 				)}
 			</h2>

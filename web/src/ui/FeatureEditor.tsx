@@ -1,3 +1,4 @@
+import { Panel } from "@aomc-server/block-ui";
 import type { Dye } from "@blockmap/shared/colors";
 import { resolveStyle } from "@blockmap/shared/featureStyle";
 import {
@@ -12,6 +13,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { showNotice } from "../api";
 import { pathsOf, TYPE_LABEL } from "../featureInfo";
 import { createFeature, deleteFeature, updateFeature } from "../layers";
+import { panelResize } from "../settings";
 import {
 	draftLook,
 	editor,
@@ -38,7 +40,6 @@ import {
 import { DyePicker } from "./DyePicker";
 import { Banner } from "./icons";
 import { LayerSelect } from "./LayerSelect";
-import { Panel } from "./Panel";
 import { PointsList, ShapeStats } from "./PointsList";
 import { StyleControls } from "./StyleControls";
 
@@ -225,6 +226,7 @@ export function FeatureEditor() {
 
 	return (
 		<Panel
+			resize={panelResize}
 			title={target.mode === "create" ? "New feature" : "Edit feature"}
 			onClose={closeEditor}
 			closeText="Cancel"
