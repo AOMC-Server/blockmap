@@ -1,12 +1,14 @@
 services:
-  aomc-map:
+  blockmap:
     build: .
     restart: unless-stopped
     ports:
       # The container listens on PORT from .env (3000 if unset); publish the same port.
-      # Bound to localhost: only the reverse proxy on this host may reach it, so client IPs
-      # taken from X-Forwarded-For can be trusted.
-      - "${PORT:-3000}:${PORT:-3000}"
+      # Only on BIND_ADDR (localhost unless .env says otherwise): client IPs are taken from
+      # X-Forwarded-For, which can only be trusted when nothing but the reverse proxy can
+      # reach the port. Use the host's LAN address for a proxy on another machine, or 0.0.0.0
+      # in development to reach it from other devices.
+      - "${BIND_ADDR:-127.0.0.1}:${PORT:-3000}:${PORT:-3000}"
     env_file: .env
     environment:
       DATA_DIR: /data

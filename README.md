@@ -1,4 +1,4 @@
-# AOMC Map
+# blockmap
 
 A web map for a Minecraft server, built from [Xaero's World Map](https://modrinth.com/mod/xaeros-world-map) exports. Players upload exported images, the server stitches them into tiles, and everyone can browse the map, add pins, lines and areas, and travel back through the map's history. Logins are via Discord.
 
@@ -42,14 +42,16 @@ The first start creates the map with the dimensions Overworld, Nether and The En
 
 ### Behind a reverse proxy
 
-Set a long random `SESSION_SECRET` (the container runs with `NODE_ENV=production`, so the server refuses to start with the built-in dev value). Terminate TLS in front of the container and set `PUBLIC_URL` to the public `https://` address (cookies are only marked `Secure` for https, and the CSRF check compares the `Origin` header to `PUBLIC_URL`). Two proxy settings matter:
+Set a long random `SESSION_SECRET` (the container runs with `NODE_ENV=production`, so the server refuses to start with the built-in dev value). Terminate TLS in front of the container and set `PUBLIC_URL` to the public `https://` address (cookies are only marked `Secure` for https, and the CSRF check compares the `Origin` header to `PUBLIC_URL`). Three things matter:
 
+- Let only the proxy reach the container. The server takes the client's address from the last `X-Forwarded-For` entry (for rate limits), so anyone who can reach the port directly can fake it. Docker Compose publishes the port on `BIND_ADDR`, `127.0.0.1` by default, which suits a proxy on the same host. For a proxy on another machine (a router such as OPNsense, say), set it to this host's LAN address and allow only the proxy's address to the port; Docker-published ports bypass ufw and firewalld, so the rule belongs in the `DOCKER-USER` iptables chain (`iptables -I DOCKER-USER -p tcp --dport 3000 ! -s <proxy ip> -j DROP`). In development without a proxy, `BIND_ADDR=0.0.0.0` makes the site reachable from other devices; set `PUBLIC_URL` to the address they use (and add its callback URL in Discord) or logging in will not work there.
 - Allow request bodies of at least `MAX_UPLOAD_BYTES` (200 MB by default), or `MAX_FILE_BYTES` (20 GiB) if the [file library](#file-library) should take files that large. For nginx: `client_max_body_size 20g;`, and `proxy_request_buffering off;` so a large upload streams through instead of being written to the proxy's disk first.
 - Do not buffer server-sent events (`/api/events` and `/api/revisions/<id>/events`). For nginx: `proxy_buffering off;` on those locations (or the whole server). The web app falls back to polling when the stream is buffered, but then updates arrive late.
 
 ## Local development
 
 ```bash
+git submodule update --init   # block-ui (or clone with --recursive)
 bun install
 cp .env.example .env      # Discord credentials are only needed to log in
 bun run dev               # API on :3000, restarts on change
@@ -58,13 +60,15 @@ bun run dev:web           # Vite dev server with hot reload; proxies /api, /auth
 
 | Command               | What it does                                                 |
 | --------------------- | ------------------------------------------------------------ |
-| `bun test`            | all tests (server, shared, web logic, scripts)               |
+| `bun run test`        | all tests (server, shared, web logic, scripts)               |
 | `bun run lint`        | Biome (formatting and lint)                                  |
 | `bun run typecheck`   | `tsc` for every package                                      |
 | `bun run build`       | production web build into `web/dist` (served by the server)  |
 | `bun run db:generate` | generate a migration after editing `server/src/db/schema.ts` |
 
-Coming from Node: `npm install` is `bun install`, `npm run x` is `bun run x`, `npx tool` is `bunx tool`, and `npm test` is `bun test`.
+Coming from Node: `npm install` is `bun install`, `npm run x` is `bun run x`, `npx tool` is `bunx tool`, and `npm test` is `bun run test`.
+
+The interface is built on [`@aomc-server/block-ui`](https://github.com/AOMC-Server/block-ui), the components, helpers and stylesheet shared with blocklogs; `web/src/styles.css` only has what is specific to the map. The library is a git submodule in `block-ui/` and a workspace package, so edits there show up right away. To change it, `git switch main` inside `block-ui/`, commit and push there, then commit the new submodule commit here; `git submodule update --remote block-ui` pulls in library changes made elsewhere. `bun run test` leaves the library's own tests out (run them with `cd block-ui && bun test`). Vite runs with `--configLoader runner` because `web/vite.config.ts` imports the library's TypeScript (its prepaint script), and the root `bunfig.toml` makes Bun compile the library's TSX with Preact in tests.
 
 ## Configuration
 
@@ -75,9 +79,10 @@ All settings are environment variables (see `.env.example`).
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` |                               | Discord OAuth credentials                                                                                                                                        |
 | `SESSION_SECRET`                             | dev value                     | signs the OAuth state cookie (at least 16 characters); required when `PUBLIC_URL` is https and in Docker (`NODE_ENV=production`), where the dev value is refused |
 | `PUBLIC_URL`                                 | `http://localhost:3000`       | public address; used for cookies, the Origin check, invite links and previews                                                                                    |
-| `SETUP_MAP_NAME`                             | `AOMC`                        | name of the map created on first boot                                                                                                                            |
+| `SETUP_MAP_NAME`                             | `Blockmap`                    | name of the map created on first boot                                                                                                                            |
 | `SETUP_OWNER_DISCORD_IDS`                    |                               | comma-separated Discord ids that become owners when they first log in; only read on the first boot, when the map is created (use _Manage → Members_ later)       |
 | `PORT`                                       | `3000`                        | listen port; `docker-compose.yml` publishes the same port on the host                                                                                            |
+| `BIND_ADDR`                                  | `127.0.0.1`                   | host address Docker Compose publishes the port on; see [Behind a reverse proxy](#behind-a-reverse-proxy)                                                         |
 | `DATA_DIR`                                   | `./data`                      | database, blobs, preview cache (`/data` in Docker)                                                                                                               |
 | `WEB_DIST`                                   | `web/dist`                    | built web app the server serves                                                                                                                                  |
 | `SCALAR_BUNDLE`                              | Scalar in `node_modules`      | Scalar's `standalone.js` for `/scalar`; the Docker image sets it                                                                                                 |
@@ -137,20 +142,20 @@ The full reference is rendered by [Scalar](https://scalar.com) at `/scalar`, wit
 
 Scalar's browser bundle is served locally (`/scalar/standalone.js`, from `node_modules` or `SCALAR_BUNDLE`), so the page makes no requests to third parties. Both documents can also be imported into Postman, a client generator and the like. The sections below are an overview.
 
-Authentication is a session cookie (browser) or `Authorization: Bearer aomc_…` (scripts). Generate one on the **Settings** page (`/settings`), or with `POST /api/tokens {"name": "…", "expiresInDays": 180}` while logged in with a session (a token cannot create or revoke tokens). It is shown once, expires after 180 days unless you pick another period (`null` = never) and each user can hold 25. A token has `scopes` (default `["read", "upload", "features"]`) and can never do more than its user: `read` shows what the user sees (without it, GETs are answered as to an anonymous visitor, except `GET /api/me`); `upload` allows uploads and deleting your own, and changes to the file library where the user may make them; `features` allows writing layers, features, layer sharing and accepting invites; `moderate` allows moderator powers (deleting any upload, restoring features, dimensions, file library access); `manage` allows owner powers (members, map invites, map settings, recomputing history) and implies `moderate`. A write outside the token's scopes answers 403; tokens created before scopes existed have all of them. Writes made with a cookie must come from `PUBLIC_URL` (CSRF), Bearer requests need no such check. Errors are JSON `{"error": "…"}`; resources you may not see answer 404. A request that fails validation answers 400 `{"error": "invalid request", "issues": [{"path": […], "message": "…"}]}` (the request itself is never echoed back); malformed JSON is a 400 `{"error"}` too. JSON bodies over 16 MiB are refused with 413 (uploads have their own limit, `MAX_UPLOAD_BYTES`).
+Authentication is a session cookie (browser) or `Authorization: Bearer blockmap_…` (scripts). Generate one on the **Settings** page (`/settings`), or with `POST /api/tokens {"name": "…", "expiresInDays": 180}` while logged in with a session (a token cannot create or revoke tokens). It is shown once, expires after 180 days unless you pick another period (`null` = never) and each user can hold 25. A token has `scopes` (default `["read", "upload", "features"]`) and can never do more than its user: `read` shows what the user sees (without it, GETs are answered as to an anonymous visitor, except `GET /api/me`); `upload` allows uploads and deleting your own, and changes to the file library where the user may make them; `features` allows writing layers, features, layer sharing and accepting invites; `moderate` allows moderator powers (deleting any upload, restoring features, dimensions, file library access); `manage` allows owner powers (members, map invites, map settings, recomputing history) and implies `moderate`. A write outside the token's scopes answers 403; tokens created before scopes existed have all of them. Writes made with a cookie must come from `PUBLIC_URL` (CSRF), Bearer requests need no such check. Errors are JSON `{"error": "…"}`; resources you may not see answer 404. A request that fails validation answers 400 `{"error": "invalid request", "issues": [{"path": […], "message": "…"}]}` (the request itself is never echoed back); malformed JSON is a 400 `{"error"}` too. JSON bodies over 16 MiB are refused with 413 (uploads have their own limit, `MAX_UPLOAD_BYTES`).
 
 ```bash
 # Upload
-curl -H "Authorization: Bearer aomc_…" \
+curl -H "Authorization: Bearer blockmap_…" \
   -F 'files[]=@Overworld_x-512_z0.png' -F 'files[]=@Overworld_x0_z0.png' \
   http://localhost:3000/api/dimensions/overworld/uploads
 # -> {"revisionId": 1, "revisionIds": [1], "skipped": []}   poll GET /api/revisions/1, or stream GET /api/events?topics=revision:1 (SSE)
 
 # Put a file in the file library (the folder must exist; onConflict=fail|replace|rename)
-curl -T world.zip -H "Authorization: Bearer aomc_…" \
+curl -T world.zip -H "Authorization: Bearer blockmap_…" \
   'http://localhost:3000/api/files/upload?path=/voxy&name=world.zip&onConflict=replace'
 # Download it
-curl -OJ -H "Authorization: Bearer aomc_…" http://localhost:3000/files/voxy/world.zip
+curl -OJ -H "Authorization: Bearer blockmap_…" http://localhost:3000/files/voxy/world.zip
 ```
 
 The in-game mod is recognised by its `User-Agent` header (`MOD_USER_AGENTS`; by default `AOMC Webmapper`, and `AOMC Visited` for older versions). Such uploads are flagged `viaMod` on their revision and counted together in one statistic (`modUploads`), besides the normal ones. An upload may also carry `coords`, a JSON array of `{x, z}` aligned with the files (after ZIP expansion), which overrides the file names. ZIP entries are read by base name only for coordinates. The export date comes from the file name, from the path of an entry inside a ZIP, or from `paths`, a JSON array of strings aligned with the uploaded files (before ZIP expansion) naming where each came from, e.g. `"2026-02-10_15.06.41/0_0_x-1248_z-1472.png"`. Xaero names exports by the local time of the player's computer, so send `timeZone`, its IANA name (e.g. `Europe/Berlin`); the web client does this automatically, and without it the dates are read as UTC. An upload with several export dates creates one revision per date, oldest first (`revisionIds`, in order; `revisionId` is the last). Duplicate files are skipped: one whose exact bytes were already uploaded to the same coordinates of the dimension (by an upload that is queued or done, not failed or deleted), or that appears twice in the request, is left out and listed in `skipped` as `{file, reason}`. If every file is a duplicate the answer is 409 `{error, skipped}`. Only uploads made since this check was added are known to it.
@@ -238,7 +243,7 @@ data/gc-quarantine/  only while gc-blobs --delete runs (see below)
 ### Backups
 
 ```bash
-docker compose exec aomc-map bun scripts/backup.ts /data/backups     # or: bun run backup <dir> --data ./data
+docker compose exec blockmap bun scripts/backup.ts /data/backups     # or: bun run backup <dir> --data ./data
 ```
 
 This writes a consistent `db-<UTC timestamp>.sqlite` (SQLite's `VACUUM INTO`, safe while the server runs) and copies any blobs and file library contents the destination doesn't have yet (`--skip-files` leaves the file library out). Neither ever changes once written, so the copy only ever grows and repeated runs are cheap. `--keep N` (default 14, at least 1) prunes old database snapshots. Put it in cron, then sync the destination off the machine with whatever you already use (rsync, restic, rclone, …). Litestream also works for continuous database replication, if you want it; the blobs still need the copy above.
@@ -250,8 +255,8 @@ This writes a consistent `db-<UTC timestamp>.sqlite` (SQLite's `VACUUM INTO`, sa
 Failed or superseded work can leave blobs that nothing references. The collector is a dry run unless you pass `--delete`:
 
 ```bash
-docker compose exec aomc-map bun scripts/gc-blobs.ts            # report only
-docker compose exec aomc-map bun scripts/gc-blobs.ts --delete
+docker compose exec blockmap bun scripts/gc-blobs.ts            # report only
+docker compose exec blockmap bun scripts/gc-blobs.ts --delete
 ```
 
 Copies in other [tile formats](#tile-formats) are removed together with their WebP. It keeps everything referenced by a tile version or an upload patch, keeps files younger than an hour (`--min-age-minutes`, a positive number; the blob store refreshes a file's age whenever an upload reuses it), and refuses to delete while jobs are pending, because a running job writes blobs before the database row that points to them. A scan can outlast a job starting, so `--delete` first moves the candidates into `data/gc-quarantine/`, reads the database again, puts back whatever became referenced or young (all of it, with an error, if a job has appeared) and only then deletes. A run that was killed halfway leaves files there; the next `--delete` run puts them back and judges them again.
@@ -261,7 +266,7 @@ Copies in other [tile formats](#tile-formats) are removed together with their We
 The importer uses only the public API, so it works against any running server. v1 stored tiles as `<dimension>/<zoom>/<x>_<z>.png` where x and z are the block coordinates of the tile's top-left corner; only zoom 0 is imported (the other levels are rebuilt by the server).
 
 ```bash
-export AOMC_TOKEN=aomc_…          # an editor's token, from POST /api/tokens
+export BLOCKMAP_TOKEN=blockmap_…          # an editor's token, from POST /api/tokens
 bun scripts/import-v1.ts --url https://map.example.com \
     --src /path/to/v1/data/output --state import-state.json
 ```
@@ -271,8 +276,8 @@ It uploads in batches (`--batch`, default 200; also capped by the server's `MAX_
 ### Importing features from a spreadsheet
 
 ```bash
-export AOMC_TOKEN=aomc_…          # a token with the `features` scope
-bun scripts/import-xlsx.ts --url https://map.example.com --file AOMC-map.xlsx [--dry-run]
+export BLOCKMAP_TOKEN=blockmap_…          # a token with the `features` scope
+bun scripts/import-xlsx.ts --url https://map.example.com --file blockmap.xlsx [--dry-run]
 ```
 
 Each sheet is a layer (sheets with `!` in the name are skipped). The sheet name sets the layer: `@<dimension>` first picks the dimension (default `overworld`, change with `--dimension`, or rename with `--dim-map nether=slug`), a leading `.` hides it by default, and a trailing `#<color>` sets its colour. Rows are `name | type | popup | coordinates` with type `Pin`, `Line` or `Polygon` and coordinates like `x z, x z, …`; a `#<color>` at the end of a name colours that feature. A layer is matched by dimension and name, created if missing, and its features are **replaced** by the sheet's rows. Rows that cannot be read are reported and skipped; lines longer than 2000 points are split into consecutive lines. `--sheet "Name"` limits the import to a sheet, and `--dry-run` only reports what would happen.
