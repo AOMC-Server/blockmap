@@ -412,11 +412,26 @@ export class Input {
 
 		if (!this.moved) {
 			this.map.pointer(p.x, p.y, "click");
+			if (e.pointerType !== "mouse") this.swallowTapClick();
 			return;
 		}
 		const v = this.releaseVelocity(e.timeStamp);
 		if (v) this.map.inertia(v.x, v.y);
 	};
+
+	/**
+	 * A tap is handled on pointerup, but the browser still sends a click to whatever is under
+	 * the finger afterwards. If the tap opened UI there (a popup), that click would press its
+	 * buttons, so the click that belongs to this tap is dropped.
+	 */
+	private swallowTapClick() {
+		const drop = (c: MouseEvent) => {
+			c.preventDefault();
+			c.stopPropagation();
+		};
+		window.addEventListener("click", drop, { capture: true, once: true });
+		setTimeout(() => window.removeEventListener("click", drop, true), 500);
+	}
 
 	private cancel = (e: PointerEvent) => {
 		if (!this.pointers.delete(e.pointerId)) return;
