@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Role } from "@blockmap/shared";
 import {
 	atLeast,
+	canDeleteDimension,
 	canEdit,
 	canEditLayer,
 	canManage,
@@ -54,6 +55,21 @@ describe("map capabilities by role", () => {
 			expect(canModerate(role)).toBe(moderate);
 			expect(canManage(role)).toBe(manage);
 		});
+	}
+});
+
+describe("canDeleteDimension", () => {
+	// [role, archived, allowed]
+	const table: [Role, boolean, boolean][] = [
+		["viewer", true, false],
+		["editor", true, false],
+		["moderator", true, false],
+		["owner", false, false],
+		["owner", true, true],
+	];
+	for (const [role, archived, expected] of table) {
+		test(`${role}, ${archived ? "archived" : "not archived"}`, () =>
+			expect(canDeleteDimension(role, { archived })).toBe(expected));
 	}
 });
 

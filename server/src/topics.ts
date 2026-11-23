@@ -80,7 +80,13 @@ const revisionMessages = {
 	},
 } satisfies Record<RevisionEvent["status"], unknown>;
 
-const jobType = z.enum(["process_upload", "erase_upload", "rebuild_history"]);
+const jobType = z.enum([
+	"process_upload",
+	"erase_upload",
+	"rebuild_history",
+	"gc_blobs",
+	"delete_dimension",
+]);
 
 /** Whether a dimension exists, for the keyed collection topics. */
 const dimensionExists = (db: Db, id: number | undefined) =>
@@ -189,7 +195,7 @@ export const topics: { [F in Family]: TopicDef<F> } = {
 	queue: {
 		title: "Job queue",
 		description:
-			"Uploads, deletions and history rebuilds run one at a time. `pending` counts the jobs waiting; `running` is the one being run (`revisionId` null for a rebuild).",
+			"Uploads, deletions, history rebuilds, image cleanups and dimension deletions run one at a time. `pending` counts the jobs waiting; `running` is the one being run (`revisionId` null for all but uploads and deletions).",
 		messages: {
 			changed: {
 				summary: "The queue changed.",

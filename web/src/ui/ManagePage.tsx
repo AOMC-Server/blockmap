@@ -13,12 +13,13 @@ import {
 } from "@blockmap/shared/schemas";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { loginUrl } from "../api";
+import { loginUrl, showNotice } from "../api";
 import { MAX_PRELOAD_TILES, preloadTiles } from "../map/tileLayer";
 import { failedUploadCount, purgeFailedUploads } from "../revisions";
 import { describeDimensionScale, formatScale, parseScale } from "../scale";
 import {
 	addDimension,
+	deleteDimension,
 	mapScope,
 	setMaintenance,
 	updateDimension,
@@ -459,6 +460,33 @@ function DimensionRow(props: {
 				>
 					{d.archived ? "Restore" : "Archive"}
 				</button>
+				{d.archived && currentMap.value && canManage(currentMap.value.role) && (
+					<button
+						type="button"
+						class="btn small danger"
+						disabled={props.busy}
+						onClick={() => {
+							const typed = prompt(
+								`This permanently deletes ${d.name} with its uploads, tile history, layers and features, and cannot be undone. Type its name to confirm.`,
+							);
+							if (typed?.trim() !== d.name) {
+								if (typed !== null)
+									showNotice("The name did not match.", "error");
+								return;
+							}
+							props.run(async () => {
+								const ok = await deleteDimension(d.slug);
+								if (ok)
+									showNotice(
+										`Deleting ${d.name}; it disappears when the server is done.`,
+									);
+								return ok;
+							});
+						}}
+					>
+						Delete permanently
+					</button>
+				)}
 			</div>
 		</li>
 	);
@@ -525,7 +553,7 @@ function DimensionsTab() {
 		<div>
 			<p class="muted">
 				Archived dimensions disappear from the dimension picker but keep their
-				tiles and history. Dimensions cannot be deleted.
+				tiles and history. Owners can delete an archived dimension for good.
 			</p>
 			<p class="muted">
 				<b>Scale</b> relates a dimension's coordinates to the overworld: 1 for

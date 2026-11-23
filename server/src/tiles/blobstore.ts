@@ -101,8 +101,7 @@ export function createBlobStore(
 			const hash = createHash("sha256").update(data).digest("hex");
 			const target = path(hash);
 			if (await Bun.file(target).exists()) {
-				// Reused: refresh the age so scripts/gc-blobs.ts treats it as new. If the file was
-				// moved away since the check (gc quarantine), it is written anew below.
+				// Reused: refresh the age. If the file vanished since the check, it is written anew below.
 				const now = new Date();
 				try {
 					await utimes(target, now, now);

@@ -170,6 +170,10 @@ export const addDimension = (
 		api.api.dimensions.$post({ json: { slug, name, scale, theme } }),
 	);
 
+/** Queues the deletion of an archived dimension; it leaves the map when the server is done. */
+export const deleteDimension = (dim: string) =>
+	mapChange(() => api.api.dimensions[":dim"].$delete({ param: { dim } }));
+
 export const updateDimension = (
 	dim: string,
 	patch: {

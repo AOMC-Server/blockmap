@@ -15,8 +15,9 @@ import {
 import { ADMIN_STATS_RANGES, type AdminStatsRange } from "@blockmap/shared";
 import { DAY, HOUR } from "@blockmap/shared/time";
 import type { InferResponseType } from "hono/client";
-import { useState } from "preact/hooks";
-import { api } from "../api";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { api, attempt, showNotice } from "../api";
+import { subscribe } from "../events";
 import { useStats } from "./useStats";
 
 type Body = InferResponseType<typeof api.api.admin.stats.$get, 200>;
@@ -47,6 +48,7 @@ const STORAGE_NOTES: Record<string, string> = {
 	upload: "After an upload",
 	erase: "After an upload was deleted",
 	gc: "After removing unused images",
+	rebuild: "After the history was rebuilt",
 	boot: "Server started",
 };
 
@@ -62,7 +64,49 @@ const formatDayTime = (t: number) =>
 		hour: "numeric",
 		minute: "2-digit",
 	});
-function Storage(props: { data: Body }) {
+/** Queues the image cleanup and follows it on the queue topic; `onDone` runs when it has finished. */
+function CleanupButton(props: { onDone: () => void }) {
+	const [queued, setQueued] = useState(false);
+	const [running, setRunning] = useState(false);
+	const waiting = useRef(false);
+	waiting.current = queued;
+	useEffect(
+		() =>
+			subscribe("queue", {
+				onEvent: (q) => {
+					setRunning(q.running?.type === "gc_blobs");
+					// Nothing left in the queue: what was queued has run.
+					if (waiting.current && q.running === null && q.pending === 0) {
+						setQueued(false);
+						props.onDone();
+					}
+				},
+			}),
+		[props.onDone],
+	);
+	const start = async () => {
+		if (!confirm("Delete the images that nothing uses? This cannot be undone."))
+			return;
+		setQueued(true);
+		const res = await attempt(() => api.api.admin.storage.cleanup.$post());
+		if (!res.ok) {
+			setQueued(false);
+			showNotice(res.error, "error");
+		}
+	};
+	return (
+		<button
+			type="button"
+			class="btn"
+			disabled={queued || running}
+			onClick={start}
+		>
+			{queued || running ? "Cleaning up…" : "Clean up now"}
+		</button>
+	);
+}
+
+function Storage(props: { data: Body; onCleaned: () => void }) {
 	const { storage, now, since, overview } = props.data;
 	const cur = storage.current;
 	const reclaimable = cur.blobBytes - cur.referencedBytes;
@@ -121,11 +165,14 @@ function Storage(props: { data: Body }) {
 					{
 						label: "Waiting for cleanup",
 						value: formatBytes(reclaimable),
-						hint: "Unused images that scripts/gc-blobs.ts removes",
+						hint: "Unused images that the cleanup removes",
 					},
 					{ label: "Database", value: formatBytes(cur.dbBytes) },
 				]}
 			/>
+			<div class="admin-block">
+				<CleanupButton onDone={props.onCleaned} />
+			</div>
 			<div class="admin-block">
 				<Chart
 					kind="steps"
@@ -427,7 +474,7 @@ function Overview(props: { data: Body }) {
 /** The owners' view of storage, network traffic and the server. */
 export function AdminStats() {
 	const [range, setRange] = useState<AdminStatsRange>("7d");
-	const { data, error } = useStats(
+	const { data, error, reload } = useStats(
 		() => api.api.admin.stats.$get({ query: { range } }),
 		[range],
 	);
@@ -448,7 +495,7 @@ export function AdminStats() {
 				!error && <p class="muted">Loading…</p>
 			) : (
 				<>
-					<Storage data={data} />
+					<Storage data={data} onCleaned={reload} />
 					<Traffic data={data} />
 					<Domains data={data} />
 					<Overview data={data} />

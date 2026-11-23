@@ -31,7 +31,13 @@ const WRITE_SCOPES: [RegExp, TokenScope][] = [
 	[/^\/api\/links\/?$/, "read"],
 ];
 
-export function writeScopeFor(path: string): TokenScope | null {
+export function writeScopeFor(
+	path: string,
+	method?: string,
+): TokenScope | null {
+	// Deleting a dimension is an owner's act, unlike the rest of dimension management.
+	if (method === "DELETE" && /^\/api\/dimensions\/[^/]+\/?$/.test(path))
+		return "manage";
 	for (const [pattern, scope] of WRITE_SCOPES) {
 		if (pattern.test(path)) return scope;
 	}
@@ -67,7 +73,7 @@ export const scopeMiddleware = createMiddleware<AppEnv>(async (c, next) => {
 	if (!c.req.path.startsWith("/api/")) return next();
 	// Token management checks for a session itself, with a clearer message.
 	if (/^\/api\/tokens(\/.*)?$/.test(c.req.path)) return next();
-	const needed = writeScopeFor(c.req.path);
+	const needed = writeScopeFor(c.req.path, c.req.method);
 	if (!needed) {
 		return c.json({ error: "this endpoint needs a browser session" }, 403);
 	}

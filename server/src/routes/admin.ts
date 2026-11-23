@@ -6,11 +6,11 @@ import {
 	HOUR,
 	MINUTE,
 } from "@blockmap/shared";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { requireUser } from "../auth/session";
 import type { Db } from "../db/client";
-import { revisions } from "../db/schema";
+import { jobs, revisions } from "../db/schema";
 import { removeUploads } from "../jobs/target";
 import { doc } from "../openapi";
 import { canManage, canModerate } from "../permissions";
@@ -330,5 +330,36 @@ export const adminRoutes = new Hono<AppEnv>()
 			for (const dimensionId of new Set(failed.map((r) => r.dimensionId)))
 				if (dimensionId !== null) svc.events.emit("revisions", dimensionId, {});
 			return c.json({ removed: failed.length });
+		},
+	)
+	.post(
+		"/storage/cleanup",
+		doc({
+			tag: "Admin",
+			summary: "Delete the images nothing uses",
+			description:
+				"Owners. Queues a job that deletes the stored images (and their copies in other formats) that no tile version or upload refers to, the `blobBytes` that exceed `referencedBytes` in the storage statistics. It runs after the jobs ahead of it; follow it in the `queue` topic (`running.type` is `gc_blobs`). A storage history point with reason `gc` is added when it is done.",
+			ok: { 202: "Queued" },
+			fails: [403, 409],
+			login: true,
+		}),
+		(c) => {
+			if (!canManage(c.var.role)) return c.json({ error: "forbidden" }, 403);
+			const { db, svc } = c.var;
+			const busy = db
+				.select({ id: jobs.id })
+				.from(jobs)
+				.where(
+					and(
+						eq(jobs.type, "gc_blobs"),
+						inArray(jobs.status, ["pending", "processing"]),
+					),
+				)
+				.get();
+			if (busy)
+				return c.json({ error: "a cleanup is already queued or running" }, 409);
+			db.insert(jobs).values({ type: "gc_blobs", payload: {} }).run();
+			svc.worker.kick();
+			return c.json({ ok: true }, 202);
 		},
 	);

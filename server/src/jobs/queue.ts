@@ -65,7 +65,7 @@ export function queueState(db: Db): QueueEvent {
 			? {
 					type: running.type,
 					revisionId:
-						running.type === "rebuild_history"
+						running.type !== "process_upload" && running.type !== "erase_upload"
 							? null
 							: (running.revisionId as number | null),
 				}

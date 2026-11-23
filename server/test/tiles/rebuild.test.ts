@@ -10,6 +10,7 @@ import {
 	jobs,
 	mapInfo,
 	revisions,
+	storageHistory,
 	tileVersions,
 	tileVersionsRebuild,
 } from "../../src/db/schema";
@@ -97,6 +98,9 @@ describe("rebuilding the history", () => {
 		});
 		expect(t.db.select().from(tileVersionsRebuild).all()).toEqual([]);
 		expect(rebuildJob(t)?.status).toBe("done");
+		expect(t.db.select().from(storageHistory).all().at(-1)?.reason).toBe(
+			"rebuild",
+		);
 	});
 
 	test("is only queued when asked for, and once", async () => {

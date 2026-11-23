@@ -61,6 +61,12 @@ export function canSeeUpload(
 	);
 }
 
+/** Deleting a dimension for good: owners, and only once it is archived. */
+export const canDeleteDimension = (
+	role: Role,
+	dimension: { archived: boolean },
+) => canManage(role) && dimension.archived;
+
 /** The actor's role on a layer: an explicit membership, else editor for its creator. */
 export function effectiveLayerRole(
 	actor: Actor,

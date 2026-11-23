@@ -25,6 +25,9 @@ export type ProcessUploadPayload = { revisionId: number; files: UploadFile[] };
 /** Deletes the upload `revisionId` from the map and from all of its history. */
 export type EraseUploadPayload = { revisionId: number };
 
+/** Deletes the archived dimension `dimensionId` with everything in it. */
+export type DeleteDimensionPayload = { dimensionId: number };
+
 /** Uploaded source files are stored as incoming/<revisionId>/<index>.png until processed. */
 export const incomingDir = (env: Env, revisionId: number) =>
 	join(incomingRoot(env.DATA_DIR), String(revisionId));

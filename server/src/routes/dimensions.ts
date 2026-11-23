@@ -4,14 +4,15 @@ import {
 	guessXaeroDimension,
 	updateDimensionSchema,
 } from "@blockmap/shared";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { announceMap } from "../announce";
 import { requireUser } from "../auth/session";
-import { dimensions } from "../db/schema";
+import { dimensions, jobs } from "../db/schema";
+import { dimensionBySlug } from "../dimensionLookup";
 import { doc } from "../openapi";
 import { nextSortOrder } from "../order";
-import { canModerate } from "../permissions";
+import { canDeleteDimension, canManage, canModerate } from "../permissions";
 import type { AppEnv } from "../types";
 import { validate } from "../validate";
 import { tileRoutes } from "./tiles";
@@ -84,6 +85,51 @@ export const dimensionRoutes = new Hono<AppEnv>()
 			if (!dimension) return c.json({ error: "not found" }, 404);
 			announceMap(c);
 			return c.json({ dimension });
+		},
+	)
+	.delete(
+		"/:dim",
+		doc({
+			tag: "Map",
+			summary: "Delete a dimension for good",
+			description:
+				"Owners, and only for an archived dimension (409 otherwise). Queues a job that deletes the dimension with its uploads, tile history, layers and features, and the short links to it; the uploads that are left are renumbered without the gap and the map `epoch` changes. The images are left for *Delete the images nothing uses*. This cannot be undone. `dim` is the slug.",
+			ok: { 202: "Queued" },
+			fails: [403, 404, 409],
+			login: true,
+		}),
+		requireUser,
+		(c) => {
+			const { db, svc } = c.var;
+			if (!canManage(c.var.role)) return c.json({ error: "forbidden" }, 403);
+			const dimension = dimensionBySlug(db, c.req.param("dim"));
+			if (!dimension) return c.json({ error: "not found" }, 404);
+			if (!canDeleteDimension(c.var.role, dimension))
+				return c.json({ error: "archive the dimension first" }, 409);
+			const queued = db
+				.select({ id: jobs.id })
+				.from(jobs)
+				.where(
+					and(
+						eq(jobs.type, "delete_dimension"),
+						inArray(jobs.status, ["pending", "processing"]),
+						sql`json_extract(${jobs.payload}, '$.dimensionId') = ${dimension.id}`,
+					),
+				)
+				.get();
+			if (queued)
+				return c.json(
+					{ error: "this dimension is already being deleted" },
+					409,
+				);
+			db.insert(jobs)
+				.values({
+					type: "delete_dimension",
+					payload: { dimensionId: dimension.id },
+				})
+				.run();
+			svc.worker.kick();
+			return c.json({ ok: true }, 202);
 		},
 	)
 	.route("/:dim/tiles", tileRoutes)

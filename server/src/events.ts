@@ -23,7 +23,12 @@ export type ProgressEvent = Exclude<RevisionEvent, { status: "gone" }>;
 export type QueueEvent = {
 	pending: number;
 	running: {
-		type: "process_upload" | "erase_upload" | "rebuild_history";
+		type:
+			| "process_upload"
+			| "erase_upload"
+			| "rebuild_history"
+			| "gc_blobs"
+			| "delete_dimension";
 		revisionId: number | null;
 	} | null;
 };

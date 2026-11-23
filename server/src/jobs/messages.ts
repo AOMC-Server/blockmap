@@ -37,5 +37,9 @@ export function waitingMessage(
 	const running = ahead.find((j) => j.status === "processing") ?? ahead[0];
 	if (running?.type === "rebuild_history")
 		return "Waiting for the history rebuild to finish";
-	return `Waiting for ${plural(ahead.length, "job", "jobs")} ahead of it (uploads, deletions and history rebuilds run one at a time)`;
+	if (running?.type === "gc_blobs")
+		return "Waiting for the image cleanup to finish";
+	if (running?.type === "delete_dimension")
+		return "Waiting for a dimension to be deleted";
+	return `Waiting for ${plural(ahead.length, "job", "jobs")} ahead of it (uploads, deletions, history rebuilds, image cleanups and dimension deletions run one at a time)`;
 }

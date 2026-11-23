@@ -411,7 +411,13 @@ export const shortLinks = sqliteTable("short_links", {
 export const jobs = sqliteTable("jobs", {
 	id: id(),
 	type: text("type", {
-		enum: ["process_upload", "erase_upload", "rebuild_history"],
+		enum: [
+			"process_upload",
+			"erase_upload",
+			"rebuild_history",
+			"gc_blobs",
+			"delete_dimension",
+		],
 	}).notNull(),
 	payload: text("payload", { mode: "json" }).notNull(),
 	status: text("status", { enum: ["pending", "processing", "done", "failed"] })
@@ -436,11 +442,11 @@ export const storageHistory = sqliteTable("storage_history", {
 	id: id(),
 	at: integer("at").notNull(),
 	reason: text("reason", {
-		enum: ["upload", "erase", "gc", "boot"],
+		enum: ["upload", "erase", "gc", "boot", "rebuild"],
 	}).notNull(),
 	blobCount: integer("blob_count").notNull(),
 	blobBytes: integer("blob_bytes").notNull(),
-	/** The part of the above that the map's history still uses; the rest awaits scripts/gc-blobs.ts. */
+	/** The part of the above that the map's history still uses; the rest awaits the cleanup (Manage → Statistics). */
 	referencedBlobs: integer("referenced_blobs").notNull(),
 	referencedBytes: integer("referenced_bytes").notNull(),
 	dbBytes: integer("db_bytes").notNull(),
