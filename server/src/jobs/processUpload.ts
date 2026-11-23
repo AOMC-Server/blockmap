@@ -55,6 +55,9 @@ export async function processUpload(
 ) {
 	const { db, env, blobs } = ctx;
 	const progress = ctx.progress ?? noProgress;
+	let made = 0;
+	const onVersion = () =>
+		progress.fact("made", messages.facts.versionsMade(++made));
 	const { revisionId, files } = payload;
 
 	const [revision] = await db
@@ -214,6 +217,7 @@ export async function processUpload(
 				blobs,
 				tileSize: T,
 				concurrency: env.JOB_CONCURRENCY,
+				onVersion,
 				tiles: stored,
 				patchesOf,
 				existing,
@@ -230,6 +234,7 @@ export async function processUpload(
 			tileSize: T,
 			maxZoom: env.MAX_ZOOM,
 			concurrency: env.JOB_CONCURRENCY,
+			onVersion,
 			changed: rewrites,
 			existing,
 			onLevel: (zoom, total) =>

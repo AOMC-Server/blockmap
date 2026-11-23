@@ -26,3 +26,33 @@ export async function mapLimit<T, R>(
 	if (failure) throw (failure as { error: unknown }).error;
 	return results;
 }
+
+/** Runs tasks with at most `limit` of them in flight, across all the callers that share it. */
+export type Limiter = {
+	/**
+	 * Waits for a free slot and starts `fn` in it, without waiting for it to finish: the caller
+	 * gets the running task (`done`) once it has started. Waiting for the slot is what keeps a
+	 * fast producer from piling up work (and the memory it holds).
+	 */
+	start<T>(fn: () => Promise<T>): Promise<{ done: Promise<T> }>;
+};
+
+export function createLimiter(limit: number): Limiter {
+	let active = 0;
+	const waiting: (() => void)[] = [];
+	const release = () => {
+		const next = waiting.shift();
+		if (next) next();
+		else active--;
+	};
+	return {
+		async start(fn) {
+			if (active < limit) active++;
+			else await new Promise<void>((resolve) => waiting.push(resolve));
+			const done = Promise.resolve().then(fn).finally(release);
+			// Failures are seen by whoever awaits the task; until then they are not "unhandled".
+			done.catch(() => {});
+			return { done };
+		},
+	};
+}

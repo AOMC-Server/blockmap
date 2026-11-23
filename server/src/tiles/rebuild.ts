@@ -1,6 +1,6 @@
 import { floorDiv } from "@blockmap/shared";
 import { and, asc, eq, gte } from "drizzle-orm";
-import { mapLimit } from "../concurrency";
+import { createLimiter, type Limiter, mapLimit } from "../concurrency";
 import type { Db } from "../db/client";
 import { tileVersions } from "../db/schema";
 import type { BlobStore } from "./blobstore";
@@ -62,82 +62,172 @@ export const dbExisting = (
 		).map((r) => ({ seq: r.seq, hash: r.hash })),
 });
 
+/** A version being built: its hash, or the encode that will tell it. */
+type Pending = { seq: number; hash: string | null | Promise<string | null> };
+
+/** Rows from versions in seq order: one wherever the tile changes from `base`. */
+async function toRows(base: string | null, versions: Pending[]) {
+	const rows: Row[] = [];
+	let prev = base;
+	for (const v of versions) {
+		const hash = await v.hash;
+		if (hash !== prev) rows.push({ seq: v.seq, hash });
+		prev = hash;
+	}
+	return rows;
+}
+
+/** The stored tile at `seq`: the last of `rows` at or before it, or else `base`. */
+function hashAt(base: string | null, rows: Row[], seq: number) {
+	let hash = base;
+	for (const r of rows) {
+		if (r.seq > seq) break;
+		hash = r.hash;
+	}
+	return hash;
+}
+
+/** Shared options of the rebuilds. */
+type RebuildOpts = {
+	blobs: BlobStore;
+	tileSize: number;
+	concurrency: number;
+	/** Bounds the tile encodes in flight, across every tile being rebuilt; one of `concurrency` by default. */
+	limiter?: Limiter;
+	/** A tile version was encoded. */
+	onVersion?: () => void;
+};
+
 /**
  * The versions of zoom 0 tiles from `fromSeq` on. A tile after an upload is the tile before it
  * with the upload's patch over it, so each patch (`patchesOf`: those of the tile at or after
  * `fromSeq`) is laid over the previous result in seq order; a row is stored wherever that
  * changes the tile. Only tiles whose rows differ from the existing ones are returned.
  *
+ * Patches are laid over one after the other, but the versions they make are encoded side by
+ * side. A patch that changes nothing makes no version. Once the tile is again what is stored at
+ * that point (a later upload covered what changed), the rest of the stored rows are kept as
+ * they are: the same patches over the same tile give the same versions.
+ *
  * `preloaded` holds the images of patches (by hash) that are already in memory, exactly as
  * they were when stored.
  */
-export async function rebuildBase(opts: {
-	blobs: BlobStore;
-	tileSize: number;
-	concurrency: number;
-	tiles: { x: number; y: number }[];
-	patchesOf: (x: number, y: number) => Promise<TilePatch[]>;
-	existing: Existing;
-	preloaded?: Map<string, Buffer>;
-	onProgress?: (done: number, total: number) => void;
-}): Promise<Rewrite[]> {
+export async function rebuildBase(
+	opts: RebuildOpts & {
+		tiles: { x: number; y: number }[];
+		patchesOf: (x: number, y: number) => Promise<TilePatch[]>;
+		existing: Existing;
+		preloaded?: Map<string, Buffer>;
+		onProgress?: (done: number, total: number) => void;
+	},
+): Promise<Rewrite[]> {
 	const { blobs, tileSize: T, existing } = opts;
+	const limiter = opts.limiter ?? createLimiter(opts.concurrency);
 	let finished = 0;
 
 	const rebuilt = await mapLimit(opts.tiles, opts.concurrency, async (tile) => {
 		const { x, y } = tile;
 		const patches = (await opts.patchesOf(x, y)).sort((a, b) => a.seq - b.seq);
-		let prev = await existing.base(0, x, y);
-		// The image of `prev`, decoded when a patch first has to go over it.
+		const base = await existing.base(0, x, y);
+		const old = await existing.rows(0, x, y);
+		const versions: Pending[] = [];
+		// The tile so far: until a patch has to go over it its hash (null = empty), then its image.
+		let current: string | null = base;
 		let canvas: Buffer | null = null;
-		const rows: Row[] = [];
+		// The stored image last compared with, kept for the next patch's comparison.
+		let seen = null as { hash: string; image: Buffer } | null;
 
 		for (const p of patches) {
-			let hash: string | null;
-			if (prev === null) {
+			if (canvas === null && current === null) {
 				// Over an empty tile the result is the patch itself.
-				hash = p.hash;
-				canvas = null;
-			} else {
-				canvas ??= await loadTile(blobs, prev, T);
-				const image =
-					opts.preloaded?.get(p.hash) ?? (await loadTile(blobs, p.hash, T));
-				overRegion(canvas, T, image, T, T, 0, 0);
-				hash = await storeTile(blobs, canvas, T);
+				current = p.hash;
+				versions.push({ seq: p.seq, hash: p.hash });
+				continue;
 			}
-			if (hash !== prev) {
-				rows.push({ seq: p.seq, hash });
-				prev = hash;
+			canvas ??= await loadTile(blobs, current as string, T);
+			const image =
+				opts.preloaded?.get(p.hash) ?? (await loadTile(blobs, p.hash, T));
+			if (!overRegion(canvas, T, image, T, T, 0, 0)) continue;
+
+			const was = hashAt(base, old, p.seq);
+			if (was !== null) {
+				const stored: Buffer =
+					seen !== null && seen.hash === was
+						? seen.image
+						: await loadTile(blobs, was, T);
+				seen = { hash: was, image: stored };
+				if (stored.equals(canvas)) {
+					versions.push({ seq: p.seq, hash: was });
+					versions.push(...old.filter((r) => r.seq > p.seq));
+					break;
+				}
 			}
+			const copy = Buffer.from(canvas);
+			const { done } = await limiter.start(async () => {
+				const hash = await storeTile(blobs, copy, T);
+				opts.onVersion?.();
+				return hash;
+			});
+			versions.push({ seq: p.seq, hash: done });
 		}
 
+		const rows = await toRows(base, versions);
 		opts.onProgress?.(++finished, opts.tiles.length);
-		return sameRows(rows, await existing.rows(0, x, y))
+		return sameRows(rows, old)
 			? null
 			: ({ zoom: 0, x, y, rows } satisfies Rewrite);
 	});
 	return rebuilt.filter((r) => r !== null);
 }
 
+type Kid = {
+	/** Before its first row. */
+	base: string | null;
+	rows: Row[];
+	/** What is stored for it now, when that may differ from `rows`. */
+	old?: Row[];
+};
+
 /**
  * The versions of a zoomed-out tile, from the versions of its four children (in quadrant order:
  * top left, top right, bottom left, bottom right). Before its first row a child is `base`; the
  * parent starts as `base` and gets a row wherever the mix of its children changes it. `mixes`
- * caches composed parents by the hashes of their children and may be shared between calls.
+ * maps the hashes of four children to the parent they make, and may be shared between calls.
+ *
+ * With `old` (the parent's stored rows, and the children's), every mix that is stored already
+ * is known without making it again. The new mixes are made one after the other and encoded side
+ * by side.
  */
-export async function parentRows(opts: {
-	blobs: BlobStore;
-	tileSize: number;
-	kids: { base: string | null; rows: Row[] }[];
-	base: string | null;
-	mixes: Map<string, string | null>;
-}): Promise<Row[]> {
+export async function parentRows(
+	opts: Pick<RebuildOpts, "blobs" | "tileSize" | "onVersion"> & {
+		kids: Kid[];
+		base: string | null;
+		old?: Row[];
+		mixes: Map<string, Pending["hash"]>;
+		limiter: Limiter;
+	},
+): Promise<Row[]> {
 	const { blobs, tileSize: T, kids, mixes } = opts;
+	const keyAt = (seq: number, rowsOf: (k: Kid) => Row[]) =>
+		kids.map((k) => hashAt(k.base, rowsOf(k), seq)).join("|");
+
+	if (opts.old) {
+		const old = opts.old;
+		const oldOf = (k: Kid) => k.old ?? k.rows;
+		mixes.set(kids.map((k) => k.base).join("|"), opts.base);
+		const seqs = new Set([
+			...old.map((r) => r.seq),
+			...kids.flatMap((k) => oldOf(k).map((r) => r.seq)),
+		]);
+		for (const seq of seqs) {
+			const key = keyAt(seq, oldOf);
+			if (!mixes.has(key)) mixes.set(key, hashAt(opts.base, old, seq));
+		}
+	}
+
 	const seqs = [...new Set(kids.flatMap((k) => k.rows.map((r) => r.seq)))].sort(
 		(a, b) => a - b,
 	);
-	let prev = opts.base;
-	const rows: Row[] = [];
 	// Each child's current image, so it is decoded once per version rather than once per seq.
 	const held: { hash: string | null; image: Buffer | null }[] = kids.map(
 		() => ({ hash: null, image: null }),
@@ -150,30 +240,31 @@ export async function parentRows(opts: {
 		}
 		return slot.image;
 	};
-	// How many of each child's rows are at or before the seq being built (seqs only go up).
-	const seen = kids.map(() => 0);
+	const versions: Pending[] = [];
 	for (const seq of seqs) {
-		const hashes = kids.map((k, q) => {
-			let n = seen[q] as number;
-			while (n < k.rows.length && (k.rows[n] as Row).seq <= seq) n++;
-			seen[q] = n;
-			return n > 0 ? (k.rows[n - 1] as Row).hash : k.base;
-		});
-		const mixKey = hashes.join("|");
-		if (!mixes.has(mixKey)) {
+		const hashes = kids.map((k) => hashAt(k.base, k.rows, seq));
+		const key = hashes.join("|");
+		if (!mixes.has(key)) {
 			const canvas = composeParent(
 				T,
 				await Promise.all(hashes.map((hash, q) => image(q, hash))),
 			);
-			mixes.set(mixKey, canvas ? await storeTile(blobs, canvas, T) : null);
+			mixes.set(
+				key,
+				canvas
+					? (
+							await opts.limiter.start(async () => {
+								const hash = await storeTile(blobs, canvas, T);
+								opts.onVersion?.();
+								return hash;
+							})
+						).done
+					: null,
+			);
 		}
-		const hash = mixes.get(mixKey) ?? null;
-		if (hash !== prev) {
-			rows.push({ seq, hash });
-			prev = hash;
-		}
+		versions.push({ seq, hash: mixes.get(key) ?? null });
 	}
-	return rows;
+	return toRows(opts.base, versions);
 }
 
 /**
@@ -181,18 +272,18 @@ export async function parentRows(opts: {
  * four children, wherever any of them changes. Children that were not rewritten are read from
  * `existing`. Only parents whose rows differ from the existing ones are returned.
  */
-export async function rebuildParents(opts: {
-	blobs: BlobStore;
-	tileSize: number;
-	maxZoom: number;
-	concurrency: number;
-	changed: Rewrite[];
-	existing: Existing;
-	onProgress?: (zoom: number, done: number, total: number) => void;
-	/** A zoom level is started, with how many tiles of it are built. */
-	onLevel?: (zoom: number, total: number) => void;
-}): Promise<Rewrite[]> {
+export async function rebuildParents(
+	opts: RebuildOpts & {
+		maxZoom: number;
+		changed: Rewrite[];
+		existing: Existing;
+		onProgress?: (zoom: number, done: number, total: number) => void;
+		/** A zoom level is started, with how many tiles of it are built. */
+		onLevel?: (zoom: number, total: number) => void;
+	},
+): Promise<Rewrite[]> {
 	const { blobs, tileSize: T, existing } = opts;
+	const limiter = opts.limiter ?? createLimiter(opts.concurrency);
 	const baseCache = new Map<string, string | null>();
 	const base = async (zoom: number, x: number, y: number) => {
 		const key = `${zoom}:${tileKey(x, y)}`;
@@ -213,31 +304,35 @@ export async function rebuildParents(opts: {
 		}
 
 		const next = new Map<string, Row[]>();
-		const mixes = new Map<string, string | null>();
+		const mixes = new Map<string, Pending["hash"]>();
 		let built = 0;
 		opts.onLevel?.(zoom, parents.size);
 		await mapLimit([...parents], opts.concurrency, async (parentKey) => {
 			const [px, py] = parseKey(parentKey);
 			const kids = await Promise.all(
-				[0, 1, 2, 3].map(async (q) => {
+				[0, 1, 2, 3].map(async (q): Promise<Kid> => {
 					const cx = 2 * px + (q % 2);
 					const cy = 2 * py + Math.floor(q / 2);
+					const stored = await existing.rows(zoom - 1, cx, cy);
 					return {
 						base: await base(zoom - 1, cx, cy),
-						rows:
-							level.get(tileKey(cx, cy)) ??
-							(await existing.rows(zoom - 1, cx, cy)),
+						rows: level.get(tileKey(cx, cy)) ?? stored,
+						old: stored,
 					};
 				}),
 			);
+			const old = await existing.rows(zoom, px, py);
 			const rows = await parentRows({
 				blobs,
 				tileSize: T,
 				kids,
 				base: await base(zoom, px, py),
+				old,
 				mixes,
+				limiter,
+				onVersion: opts.onVersion,
 			});
-			if (!sameRows(rows, await existing.rows(zoom, px, py))) {
+			if (!sameRows(rows, old)) {
 				rewrites.push({ zoom, x: px, y: py, rows });
 				next.set(parentKey, rows);
 			}

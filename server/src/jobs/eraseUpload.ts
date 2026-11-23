@@ -35,6 +35,9 @@ export async function eraseUpload(
 ) {
 	const { db, env, blobs } = ctx;
 	const progress = ctx.progress ?? noProgress;
+	let made = 0;
+	const onVersion = () =>
+		progress.fact("made", messages.facts.versionsMade(++made));
 
 	const [target] = await db
 		.select()
@@ -103,6 +106,7 @@ export async function eraseUpload(
 		blobs,
 		tileSize: T,
 		concurrency: env.JOB_CONCURRENCY,
+		onVersion,
 		tiles: touched,
 		patchesOf: async (x, y) =>
 			(await tilePatches(db, dimId, x, y, seq)).filter((p) => p.seq !== seq),
@@ -116,6 +120,7 @@ export async function eraseUpload(
 			tileSize: T,
 			maxZoom: env.MAX_ZOOM,
 			concurrency: env.JOB_CONCURRENCY,
+			onVersion,
 			changed: base,
 			existing,
 			onLevel: (zoom, total) =>

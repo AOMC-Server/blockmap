@@ -73,6 +73,9 @@ export function queueRebuildIfPending(db: Db): boolean {
 export async function rebuildHistory(ctx: JobContext, jobId: number) {
 	const { db, env, blobs } = ctx;
 	const progress = ctx.progress ?? noProgress;
+	let made = 0;
+	const onVersion = () =>
+		progress.fact("made", messages.facts.versionsMade(++made));
 	const map = await loadMap(db);
 	const T = map.tileSize;
 	const startHead = map.headRev;
@@ -163,6 +166,7 @@ export async function rebuildHistory(ctx: JobContext, jobId: number) {
 			blobs,
 			tileSize: T,
 			concurrency: env.JOB_CONCURRENCY,
+			onVersion,
 			tiles: [...byTile.keys()].map((key) => {
 				const [x, y] = parseKey(key);
 				return { x, y };
@@ -179,6 +183,7 @@ export async function rebuildHistory(ctx: JobContext, jobId: number) {
 				tileSize: T,
 				maxZoom: env.MAX_ZOOM,
 				concurrency: env.JOB_CONCURRENCY,
+				onVersion,
 				changed: base,
 				existing: emptyExisting,
 				onLevel: (zoom, total) =>

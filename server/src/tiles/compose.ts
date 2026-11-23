@@ -14,7 +14,7 @@ export function isEmpty(rgba: Uint8Array): boolean {
 
 /**
  * Composites src over dst ("over" operator) with src's top-left corner at (dx, dy) in dst
- * coordinates. Anything outside dst is clipped. Mutates dst.
+ * coordinates. Anything outside dst is clipped. Mutates dst; returns whether that changed it.
  */
 export function overRegion(
 	dst: Uint8Array,
@@ -24,12 +24,13 @@ export function overRegion(
 	srcH: number,
 	dx: number,
 	dy: number,
-): void {
+): boolean {
 	const dstH = dst.length / 4 / dstW;
 	const x0 = Math.max(0, dx);
 	const x1 = Math.min(dstW, dx + srcW);
 	const y0 = Math.max(0, dy);
 	const y1 = Math.min(dstH, dy + srcH);
+	let changed = false;
 	for (let y = y0; y < y1; y++) {
 		let s = ((y - dy) * srcW + (x0 - dx)) * 4;
 		let d = (y * dstW + x0) * 4;
@@ -37,23 +38,44 @@ export function overRegion(
 			const sa = src[s + 3] as number;
 			if (sa === 0) continue;
 			const da = dst[d + 3] as number;
+			let r: number;
+			let g: number;
+			let b: number;
+			let a: number;
 			if (sa === 255 || da === 0) {
-				dst[d] = src[s] as number;
-				dst[d + 1] = src[s + 1] as number;
-				dst[d + 2] = src[s + 2] as number;
-				dst[d + 3] = sa;
-				continue;
-			}
-			const dw = (da * (255 - sa)) / 255;
-			const outA = sa + dw;
-			for (let k = 0; k < 3; k++) {
-				dst[d + k] = Math.round(
-					((src[s + k] as number) * sa + (dst[d + k] as number) * dw) / outA,
+				r = src[s] as number;
+				g = src[s + 1] as number;
+				b = src[s + 2] as number;
+				a = sa;
+			} else {
+				const dw = (da * (255 - sa)) / 255;
+				const outA = sa + dw;
+				r = Math.round(
+					((src[s] as number) * sa + (dst[d] as number) * dw) / outA,
 				);
+				g = Math.round(
+					((src[s + 1] as number) * sa + (dst[d + 1] as number) * dw) / outA,
+				);
+				b = Math.round(
+					((src[s + 2] as number) * sa + (dst[d + 2] as number) * dw) / outA,
+				);
+				a = Math.round(outA);
 			}
-			dst[d + 3] = Math.round(outA);
+			if (
+				!changed &&
+				(dst[d] !== r ||
+					dst[d + 1] !== g ||
+					dst[d + 2] !== b ||
+					dst[d + 3] !== a)
+			)
+				changed = true;
+			dst[d] = r;
+			dst[d + 1] = g;
+			dst[d + 2] = b;
+			dst[d + 3] = a;
 		}
 	}
+	return changed;
 }
 
 /**

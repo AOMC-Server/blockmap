@@ -55,6 +55,8 @@ export const messages = {
 		uploads: (n: number) => `${plural(n, "upload", "uploads")} to replay`,
 		dimension: (name: string, at: number, of: number) =>
 			`Dimension ${at} of ${of}: ${name}`,
+		versionsMade: (n: number) =>
+			`${plural(n, "tile image", "tile images")} made so far`,
 		versionsWritten: (n: number) =>
 			`${plural(n, "tile version", "tile versions")} written`,
 		inUse: (n: number) => `${plural(n, "image", "images")} in use`,
