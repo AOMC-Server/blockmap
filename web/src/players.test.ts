@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { type Attribution, attributionChange, featureMapUrl } from "./players";
+import {
+	type Attribution,
+	attributionChange,
+	featureMapUrl,
+	MAX_RECENT_PLAYERS,
+	parseRecentPlayers,
+	withRecentPlayer,
+} from "./players";
 
 const player = (id: number, name: string) => ({ id, uuid: `uuid-${id}`, name });
 const A = player(1, "Alex");
@@ -59,5 +66,31 @@ describe("featureMapUrl", () => {
 		expect(
 			featureMapUrl({ id: 7, dimension: "nether", center: [10, -20] }),
 		).toBe("/?dim=nether&x=10&z=-20&feature=7");
+	});
+});
+
+describe("recent players", () => {
+	test("a pick goes to the front, once, and the oldest fall off", () => {
+		expect(withRecentPlayer([A, B], C)).toEqual([C, A, B]);
+		expect(withRecentPlayer([A, B, C], B)).toEqual([B, A, C]);
+		const many = Array.from({ length: MAX_RECENT_PLAYERS }, (_, i) =>
+			player(i + 10, `P${i}`),
+		);
+		const next = withRecentPlayer(many, A);
+		expect(next).toHaveLength(MAX_RECENT_PLAYERS);
+		expect(next[0]).toBe(A);
+		expect(next).not.toContainEqual(many.at(-1));
+	});
+
+	test("stored lists are read leniently", () => {
+		expect(parseRecentPlayers(JSON.stringify([A, B]))).toEqual([A, B]);
+		expect(parseRecentPlayers(null)).toEqual([]);
+		expect(parseRecentPlayers("not json")).toEqual([]);
+		expect(parseRecentPlayers('{"a":1}')).toEqual([]);
+		expect(
+			parseRecentPlayers(
+				JSON.stringify([A, { id: "x" }, null, 3, { ...A, name: 4 }, A, B]),
+			),
+		).toEqual([A, B]);
 	});
 });

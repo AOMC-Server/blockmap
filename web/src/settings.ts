@@ -6,8 +6,10 @@ import {
 	type StyleId,
 } from "@aomc-server/block-ui/theme";
 import { createWidthStore } from "@aomc-server/block-ui/width";
+import type { Player } from "@blockmap/shared/players";
 import type { View } from "@blockmap/shared/view";
 import { signal } from "@preact/signals";
+import { parseRecentPlayers, withRecentPlayer } from "./players";
 
 /** How quickly the camera moves between views; the factor scales how long a transition takes. */
 export const TRANSITION_SPEEDS = [
@@ -279,6 +281,19 @@ export const loadPosition = () => parsePosition(read(POSITION_KEY));
 
 export function savePosition(position: SavedPosition) {
 	write(POSITION_KEY, JSON.stringify(position));
+}
+
+const RECENT_PLAYERS_KEY = "blockmap.recentPlayers";
+
+export const loadRecentPlayers = () =>
+	parseRecentPlayers(read(RECENT_PLAYERS_KEY));
+
+/** Remembers a player that was picked for a feature, to offer first next time. */
+export function rememberPlayer(player: Player) {
+	write(
+		RECENT_PLAYERS_KEY,
+		JSON.stringify(withRecentPlayer(loadRecentPlayers(), player)),
+	);
 }
 
 const LAYERS_KEY = "blockmap.layers";

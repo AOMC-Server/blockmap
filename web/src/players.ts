@@ -25,6 +25,44 @@ export function featureMapUrl(f: {
 	return `/?${q}`;
 }
 
+/** How many recently picked players are kept. */
+export const MAX_RECENT_PLAYERS = 8;
+
+/** The recently picked players, from stored JSON; anything that is not a player is skipped. */
+export function parseRecentPlayers(raw: string | null): Player[] {
+	if (!raw) return [];
+	try {
+		const data = JSON.parse(raw) as unknown;
+		if (!Array.isArray(data)) return [];
+		const seen = new Set<number>();
+		const out: Player[] = [];
+		for (const p of data) {
+			if (
+				typeof p?.id === "number" &&
+				Number.isInteger(p.id) &&
+				p.id > 0 &&
+				typeof p.uuid === "string" &&
+				typeof p.name === "string" &&
+				!seen.has(p.id)
+			) {
+				seen.add(p.id);
+				out.push({ id: p.id, uuid: p.uuid, name: p.name });
+			}
+		}
+		return out.slice(0, MAX_RECENT_PLAYERS);
+	} catch {
+		return [];
+	}
+}
+
+/** The list with `player` moved (or added) to the front; the oldest fall off the end. */
+export function withRecentPlayer(recent: readonly Player[], player: Player) {
+	return [player, ...recent.filter((p) => p.id !== player.id)].slice(
+		0,
+		MAX_RECENT_PLAYERS,
+	);
+}
+
 /** Who a version of a feature is attributed to. */
 export type Attribution = {
 	ownerId: number | null;

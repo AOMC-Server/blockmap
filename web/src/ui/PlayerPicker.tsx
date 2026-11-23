@@ -1,7 +1,8 @@
 import { useAsync, useDebounced } from "@aomc-server/block-ui/hooks";
 import { MAX_BUILDERS, type Player } from "@blockmap/shared/players";
-import { useEffect, useId, useRef, useState } from "preact/hooks";
+import { useEffect, useId, useMemo, useRef, useState } from "preact/hooks";
 import { api, attempt } from "../api";
+import { loadRecentPlayers, rememberPlayer } from "../settings";
 import { NewPlayerDialog } from "./NewPlayerDialog";
 import { PlayerHead } from "./PlayerHead";
 
@@ -26,8 +27,13 @@ function PlayerSearch(props: {
 	const root = useRef<HTMLDivElement>(null);
 	const listId = useId();
 	const query = useDebounced(text.trim(), 200);
+	// With nothing typed, the players picked lately come first (when there are any).
+	const recent = useMemo(() => (open ? loadRecentPlayers() : []), [open]);
+	const typed = text.trim();
+	const showRecent =
+		typed === "" && recent.some((p) => !props.exclude?.includes(p.id));
 	const state = useAsync(
-		open
+		open && !showRecent
 			? async () => {
 					const res = await attempt(() =>
 						api.api.players.$get({
@@ -41,7 +47,7 @@ function PlayerSearch(props: {
 					return res.body.players;
 				}
 			: null,
-		[query, open],
+		[query, open, showRecent],
 	);
 
 	useEffect(() => {
@@ -53,8 +59,7 @@ function PlayerSearch(props: {
 		return () => document.removeEventListener("pointerdown", onDown);
 	}, [open]);
 
-	const typed = text.trim();
-	const found = state.data ?? [];
+	const found = showRecent ? recent : (state.data ?? []);
 	const exact = found.some((p) => p.name.toLowerCase() === typed.toLowerCase());
 	const options: Option[] = [
 		...found
@@ -63,7 +68,7 @@ function PlayerSearch(props: {
 			.map((player): Option => ({ kind: "player", player })),
 		...(exact ? [] : [{ kind: "new", text: typed } as Option]),
 	];
-	const settled = query === typed && !state.loading;
+	const settled = showRecent || (query === typed && !state.loading);
 
 	// A new list starts at its first entry.
 	useEffect(() => setActive(0), [state.data, typed]);
@@ -76,7 +81,12 @@ function PlayerSearch(props: {
 			return;
 		}
 		setText("");
-		props.onPick(o.player);
+		pick(o.player);
+	};
+
+	const pick = (player: Player) => {
+		rememberPlayer(player);
+		props.onPick(player);
 	};
 
 	const onKeyDown = (e: KeyboardEvent) => {
@@ -123,6 +133,11 @@ function PlayerSearch(props: {
 			/>
 			{open && (
 				<div class="player-options" role="listbox" id={listId}>
+					{showRecent && (
+						<div class="player-option-note muted" role="presentation">
+							Recent
+						</div>
+					)}
 					{options.map((o, i) => (
 						<div
 							key={o.kind === "player" ? o.player.id : "new"}
@@ -161,7 +176,7 @@ function PlayerSearch(props: {
 			{creating !== null && (
 				<NewPlayerDialog
 					initial={creating}
-					onPicked={props.onPick}
+					onPicked={pick}
 					onClose={() => setCreating(null)}
 				/>
 			)}
