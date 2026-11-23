@@ -49,8 +49,21 @@ body,
 .page-root:not(.embedded, .invite-page) {
 	position: relative;
 	inset: auto;
+	isolation: isolate;
 	min-height: 100dvh;
-	background-attachment: fixed;
+}
+
+/*
+ * The page background stays put on a layer of its own. Not background-attachment: fixed, which
+ * makes Firefox repaint the whole window on every frame of scrolling.
+ */
+.page-root:not(.embedded, .invite-page)::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	background: inherit;
+	pointer-events: none;
 }
 
 .page-root:not(.embedded, .invite-page) > .page-head {
