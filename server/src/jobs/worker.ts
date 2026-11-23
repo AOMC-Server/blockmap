@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
 	dimensions,
 	jobs,
@@ -17,7 +17,7 @@ import { deleteDimension } from "./deleteDimension";
 import { eraseUpload } from "./eraseUpload";
 import { messages } from "./messages";
 import { processUpload } from "./processUpload";
-import { queueState } from "./queue";
+import { openJobs, queueState } from "./queue";
 import { rebuildHistory } from "./rebuildHistory";
 import {
 	type DeleteDimensionPayload,
@@ -30,7 +30,7 @@ import {
 
 const MAX_ATTEMPTS = 3;
 
-/** Runs persisted jobs one at a time, in id order. */
+/** Runs persisted jobs one at a time, in `runOrder`. */
 export function createWorker(ctx: JobContext) {
 	const { db, env, events } = ctx;
 	let running: Promise<void> | null = null;
@@ -313,14 +313,10 @@ export function createWorker(ctx: JobContext) {
 			await null; // let `running` be assigned before the loop can clear it
 			try {
 				for (;;) {
-					const job = db
-						.select()
-						.from(jobs)
-						.where(eq(jobs.status, "pending"))
-						.orderBy(asc(jobs.id))
-						.limit(1)
-						.get();
-					if (!job) break;
+					const next = openJobs(db).find((j) => j.status === "pending");
+					if (!next) break;
+					const job = db.select().from(jobs).where(eq(jobs.id, next.id)).get();
+					if (!job) continue;
 					try {
 						await runJob(job);
 					} catch (err) {

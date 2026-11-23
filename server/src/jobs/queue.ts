@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { dimensions, jobs, revisions, users } from "../db/schema";
 import type { QueueEvent } from "../events";
@@ -28,26 +28,12 @@ export function erasing(db: Db, ids?: number[]): Set<number> {
  * running, or finished): the history rebuild in the way, or how many jobs are ahead of it.
  */
 export function waiting(db: Db, revisionId: number): string | null {
-	const job = db
-		.select({ id: jobs.id })
-		.from(jobs)
-		.where(and(eq(jobRevisionId, revisionId), eq(jobs.status, "pending")))
-		.orderBy(desc(jobs.id))
-		.get();
-	if (!job) return null;
-	return waitingMessage(
-		db
-			.select({ type: jobs.type, status: jobs.status })
-			.from(jobs)
-			.where(
-				and(
-					lt(jobs.id, job.id),
-					inArray(jobs.status, ["pending", "processing"]),
-				),
-			)
-			.orderBy(asc(jobs.id))
-			.all(),
+	const open = openJobs(db);
+	const at = open.findLastIndex(
+		(j) => j.revisionId === revisionId && j.status === "pending",
 	);
+	if (at < 0) return null;
+	return waitingMessage(open.slice(0, at));
 }
 
 /** How many jobs wait, and which one runs. */
@@ -93,6 +79,7 @@ function jobRows(db: Db) {
 			errorDetail: revisions.errorDetail,
 			revisionId: revisions.id,
 			fileCount: revisions.fileCount,
+			exportedAt: revisions.exportedAt,
 			dimension: dimensions.name,
 			dimensionArchived: dimensions.archived,
 			author: users.username,
@@ -105,12 +92,53 @@ function jobRows(db: Db) {
 
 export type JobRow = ReturnType<ReturnType<typeof jobRows>["all"]>[number];
 
-/** The jobs that wait or run, in the order they run: the running one first. */
+type Orderable = {
+	id: number;
+	type: string;
+	status: string;
+	exportedAt: number | null;
+	createdAt: number;
+};
+
+/**
+ * The order jobs run in: the running one, then the queued ones by id, except that uploads
+ * queued back to back run oldest export first (undated ones count as made when uploaded).
+ * Stacking older data before newer spares the rewrite of the newer uploads' tiles. Uploads
+ * never pass another kind of job, which stays where it was queued.
+ */
+export function runOrder<T extends Orderable>(open: T[]): T[] {
+	const byId = [...open].sort((a, b) => a.id - b.id);
+	const out = byId.filter((j) => j.status !== "pending");
+	let uploads: T[] = [];
+	const flush = () => {
+		uploads.sort(
+			(a, b) =>
+				(a.exportedAt ?? a.createdAt) - (b.exportedAt ?? b.createdAt) ||
+				a.id - b.id,
+		);
+		out.push(...uploads);
+		uploads = [];
+	};
+	for (const job of byId) {
+		if (job.status !== "pending") continue;
+		if (job.type === "process_upload") {
+			uploads.push(job);
+			continue;
+		}
+		flush();
+		out.push(job);
+	}
+	flush();
+	return out;
+}
+
+/** The jobs that wait or run, in the order they run (see `runOrder`). */
 export function openJobs(db: Db): JobRow[] {
-	return jobRows(db)
-		.where(inArray(jobs.status, ["pending", "processing"]))
-		.orderBy(desc(sql`${jobs.status} = 'processing'`), asc(jobs.id))
-		.all();
+	return runOrder(
+		jobRows(db)
+			.where(inArray(jobs.status, ["pending", "processing"]))
+			.all(),
+	);
 }
 
 /** The jobs that finished or failed last, newest first. */
@@ -136,5 +164,6 @@ export function publicJob(job: JobRow) {
 		dimension: job.dimensionArchived ? null : job.dimension,
 		author: job.author,
 		fileCount: job.fileCount,
+		exportedAt: job.exportedAt,
 	};
 }

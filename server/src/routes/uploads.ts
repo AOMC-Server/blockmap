@@ -306,8 +306,8 @@ export const uploadRoutes = new Hono<AppEnv>().post(
 			);
 		}
 
-		// One revision per export, oldest first: jobs run in id order, so each export is stacked
-		// onto the map in the order it was made. Files without a date count as uploaded now.
+		// One revision per export: queued uploads run oldest export first, so each export is
+		// stacked onto the map in the order it was made. Files without a date count as uploaded now.
 		const groups = new Map<number | null, typeof kept>();
 		for (const item of kept) {
 			const group = groups.get(item.exportedAt) ?? [];
