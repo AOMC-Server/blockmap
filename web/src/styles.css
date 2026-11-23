@@ -2696,9 +2696,8 @@ img.banner,
 	margin-top: 22px;
 }
 
-/* An app's version or one of this site's browsers, under its group in the traffic table. */
+/* A row under another in the traffic table (an app's version, one of this site's browsers). */
 .admin-stats .domain-child {
-	padding-left: 2.2em;
 	color: var(--muted);
 }
 

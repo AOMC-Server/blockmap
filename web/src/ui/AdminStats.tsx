@@ -15,11 +15,12 @@ import {
 import { ADMIN_STATS_RANGES, type AdminStatsRange } from "@blockmap/shared";
 import { DAY, HOUR } from "@blockmap/shared/time";
 import type { InferResponseType } from "hono/client";
-import { Fragment } from "preact";
+import { Fragment, type JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api, attempt, showNotice } from "../api";
 import { subscribe } from "../events";
 import {
+	type DomainNode,
 	type DomainRow,
 	type DomainSort,
 	groupDomains,
@@ -407,18 +408,59 @@ function Domains(props: { data: Body; onChange: () => void }) {
 			</>
 		);
 	};
-	const deleteButton = (label: string, domains: string[]) => (
-		<td>
-			<button
-				type="button"
-				class="btn small danger"
-				disabled={busy}
-				onClick={() => void remove(label, domains)}
-			>
-				Delete
-			</button>
-		</td>
-	);
+	/** A row and, when open, the rows under it; `fixed`: rows that cannot be deleted. */
+	const rowsOf = (
+		n: DomainNode,
+		depth: number,
+		fixed: boolean,
+	): JSX.Element => {
+		const expanded = open.has(n.key);
+		const nested = n.children.length > 0;
+		return (
+			<Fragment key={n.key}>
+				<tr>
+					<td
+						class={depth === 0 ? (fixed ? "muted-cell" : "") : "domain-child"}
+						style={{
+							// Rows without a chevron line up with the labels of rows that have one.
+							paddingLeft:
+								depth > 0 ? `${depth * 1.6 + (nested ? 0 : 1.3)}em` : undefined,
+						}}
+					>
+						{nested ? (
+							<button
+								type="button"
+								class="plain"
+								aria-expanded={expanded}
+								onClick={() => toggle(n.key)}
+							>
+								<span class="chevron" aria-hidden="true">
+									{expanded ? "▼" : "▶"}
+								</span>{" "}
+								{n.label} <span class="muted">({n.children.length})</span>
+							</button>
+						) : (
+							n.label
+						)}
+					</td>
+					{cells(n.total)}
+					<td>
+						{!fixed && (
+							<button
+								type="button"
+								class="btn small danger"
+								disabled={busy}
+								onClick={() => void remove(n.key, n.domains)}
+							>
+								Delete
+							</button>
+						)}
+					</td>
+				</tr>
+				{expanded && n.children.map((c) => rowsOf(c, depth + 1, fixed))}
+			</Fragment>
+		);
+	};
 
 	return (
 		<>
@@ -455,52 +497,7 @@ function Domains(props: { data: Body; onChange: () => void }) {
 							</tr>
 						</thead>
 						<tbody>
-							{groups.map((g) => {
-								const pseudo = PSEUDO_DOMAINS.has(g.name);
-								const expanded = open.has(g.name);
-								const nested = g.children.length > 0;
-								return (
-									<Fragment key={g.name}>
-										<tr>
-											<td class={pseudo ? "muted-cell" : ""}>
-												{nested ? (
-													<button
-														type="button"
-														class="plain"
-														aria-expanded={expanded}
-														onClick={() => toggle(g.name)}
-													>
-														<span class="chevron" aria-hidden="true">
-															{expanded ? "▼" : "▶"}
-														</span>{" "}
-														{g.name}{" "}
-														<span class="muted">({g.children.length})</span>
-													</button>
-												) : (
-													g.name
-												)}
-											</td>
-											{cells(g.total)}
-											{pseudo ? (
-												<td />
-											) : (
-												deleteButton(
-													g.name,
-													nested ? g.children.map((c) => c.domain) : [g.name],
-												)
-											)}
-										</tr>
-										{expanded &&
-											g.children.map((c) => (
-												<tr key={c.domain}>
-													<td class="domain-child">{c.label}</td>
-													{cells(c)}
-													{pseudo ? <td /> : deleteButton(c.domain, [c.domain])}
-												</tr>
-											))}
-									</Fragment>
-								);
-							})}
+							{groups.map((g) => rowsOf(g, 0, PSEUDO_DOMAINS.has(g.key)))}
 						</tbody>
 					</table>
 				</div>
