@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import * as XLSX from "@e965/xlsx";
 import { DYES, type Dye } from "../shared/src/colors";
@@ -205,7 +206,7 @@ export function parseWorkbook(
 	file: string,
 	opts: Pick<ImportOptions, "defaultDimension" | "dimMap" | "sheets"> = {},
 ): ParsedLayer[] {
-	const wb = XLSX.readFile(file);
+	const wb = XLSX.read(readFileSync(file));
 	return wb.SheetNames.filter(
 		(n) => !n.includes("!") && (!opts.sheets || opts.sheets.includes(n)),
 	).map((n) =>
