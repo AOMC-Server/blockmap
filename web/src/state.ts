@@ -102,7 +102,7 @@ export type RevisionInfo = InferResponseType<
 	200
 >["revisions"][number];
 
-/** Changes when history is rewritten (an upload is deleted), so cached tiles are not reused. */
+/** Changes when history is rewritten (an upload is added out of order or deleted), so cached tiles are not reused. */
 export const mapEpoch = computed(() => currentMap.value?.map.epoch ?? 0);
 
 /** The upload being looked at on its own (tiles of that upload only), or null for the whole map. */

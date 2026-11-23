@@ -25,7 +25,7 @@ export function erasing(db: Db, ids?: number[]): Set<number> {
 
 /**
  * Why the revision's queued job has not started, or null when it has no queued job (it is
- * running, or finished): the history recompute in the way, or how many jobs are ahead of it.
+ * running, or finished): the history rebuild in the way, or how many jobs are ahead of it.
  */
 export function waiting(db: Db, revisionId: number): string | null {
 	const job = db
@@ -65,7 +65,7 @@ export function queueState(db: Db): QueueEvent {
 			? {
 					type: running.type,
 					revisionId:
-						running.type === "recompute_history"
+						running.type === "rebuild_history"
 							? null
 							: (running.revisionId as number | null),
 				}

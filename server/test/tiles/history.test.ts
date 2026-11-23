@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { rm } from "node:fs/promises";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { dimensions, jobs, mapInfo, revisions } from "../../src/db/schema";
 import type { RevisionEvent } from "../../src/events";
 import { messages } from "../../src/jobs/messages";
@@ -112,12 +112,12 @@ describe("upload", () => {
 	test("an unchanged re-upload adds a revision but no tile writes", async () => {
 		const t = await bootTiles();
 		await upload(t, await solid(T, T, RED), 0, 0);
+		const before = await t.db.query.tileVersions.findMany();
 		// Not the same file (that would be skipped), but nothing new: black is "no data".
 		const partial = await png(T, T, (_, y) => (y === 0 ? BLACK : RED));
 		const again = await upload(t, partial, 0, 0);
 		expect((await revisionOf(t, again)).rev).toBe(2);
-		const rows = await t.db.query.tileVersions.findMany();
-		expect(rows.filter((r) => r.rev === 2)).toHaveLength(0);
+		expect(await t.db.query.tileVersions.findMany()).toEqual(before);
 	});
 });
 
@@ -185,21 +185,26 @@ describe("deleting an upload", () => {
 		return out;
 	}
 
+	const revNumbers = async (t: TileApp) =>
+		(
+			await t.db
+				.select({ rev: revisions.rev })
+				.from(revisions)
+				.orderBy(asc(revisions.rev))
+		).map((r) => r.rev);
+
 	test("it is as if the upload was never made, at every revision", async () => {
 		for (const skip of [0, 1, 2, 3]) {
 			const full = await history();
 			await erase(full.t, full.ids[skip] as number);
 			const without = await history(skip);
 
-			// Revisions after the deleted one keep their numbers, so there is a gap.
-			const gap = skip + 1;
-			const head = full.ids.length;
+			// The revisions after the deleted one move down, leaving no gap.
 			expect(await snapshot(full.t)).toEqual(await snapshot(without.t));
-			for (let rev = 0; rev <= head; rev++) {
-				if (rev === gap) continue;
-				const there = rev < gap ? rev : rev - 1;
+			expect(await revNumbers(full.t)).toEqual(await revNumbers(without.t));
+			for (let rev = 0; rev < full.ids.length; rev++) {
 				expect(await snapshot(full.t, rev)).toEqual(
-					await snapshot(without.t, there),
+					await snapshot(without.t, rev),
 				);
 			}
 		}
@@ -451,7 +456,7 @@ describe("failures", () => {
 		const rev = await revisionOf(t, revisionId);
 		expect(rev).toMatchObject({
 			status: "failed",
-			error: "interrupted too many times",
+			error: messages.failed.interrupted,
 		});
 		expect(await jobStatus(t, jobId)).toBe("failed");
 		expect(await readTile(t, 0, 0, 0)).toBeNull();

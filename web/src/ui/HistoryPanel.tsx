@@ -27,7 +27,6 @@ import {
 	eventForRev,
 	filterRevisions,
 	groupByDay,
-	outOfOrder,
 	timelineEvents,
 	viewBounds,
 } from "../timeline";
@@ -47,6 +46,12 @@ function showRevision(r: RevisionInfo) {
 		mapView.value?.fitBounds(r.bbox, { padding: 120, closestZoom: 0 });
 }
 
+/** The reason for a failure, with the technical error under it for moderators (the server sends it to them only). */
+const errorTitle = (r: RevisionInfo) =>
+	[r.error, r.errorDetail && `Technical: ${r.errorDetail}`]
+		.filter(Boolean)
+		.join("\n\n");
+
 function describe(r: RevisionInfo): string {
 	const files = `${r.fileCount} file${r.fileCount === 1 ? "" : "s"}`;
 	return r.viaMod ? `${files} via mod` : files;
@@ -64,7 +69,7 @@ function deletable(r: RevisionInfo, now: number) {
 	);
 }
 
-function RevisionRow(props: { r: RevisionInfo; odd: boolean; now: number }) {
+function RevisionRow(props: { r: RevisionInfo; now: number }) {
 	const { r } = props;
 	const row = useRef<HTMLLIElement>(null);
 	const active =
@@ -119,21 +124,13 @@ function RevisionRow(props: { r: RevisionInfo; odd: boolean; now: number }) {
 				</span>
 			</button>
 			<div class="rev-badges">
-				{props.odd && (
-					<span
-						class="badge warn"
-						title="Uploaded after newer exports: the map at this revision also shows those."
-					>
-						late
-					</span>
-				)}
 				{busy && (
 					<span
 						class="badge"
 						title={
 							removing?.detail ??
 							(r.status === "pending"
-								? "Queued: uploads, deletions and history recomputes run one at a time"
+								? "Queued: uploads, deletions and history rebuilds run one at a time"
 								: "Being added to the map")
 						}
 					>
@@ -142,12 +139,12 @@ function RevisionRow(props: { r: RevisionInfo; odd: boolean; now: number }) {
 					</span>
 				)}
 				{r.status === "done" && r.error && (
-					<span class="badge error" title={r.error}>
+					<span class="badge error" title={errorTitle(r)}>
 						{r.error}
 					</span>
 				)}
 				{r.status === "failed" && (
-					<span class="badge error" title={r.error ?? ""}>
+					<span class="badge error" title={errorTitle(r)}>
 						failed{r.error ? `: ${r.error}` : ""}
 					</span>
 				)}
@@ -269,7 +266,6 @@ export function HistoryPanel() {
 	);
 
 	const all = revisionsData.value;
-	const odd = useMemo(() => outOfOrder(all), [all]);
 	const shown = useMemo(
 		() =>
 			filterRevisions(all, {
@@ -355,12 +351,7 @@ export function HistoryPanel() {
 						)}
 					</div>
 
-					<Timeline
-						events={events}
-						pending={pending}
-						outOfOrder={odd}
-						describe={describe}
-					/>
+					<Timeline events={events} pending={pending} describe={describe} />
 				</div>
 			}
 		>
@@ -376,7 +367,7 @@ export function HistoryPanel() {
 					</h4>
 					<ul class="revisions">
 						{g.items.map((r) => (
-							<RevisionRow key={r.id} r={r} odd={odd.has(r.id)} now={now} />
+							<RevisionRow key={r.id} r={r} now={now} />
 						))}
 					</ul>
 				</section>

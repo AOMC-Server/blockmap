@@ -48,6 +48,19 @@ export function canDeleteUpload(
 	);
 }
 
+/** Failed uploads are listed to their author and to moderators only. */
+export function canSeeUpload(
+	actor: Actor,
+	role: Role,
+	upload: { status: string; authorId: string },
+): boolean {
+	return (
+		upload.status !== "failed" ||
+		canModerate(role) ||
+		(actor !== null && actor.id === upload.authorId)
+	);
+}
+
 /** The actor's role on a layer: an explicit membership, else editor for its creator. */
 export function effectiveLayerRole(
 	actor: Actor,

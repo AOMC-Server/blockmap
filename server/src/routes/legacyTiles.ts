@@ -12,8 +12,8 @@ import {
 	loadTile,
 	overRegion,
 } from "../tiles/compose";
-import { tileHashesIn } from "../tiles/history";
-import { tileKey } from "../tiles/pyramid";
+import { seqOfRev, tileHashesIn } from "../tiles/history";
+import { tileKey } from "../tiles/rebuild";
 import type { AppEnv } from "../types";
 
 /** v1 tiles were 512 pixels whatever the map's tile size is now. */
@@ -208,7 +208,7 @@ export const legacyTileRoutes = new Hono<AppEnv>().get(
 			dim.id,
 			zoom - levels,
 			rect,
-			map.headRev,
+			await seqOfRev(db, map.headRev),
 		);
 		if (sources.length === 0) return notFound(c);
 

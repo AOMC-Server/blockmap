@@ -12,6 +12,7 @@ import {
 	layers,
 	revisions,
 } from "../src/db/schema";
+import { SEQS_PER_MS } from "../src/tiles/history";
 import type { Auth, TileApp } from "./helpers";
 import {
 	bootTiles,
@@ -566,7 +567,7 @@ describe("feature revisions", () => {
 });
 
 describe("time travel", () => {
-	test("`at` shows features and layers as they were when that revision completed", async () => {
+	test("`at` shows features and layers as they were when that revision was exported", async () => {
 		const t = await bootTiles();
 		for (let i = 0; i < 3; i++)
 			await upload(t, await solid(T, T, RED), i * T, 0);
@@ -574,7 +575,7 @@ describe("time travel", () => {
 		for (const [i, completedAt] of stamps.entries()) {
 			await t.db
 				.update(revisions)
-				.set({ completedAt })
+				.set({ seq: completedAt * SEQS_PER_MS })
 				.where(eq(revisions.rev, i + 1));
 		}
 
@@ -620,7 +621,7 @@ describe("time travel", () => {
 			.where(eq(featureRevisions.deleted, true));
 		await t.db
 			.update(revisions)
-			.set({ completedAt: 7000 })
+			.set({ seq: 7000 * SEQS_PER_MS })
 			.where(eq(revisions.rev, 3));
 		expect((await at(2))[0].name).toBe("Base");
 	});
@@ -632,7 +633,7 @@ describe("time travel", () => {
 		for (const [i, completedAt] of [1000, 3000, 5000].entries()) {
 			await t.db
 				.update(revisions)
-				.set({ completedAt })
+				.set({ seq: completedAt * SEQS_PER_MS })
 				.where(eq(revisions.rev, i + 1));
 		}
 		const young = await makeLayer(t, t.editor, { name: "Young" });
@@ -1817,7 +1818,7 @@ describe("moving a feature to another layer", () => {
 		for (const [i, completedAt] of [1000, 3000, 5000].entries())
 			await t.db
 				.update(revisions)
-				.set({ completedAt })
+				.set({ seq: completedAt * SEQS_PER_MS })
 				.where(eq(revisions.rev, i + 1));
 		const a = await makeLayer(t, t.editor, { name: "A" });
 		const b = await makeLayer(t, t.editor, { name: "B" });

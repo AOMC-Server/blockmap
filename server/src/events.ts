@@ -23,23 +23,8 @@ export type ProgressEvent = Exclude<RevisionEvent, { status: "gone" }>;
 export type QueueEvent = {
 	pending: number;
 	running: {
-		type: "process_upload" | "erase_upload" | "recompute_history";
+		type: "process_upload" | "erase_upload" | "rebuild_history";
 		revisionId: number | null;
-	} | null;
-};
-
-/** The newest history recompute (null if there never was one). */
-export type RecomputeEvent = {
-	recompute: {
-		status: "pending" | "processing" | "done" | "failed";
-		error: string | null;
-		queuedAt: number;
-		completedAt: number | null;
-		progress: {
-			message: string;
-			done: number | null;
-			total: number | null;
-		} | null;
 	} | null;
 };
 
@@ -55,7 +40,6 @@ export type Events = {
 	layers: Invalidation;
 	map: MapEvent;
 	queue: QueueEvent;
-	recompute: RecomputeEvent;
 };
 
 export type Family = keyof Events;

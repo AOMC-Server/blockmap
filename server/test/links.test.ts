@@ -2,7 +2,18 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { createApiToken } from "../src/auth/tokens";
 import { SHORT_LINK_RATE_LIMIT } from "../src/ratelimit";
 import { viewQuery } from "../src/routes/links";
-import { call, cleanupTempDirs, makeTestApp, makeUser } from "./helpers";
+import {
+	bootTiles,
+	call,
+	cleanupTempDirs,
+	erase,
+	makeTestApp,
+	makeUser,
+	RED,
+	solid,
+	T,
+	uploadFrom,
+} from "./helpers";
 
 afterAll(cleanupTempDirs);
 
@@ -10,7 +21,15 @@ const view = { dim: "overworld", x: 120, z: -40, zoom: 1.5 };
 
 describe("short links", () => {
 	test("anyone can make one; it redirects to the view", async () => {
-		const t = makeTestApp();
+		const t = await bootTiles();
+		for (const [i, day] of [10, 11, 12].entries())
+			await uploadFrom(
+				t,
+				await solid(T, T, RED),
+				i * T,
+				0,
+				`2026-02-${day}_10.00.00/a.png`,
+			);
 		const res = await call(t, null, "POST", "/api/links", {
 			...view,
 			rev: 3,
@@ -25,6 +44,40 @@ describe("short links", () => {
 		expect(open.headers.get("Location")).toBe(
 			"/v2/?dim=overworld&x=120&z=-40&zoom=1.5&rev=3&layers=2%2C5",
 		);
+	});
+
+	test("a link keeps its moment when uploads are added before it or deleted", async () => {
+		const t = await bootTiles();
+		const png = await solid(T, T, RED);
+		const at = (day: number) =>
+			`2026-02-${String(day).padStart(2, "0")}_10.00.00/a.png`;
+		const a = await uploadFrom(t, png, 0, 0, at(10));
+		await uploadFrom(t, png, T, 0, at(12));
+		const link = async (rev: number) =>
+			(await call(t, null, "POST", "/api/links", { ...view, rev })).body.code;
+		const opens = async (code: string) =>
+			new URL(
+				(await t.app.request(`/s/${code}`)).headers.get("Location") as string,
+				"http://x",
+			).searchParams.get("rev");
+		const [first, second, none] = [await link(1), await link(2), await link(0)];
+		expect(await link(9)).not.toBe(second);
+
+		// An older export lands between the two: the second moves to revision 3.
+		await uploadFrom(t, png, 2 * T, 0, at(11));
+		expect([
+			await opens(first),
+			await opens(second),
+			await opens(none),
+		]).toEqual(["1", "3", "0"]);
+
+		// And one before everything moves them all up.
+		await uploadFrom(t, png, 3 * T, 0, at(9));
+		expect([await opens(first), await opens(second)]).toEqual(["2", "4"]);
+
+		await erase(t, a);
+		expect([await opens(first), await opens(second)]).toEqual(["1", "3"]);
+		expect(await opens(await link(9))).toBeNull();
 	});
 
 	test("the same view gets the same link, however its layers are listed", async () => {

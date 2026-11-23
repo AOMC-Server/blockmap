@@ -25,6 +25,7 @@ const WRITE_SCOPES: [RegExp, TokenScope][] = [
 	[/^\/api\/invites\/?$/, "manage"],
 	[/^\/api\/members(\/.*)?$/, "manage"],
 	[/^\/api\/map\/?$/, "manage"],
+	[/^\/api\/admin\/uploads\/purge-failed\/?$/, "moderate"],
 	[/^\/api\/admin(\/.*)?$/, "manage"],
 	// Anyone may make a short link, even without logging in.
 	[/^\/api\/links\/?$/, "read"],

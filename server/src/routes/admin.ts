@@ -6,15 +6,15 @@ import {
 	HOUR,
 	MINUTE,
 } from "@blockmap/shared";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { requireUser } from "../auth/session";
 import type { Db } from "../db/client";
-import { lateUploads, queueRecompute } from "../jobs/recomputeHistory";
+import { revisions } from "../db/schema";
+import { removeUploads } from "../jobs/target";
 import { doc } from "../openapi";
-import { canManage } from "../permissions";
+import { canManage, canModerate } from "../permissions";
 import { measureStorage } from "../storage";
-import { recomputeSnapshot } from "../topics";
 import { TRAFFIC_CATEGORIES, type TrafficCategory } from "../traffic";
 import type { AppEnv } from "../types";
 import { validate } from "../validate";
@@ -245,6 +245,13 @@ function overview(db: Db, now: number) {
 	};
 }
 
+const failedUploads = (db: Db) =>
+	db
+		.select({ id: revisions.id, dimensionId: revisions.dimensionId })
+		.from(revisions)
+		.where(eq(revisions.status, "failed"))
+		.all();
+
 export const adminRoutes = new Hono<AppEnv>()
 	.use(requireUser)
 	.get(
@@ -286,49 +293,42 @@ export const adminRoutes = new Hono<AppEnv>()
 		},
 	)
 	.get(
-		"/history",
+		"/uploads/failed",
 		doc({
 			tag: "Admin",
-			summary: "How the map's history is ordered",
+			summary: "How many uploads failed",
 			description:
-				"Owners. `lateUploads` counts finished uploads published after an upload of the same dimension that was exported later; looking at the map as of one of them also shows those newer exports. `recompute` is the newest history recompute (null if there never was one): its `status`, `error` when it failed, and while it runs, `progress` (`message`, and `done` of `total` steps where known).",
+				"Moderators. `count` is the number of failed uploads of all dimensions.",
 			fails: [403],
 			login: true,
 		}),
 		(c) => {
-			if (!canManage(c.var.role)) return c.json({ error: "forbidden" }, 403);
-			const { db, svc } = c.var;
-			return c.json({
-				lateUploads: lateUploads(db),
-				recompute: recomputeSnapshot(db, svc.worker.recomputeProgress())
-					.recompute,
-			});
+			if (!canModerate(c.var.role)) return c.json({ error: "forbidden" }, 403);
+			return c.json({ count: failedUploads(c.var.db).length });
 		},
 	)
 	.post(
-		"/history/recompute",
+		"/uploads/purge-failed",
 		doc({
 			tag: "Admin",
-			summary: "Recompute the history in export order",
+			summary: "Delete all failed uploads",
 			description:
-				"Owners. Queues a job that renumbers every finished upload by export date (across all dimensions) and rebuilds every past revision of the map from that order, so the map as of an upload holds exactly the uploads exported up to then. The newest map stays the same. Revision numbers change, so links to a `rev` afterwards show a different moment. Follow it with `GET /api/admin/history`.",
-			ok: { 202: "Queued" },
-			fails: [403, 409],
+				"Moderators. Removes every failed upload, of every author, from the upload log. Answers how many (`removed`). Uploads that finished are not touched.",
+			fails: [403],
 			login: true,
 		}),
 		(c) => {
-			if (!canManage(c.var.role)) return c.json({ error: "forbidden" }, 403);
+			if (!canModerate(c.var.role)) return c.json({ error: "forbidden" }, 403);
 			const { db, svc } = c.var;
-			if (!queueRecompute(db))
-				return c.json(
-					{ error: "a recompute is already queued or running" },
-					409,
-				);
-			svc.events.emit(
-				"recompute",
-				recomputeSnapshot(db, svc.worker.recomputeProgress()),
+			const failed = failedUploads(db);
+			removeUploads(
+				db,
+				failed.map((r) => r.id),
 			);
-			svc.worker.kick();
-			return c.json({ ok: true }, 202);
+			for (const { id } of failed)
+				svc.events.emit("revision", id, { status: "gone" });
+			for (const dimensionId of new Set(failed.map((r) => r.dimensionId)))
+				if (dimensionId !== null) svc.events.emit("revisions", dimensionId, {});
+			return c.json({ removed: failed.length });
 		},
 	);

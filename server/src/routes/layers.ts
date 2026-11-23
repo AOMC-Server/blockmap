@@ -99,7 +99,7 @@ export const layerRoutes = new Hono<AppEnv>()
 			tag: "Layers",
 			summary: "List layers with their features",
 			description:
-				"Only layers you may see. `at` reads the layers as of a revision (404 if there is no such revision).",
+				"Only layers you may see. `at` reads the layers as of a revision, that is as of the time its upload was exported (404 if there is no such revision).",
 			fails: [400, 404],
 		}),
 		validate("query", layersQuerySchema),

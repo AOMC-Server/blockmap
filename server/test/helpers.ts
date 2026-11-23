@@ -243,8 +243,15 @@ export const uploadFrom = (
 	path: string,
 ) => uploadMany(t, [{ data, x, z, path }]);
 
-export async function revisionOf(t: TileApp, id: number) {
-	const res = await t.app.request(`/api/revisions/${id}`);
+/** A revision as a moderator sees it (failed uploads are listed to moderators and their author only). */
+export async function revisionOf(
+	t: TileApp,
+	id: number,
+	user: { auth: Record<string, string> } | null = t.mod,
+) {
+	const res = await t.app.request(`/api/revisions/${id}`, {
+		headers: user?.auth ?? {},
+	});
 	return ((await res.json()) as { revision: Record<string, unknown> }).revision;
 }
 

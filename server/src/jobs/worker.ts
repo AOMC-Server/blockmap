@@ -1,16 +1,15 @@
 import { rmSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { jobs, revisions, tileVersionsRebuild } from "../db/schema";
+import { jobs, mapInfo, revisions, tileVersionsRebuild } from "../db/schema";
 import { recordStorage } from "../storage";
 import { isPublished } from "../tiles/history";
-import { mapSnapshot, recomputeSnapshot } from "../topics";
+import { mapSnapshot } from "../topics";
 import { eraseUpload } from "./eraseUpload";
 import { messages } from "./messages";
 import { processUpload } from "./processUpload";
 import { queueState } from "./queue";
-import { type RecomputeProgress, recomputeHistory } from "./recomputeHistory";
-import { throttled } from "./report";
+import { rebuildHistory } from "./rebuildHistory";
 import {
 	type EraseUploadPayload,
 	incomingDir,
@@ -26,8 +25,6 @@ export function createWorker(ctx: JobContext) {
 	const { db, env, events } = ctx;
 	let running: Promise<void> | null = null;
 	let timer: ReturnType<typeof setInterval> | undefined;
-	/** How far a running history recompute is; null when none is running. */
-	let recompute: RecomputeProgress | null = null;
 
 	let lastQueue = "";
 	/** Tells followers about the queue, when it changed since it last did. */
@@ -38,8 +35,6 @@ export function createWorker(ctx: JobContext) {
 		lastQueue = json;
 		events.emit("queue", state);
 	};
-	const announceRecompute = () =>
-		events.emit("recompute", recomputeSnapshot(db, recompute));
 	const announceMap = () => events.emit("map", mapSnapshot(db));
 
 	const markJob = (id: number, status: "pending" | "done" | "failed") =>
@@ -53,18 +48,18 @@ export function createWorker(ctx: JobContext) {
 		job: typeof jobs.$inferSelect,
 		revisionId: number,
 		message: string,
+		detail: string | null = null,
 	) => {
+		const errorDetail = detail?.slice(0, 500) ?? null;
 		markJob(job.id, "failed");
 		db.update(revisions)
 			.set(
 				job.type === "erase_upload"
-					? {
-							status: "done",
-							error: `delete failed: ${message}`.slice(0, 500),
-						}
+					? { error: `delete failed: ${message}`.slice(0, 500), errorDetail }
 					: {
 							status: "failed",
 							error: message.slice(0, 500),
+							errorDetail,
 							completedAt: Date.now(),
 						},
 			)
@@ -77,55 +72,49 @@ export function createWorker(ctx: JobContext) {
 		job.type === "process_upload" &&
 		isPublished(db, (job.payload as { revisionId: number }).revisionId);
 
-	/** A history recompute has no revision of its own: its state and error live on the job. */
-	async function runRecompute(job: typeof jobs.$inferSelect) {
+	/**
+	 * A history rebuild has no revision of its own: its error lives on the job. The map is read
+	 * only meanwhile (unless it already was).
+	 */
+	async function runRebuild(job: typeof jobs.$inferSelect) {
 		db.update(jobs)
 			.set({ status: "processing", attempts: job.attempts + 1, error: null })
 			.where(eq(jobs.id, job.id))
 			.run();
-		recompute = { message: messages.starting };
+		const wasReadOnly = db
+			.select({ on: mapInfo.maintenance })
+			.from(mapInfo)
+			.get()?.on;
+		if (!wasReadOnly) db.update(mapInfo).set({ maintenance: true }).run();
 		announceQueue();
-		announceRecompute();
-		const report = throttled((_: RecomputeProgress) => announceRecompute());
-		let published = false;
+		announceMap();
 		try {
 			// Publishing marks the job done in the same transaction.
-			await recomputeHistory(ctx, job.id, (p) => {
-				recompute = p;
-				report(p);
-			});
-			published = true;
+			await rebuildHistory(ctx, job.id);
 		} catch (err) {
 			console.error(`job ${job.id} failed:`, err);
 			db.delete(tileVersionsRebuild).run();
 			db.update(jobs)
 				.set({
 					status: "failed",
-					error: (err instanceof UserError
-						? err.message
-						: "internal error"
-					).slice(0, 500),
+					error: "internal error",
 					completedAt: Date.now(),
 				})
 				.where(eq(jobs.id, job.id))
 				.run();
-		} finally {
-			recompute = null;
-			announceRecompute();
-			announceQueue();
 		}
-		if (published) {
-			announceMap();
-			for (const dim of db
-				.selectDistinct({ id: revisions.dimensionId })
-				.from(revisions)
-				.all())
-				if (dim.id !== null) events.emit("revisions", dim.id, {});
-		}
+		if (!wasReadOnly) db.update(mapInfo).set({ maintenance: false }).run();
+		announceQueue();
+		announceMap();
+		for (const dim of db
+			.selectDistinct({ id: revisions.dimensionId })
+			.from(revisions)
+			.all())
+			if (dim.id !== null) events.emit("revisions", dim.id, {});
 	}
 
 	async function runJob(job: typeof jobs.$inferSelect) {
-		if (job.type === "recompute_history") return runRecompute(job);
+		if (job.type === "rebuild_history") return runRebuild(job);
 		const payload = job.payload as { revisionId: number };
 		const isErase = job.type === "erase_upload";
 		if (alreadyPublished(job)) {
@@ -141,13 +130,11 @@ export function createWorker(ctx: JobContext) {
 			.update(jobs)
 			.set({ status: "processing", attempts: job.attempts + 1 })
 			.where(eq(jobs.id, job.id));
-		// An erase only touches its target once it starts: until then the upload stays as it was.
+		// An erase leaves its target's status alone: it is part of the map until it is gone.
 		await db
 			.update(revisions)
 			.set(
-				isErase
-					? { status: "processing", error: null }
-					: { status: "processing" },
+				isErase ? { error: null, errorDetail: null } : { status: "processing" },
 			)
 			.where(eq(revisions.id, payload.revisionId));
 		// Read before an erase removes the revision.
@@ -181,12 +168,17 @@ export function createWorker(ctx: JobContext) {
 				markJob(job.id, "done");
 			} else {
 				const message =
+					err instanceof UserError ? err.message : messages.failed.internal;
+				failJob(
+					job,
+					payload.revisionId,
+					message,
 					err instanceof UserError
-						? err.message
-						: isErase
-							? "internal error"
-							: "processing failed";
-				failJob(job, payload.revisionId, message);
+						? null
+						: err instanceof Error
+							? err.message
+							: String(err),
+				);
 				announceQueue();
 				announceDimension();
 				events.emit("revision", payload.revisionId, {
@@ -269,8 +261,6 @@ export function createWorker(ctx: JobContext) {
 
 	return {
 		run,
-		/** Progress of the history recompute that is running, if one is. */
-		recomputeProgress: () => recompute,
 		/** Starts on queued jobs, and tells followers about the queue if it changed. */
 		kick() {
 			try {
@@ -290,7 +280,7 @@ export function createWorker(ctx: JobContext) {
 				.from(jobs)
 				.where(eq(jobs.status, "processing"))
 				.all()) {
-				if (job.type === "recompute_history") {
+				if (job.type === "rebuild_history") {
 					// Nothing of it was published; it starts over, unless it keeps crashing.
 					db.update(jobs)
 						.set(
@@ -315,17 +305,19 @@ export function createWorker(ctx: JobContext) {
 						force: true,
 					});
 				} else if (job.attempts >= MAX_ATTEMPTS) {
-					failJob(job, revisionId, "interrupted too many times");
+					failJob(job, revisionId, messages.failed.interrupted);
 					rmSync(incomingDir(env, revisionId), {
 						recursive: true,
 						force: true,
 					});
 				} else {
 					markJob(job.id, "pending");
-					db.update(revisions)
-						.set({ status: isErase ? "done" : "pending" })
-						.where(eq(revisions.id, revisionId))
-						.run();
+					if (!isErase) {
+						db.update(revisions)
+							.set({ status: "pending" })
+							.where(eq(revisions.id, revisionId))
+							.run();
+					}
 				}
 			}
 			timer = setInterval(() => this.kick(), 5000);

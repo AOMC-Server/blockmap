@@ -14,7 +14,7 @@ export type TimelineRevision = {
 	createdAt: number;
 };
 
-/** When an upload counts as made: its export time, or else when it was uploaded (as the server stacks tiles). */
+/** When an upload counts as made: its export time, or else when it was uploaded. Revision numbers follow this order. */
 export const eventTime = (r: TimelineRevision) => r.exportedAt ?? r.createdAt;
 
 /** The blocks the camera sees. */
@@ -54,24 +54,6 @@ export function timelineEvents<R extends TimelineRevision>(
 				r.kind === "upload" && r.status === "done" && r.rev !== null,
 		)
 		.sort((a, b) => eventTime(a) - eventTime(b) || a.rev - b.rev);
-}
-
-/**
- * Uploads that were made (exported) before some upload that was published ahead of them. Looking
- * at one of them also shows those newer exports, so the map is not quite "as of" its date.
- */
-export function outOfOrder(
-	revisions: readonly TimelineRevision[],
-): Set<number> {
-	const byRev = timelineEvents(revisions).sort((a, b) => a.rev - b.rev);
-	const out = new Set<number>();
-	let latest = Number.NEGATIVE_INFINITY;
-	for (const r of byRev) {
-		const t = eventTime(r);
-		if (t < latest) out.add(r.id);
-		latest = Math.max(latest, t);
-	}
-	return out;
 }
 
 /**

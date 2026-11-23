@@ -141,6 +141,20 @@
       "when": 1794755317024,
       "tag": "0019_file_library",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1795388749168,
+      "tag": "0020_history_by_seq",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1795390671248,
+      "tag": "0021_error_detail",
+      "breakpoints": true
     }
   ]
 }

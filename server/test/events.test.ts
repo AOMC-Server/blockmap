@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
-import { revisions } from "../src/db/schema";
+import { mapInfo, revisions } from "../src/db/schema";
 import type { Envelope } from "../src/events";
+import { queueRebuildIfPending } from "../src/jobs/rebuildHistory";
 import {
 	type Auth,
 	BLUE,
@@ -76,16 +77,22 @@ async function dimensionIds(t: TileApp) {
 	return { overworld: idOf("overworld"), nether: idOf("nether") };
 }
 
+/** Queues a history rebuild, as a migration asks for on boot. */
+function queueRebuild(t: TileApp) {
+	t.db.update(mapInfo).set({ rebuildPending: true }).run();
+	queueRebuildIfPending(t.db);
+}
+
 describe("GET /api/events", () => {
 	test("sends the current state of every topic first", async () => {
 		const t = await boot();
 		const { overworld } = await dimensionIds(t);
 		const seen = await follow(
 			t,
-			`map,queue,layers:${overworld},revisions:${overworld},recompute`,
+			`map,queue,layers:${overworld},revisions:${overworld}`,
 			t.owner,
 		);
-		expect(seen).toHaveLength(5);
+		expect(seen).toHaveLength(4);
 		for (const envelope of seen) {
 			expect(envelope).toMatchObject({ snapshot: true });
 			expect("final" in envelope).toBe(false);
@@ -97,14 +104,13 @@ describe("GET /api/events", () => {
 		expect(byTopic.queue).toEqual({ pending: 0, running: null });
 		expect(byTopic[`layers:${overworld}`]).toEqual({});
 		expect(byTopic[`revisions:${overworld}`]).toEqual({});
-		expect(byTopic.recompute).toEqual({ recompute: null });
 	});
 
 	test("says why a topic cannot be followed", async () => {
 		const t = await boot();
 		const asEditor = await follow(
 			t,
-			"nonsense,layers:999999,layers,layers:abc,map:1,recompute",
+			"nonsense,layers:999999,layers,layers:abc,map:1",
 			t.editor,
 		);
 		expect(asEditor).toEqual([
@@ -113,10 +119,7 @@ describe("GET /api/events", () => {
 			{ topic: "layers", error: "unknown topic" },
 			{ topic: "layers:abc", error: "unknown topic" },
 			{ topic: "map:1", error: "unknown topic" },
-			{ topic: "recompute", error: "forbidden" },
 		]);
-		const anonymous = await follow(t, "recompute", null);
-		expect(anonymous).toEqual([{ topic: "recompute", error: "forbidden" }]);
 	});
 
 	test("ends right away when nothing can be followed", async () => {
@@ -126,18 +129,6 @@ describe("GET /api/events", () => {
 		expect(parse(await (await t.app.request("/api/events")).text())).toEqual(
 			[],
 		);
-	});
-
-	test("owners may follow the recompute", async () => {
-		const t = await boot();
-		const [envelope] = await follow(t, "recompute", t.owner);
-		expect(envelope).toMatchObject({
-			topic: "recompute",
-			snapshot: true,
-			data: { recompute: null },
-		});
-		const moderator = await follow(t, "recompute", t.mod);
-		expect(moderator).toEqual([{ topic: "recompute", error: "forbidden" }]);
 	});
 
 	test("a finished revision is one final snapshot, and the stream ends", async () => {
@@ -238,9 +229,7 @@ describe("a waiting revision", () => {
 	test("is announced again when the queue in front of it moves", async () => {
 		const t = await boot();
 		await upload(t, await solid(T, T, RED), 0, 0);
-		expect(
-			(await call(t, t.owner, "POST", "/api/admin/history/recompute")).status,
-		).toBe(202);
+		queueRebuild(t);
 		const res = await postUpload(t, t.editor, [
 			{ name: "b_x0_z0.png", data: await solid(T, T, BLUE) },
 		]);
@@ -275,7 +264,7 @@ describe("a waiting revision", () => {
 	test("its first state says what it waits for", async () => {
 		const t = await boot();
 		await upload(t, await solid(T, T, RED), 0, 0);
-		await call(t, t.owner, "POST", "/api/admin/history/recompute");
+		queueRebuild(t);
 		const res = await postUpload(t, t.editor, [
 			{ name: "b_x0_z0.png", data: await solid(T, T, BLUE) },
 		]);
@@ -285,7 +274,7 @@ describe("a waiting revision", () => {
 			snapshot: true,
 			data: {
 				status: "pending",
-				message: "Waiting for the history recompute to finish",
+				message: "Waiting for the history rebuild to finish",
 			},
 		});
 		await t.services.worker.run();
@@ -438,36 +427,6 @@ describe("routes announce what they change", async () => {
 		expect(topicsOf(seen)).toContain(`revisions:${ow}`);
 		expect(queue[0]).toMatchObject({ pending: 1 });
 		await t.services.worker.run();
-	});
-
-	test("starting a recompute announces it", async () => {
-		const seen = await run(t.owner, "POST", "/api/admin/history/recompute");
-		expect(seen.filter((s) => s.topic === "recompute")[0]).toEqual({
-			topic: "recompute",
-			data: {
-				recompute: {
-					status: "pending",
-					error: null,
-					queuedAt: expect.any(Number),
-					completedAt: null,
-					progress: null,
-				},
-			},
-		});
-		await t.services.worker.run();
-	});
-
-	test("the history shows what the stream does", async () => {
-		const history = await call(t, t.owner, "GET", "/api/admin/history");
-		const [envelope] = await follow(t, "recompute", t.owner);
-		expect(history.body.recompute).toEqual(
-			(envelope as { data: { recompute: unknown } }).data.recompute,
-		);
-		expect(history.body.recompute).toMatchObject({ status: "done" });
-		expect(Object.keys(history.body).sort()).toEqual([
-			"lateUploads",
-			"recompute",
-		]);
 	});
 
 	test("changing the map settings announces the map", async () => {

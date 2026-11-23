@@ -71,12 +71,12 @@ export const mapInfo = sqliteTable("map_info", {
 	name: text("name").notNull(),
 	tileSize: integer("tile_size").notNull(),
 	headRev: integer("head_rev").notNull().default(0),
-	/** Bumped when history is rewritten (an upload is deleted), so cached tiles are not reused. */
+	/** Bumped when history is rewritten (an upload is deleted or inserted before newer ones), so cached tiles are not reused. */
 	epoch: integer("epoch").notNull().default(0),
 	/** Read only for everyone but owners. */
 	maintenance: bool("maintenance").notNull().default(false),
-	/** Set when history must be rebuilt in export order (after legacy reverts were removed); queued on boot. */
-	recomputePending: bool("recompute_pending").notNull().default(false),
+	/** Set when the tile history must be rebuilt from the uploads' patches; queued on boot. */
+	rebuildPending: bool("recompute_pending").notNull().default(false),
 	createdAt: createdAt(),
 });
 
@@ -123,7 +123,10 @@ export const revisions = sqliteTable(
 	"revisions",
 	{
 		id: id(),
-		rev: integer("rev").unique(), // assigned when the job completes
+		/** The upload's place in the history: 1 for the oldest export, no gaps. Assigned when published. */
+		rev: integer("rev").unique(),
+		/** Sort key of the export (its time * 1024, ties by publish order); never changes. Assigned when published. */
+		seq: integer("seq").unique(),
 		kind: text("kind", { enum: ["upload"] }).notNull(),
 		dimensionId: integer("dimension_id").references(() => dimensions.id),
 		authorId: text("author_id")
@@ -135,6 +138,8 @@ export const revisions = sqliteTable(
 			.notNull()
 			.default("pending"),
 		error: text("error"),
+		/** The internal error behind a failure that is not the uploader's doing; shown to moderators only. */
+		errorDetail: text("error_detail"),
 		bboxMinX: integer("bbox_min_x"),
 		bboxMinZ: integer("bbox_min_z"),
 		bboxMaxX: integer("bbox_max_x"),
@@ -199,15 +204,16 @@ export const tileVersions = sqliteTable(
 		zoom: integer("zoom").notNull(),
 		tileX: integer("tile_x").notNull(),
 		tileY: integer("tile_y").notNull(),
-		rev: integer("rev").notNull(),
-		blobHash: text("blob_hash"), // null = empty tile at this rev
+		/** The `seq` of the upload that made this version. */
+		seq: integer("seq").notNull(),
+		blobHash: text("blob_hash"), // null = empty tile from this seq on
 	},
 	(t) => [
-		primaryKey({ columns: [t.dimensionId, t.zoom, t.tileX, t.tileY, t.rev] }),
+		primaryKey({ columns: [t.dimensionId, t.zoom, t.tileX, t.tileY, t.seq] }),
 	],
 );
 
-/** Where a history recompute writes the new tile_versions before swapping them in. */
+/** Where a history rebuild writes the new tile_versions before swapping them in. */
 export const tileVersionsRebuild = sqliteTable(
 	"tile_versions_rebuild",
 	{
@@ -215,11 +221,11 @@ export const tileVersionsRebuild = sqliteTable(
 		zoom: integer("zoom").notNull(),
 		tileX: integer("tile_x").notNull(),
 		tileY: integer("tile_y").notNull(),
-		rev: integer("rev").notNull(),
+		seq: integer("seq").notNull(),
 		blobHash: text("blob_hash"),
 	},
 	(t) => [
-		primaryKey({ columns: [t.dimensionId, t.zoom, t.tileX, t.tileY, t.rev] }),
+		primaryKey({ columns: [t.dimensionId, t.zoom, t.tileX, t.tileY, t.seq] }),
 	],
 );
 
@@ -395,7 +401,7 @@ export const fileGrants = sqliteTable(
 /** Short links to a view of the map: /s/<code> redirects to /?<query>. */
 export const shortLinks = sqliteTable("short_links", {
 	code: text("code").primaryKey(),
-	/** The view's query string, without the "?"; one link per view. */
+	/** The view's query string, without the "?"; one link per view. A pinned moment is `seq=` (see revisions.seq), not `rev=`. */
 	query: text("query").notNull().unique(),
 	/** null: made by an anonymous visitor. */
 	createdBy: text("created_by").references(() => users.id),
@@ -405,14 +411,14 @@ export const shortLinks = sqliteTable("short_links", {
 export const jobs = sqliteTable("jobs", {
 	id: id(),
 	type: text("type", {
-		enum: ["process_upload", "erase_upload", "recompute_history"],
+		enum: ["process_upload", "erase_upload", "rebuild_history"],
 	}).notNull(),
 	payload: text("payload", { mode: "json" }).notNull(),
 	status: text("status", { enum: ["pending", "processing", "done", "failed"] })
 		.notNull()
 		.default("pending"),
 	attempts: integer("attempts").notNull().default(0),
-	/** Why a job that has no revision to carry it (a history recompute) failed. */
+	/** Why a job that has no revision to carry it (a history rebuild) failed. */
 	error: text("error"),
 	createdAt: createdAt(),
 	completedAt: integer("completed_at"),

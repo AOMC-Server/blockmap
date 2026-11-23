@@ -12,9 +12,10 @@ import {
 	xaeroDimensionSchema,
 } from "@blockmap/shared/schemas";
 import type { ComponentChildren } from "preact";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { loginUrl } from "../api";
 import { MAX_PRELOAD_TILES, preloadTiles } from "../map/tileLayer";
+import { failedUploadCount, purgeFailedUploads } from "../revisions";
 import { describeDimensionScale, formatScale, parseScale } from "../scale";
 import {
 	addDimension,
@@ -27,7 +28,6 @@ import { slugify } from "../slug";
 import { currentMap, type Dimension, user } from "../state";
 import { DIMENSION_THEME_NAMES } from "../theme";
 import { AdminStats } from "./AdminStats";
-import { HistoryRecompute } from "./HistoryRecompute";
 import { InviteLinks } from "./InviteLinks";
 import { BlockIcon } from "./icons";
 import { MembersSection } from "./MembersSection";
@@ -85,7 +85,7 @@ function SettingsTab() {
 				</button>
 			</form>
 			<MaintenanceToggle />
-			<HistoryRecompute />
+			<FailedUploads />
 		</>
 	);
 }
@@ -109,6 +109,41 @@ function MaintenanceToggle() {
 			label="Maintenance mode"
 			hint="Makes the map read only for everyone but owners: no uploads, drawing, layer or dimension changes, deletions or invites. Everyone sees a banner saying the map is in maintenance."
 		/>
+	);
+}
+
+function FailedUploads() {
+	const [count, setCount] = useState<number | null>(null);
+	const [busy, setBusy] = useState(false);
+	useEffect(() => {
+		void failedUploadCount().then(setCount);
+	}, []);
+	const purge = async () => {
+		if (!confirm("Delete all failed uploads of everyone from the upload log?"))
+			return;
+		setBusy(true);
+		try {
+			if ((await purgeFailedUploads()) !== null) setCount(0);
+		} finally {
+			setBusy(false);
+		}
+	};
+	return (
+		<div class="field flow">
+			<span class="label">Failed uploads</span>
+			<p class="muted hint">
+				Only their author and moderators see failed uploads in the history.
+				Purging removes them for good; the files can be uploaded again.
+			</p>
+			<button
+				type="button"
+				class="btn"
+				disabled={busy || count === 0}
+				onClick={purge}
+			>
+				Purge failed uploads{count ? ` (${count})` : ""}
+			</button>
+		</div>
 	);
 }
 

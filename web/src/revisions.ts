@@ -264,6 +264,25 @@ const setDeleting = (
 	deleting.value = next;
 };
 
+/** How many uploads failed, as a moderator sees them (null when it could not be read). */
+export async function failedUploadCount(): Promise<number | null> {
+	const res = await attempt(() => api.api.admin.uploads.failed.$get());
+	return res.ok ? res.body.count : null;
+}
+
+/** Deletes every failed upload, of every author. Returns how many were removed. */
+export async function purgeFailedUploads(): Promise<number | null> {
+	const out = await run(() => api.api.admin.uploads["purge-failed"].$post());
+	if (!out) return null;
+	showNotice(
+		out.removed === 1
+			? "Removed 1 failed upload."
+			: `Removed ${out.removed} failed uploads.`,
+	);
+	await loadRevisions(true);
+	return out.removed;
+}
+
 /**
  * Deletes an upload from the map and all of its history (moderators, or its author for a while
  * after uploading it). The server erases it in the background; this waits until it is gone (or

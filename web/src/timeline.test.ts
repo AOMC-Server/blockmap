@@ -8,7 +8,6 @@ import {
 	filterRevisions,
 	groupByDay,
 	inBreak,
-	outOfOrder,
 	revisionStops,
 	stepRevision,
 	stopIndex,
@@ -70,18 +69,14 @@ describe("viewBounds and filterRevisions", () => {
 
 describe("events", () => {
 	const a = rev(1, 1, T0);
-	const b = rev(2, 2, T0 + 2 * DAY);
-	// Exported between the two, but published after both.
-	const late = rev(3, 3, T0 + DAY);
+	const b = rev(3, 3, T0 + 2 * DAY);
+	// Exported between the two; revision numbers follow export time.
+	const mid = rev(2, 2, T0 + DAY);
 	const pending = rev(4, null, T0 + 3 * DAY, { status: "pending" });
-	const all = [a, b, late, pending];
+	const all = [a, b, mid, pending];
 
 	test("only finished uploads, by time", () => {
-		expect(timelineEvents(all).map((e) => e.id)).toEqual([1, 3, 2]);
-	});
-
-	test("out of order: published after a newer export", () => {
-		expect([...outOfOrder(all)]).toEqual([3]);
+		expect(timelineEvents(all).map((e) => e.id)).toEqual([1, 2, 3]);
 	});
 
 	test("eventNearest picks the closest, whichever side it is on", () => {
@@ -89,9 +84,9 @@ describe("events", () => {
 		const at = (t: number) => eventNearest(events, t, (e) => e.exportedAt ?? 0);
 		expect(at(T0 - 5 * DAY)?.id).toBe(1);
 		expect(at(T0 + 0.4 * DAY)?.id).toBe(1);
-		expect(at(T0 + 0.6 * DAY)?.id).toBe(3);
-		expect(at(T0 + 1.6 * DAY)?.id).toBe(2);
-		expect(at(T0 + 9 * DAY)?.id).toBe(2);
+		expect(at(T0 + 0.6 * DAY)?.id).toBe(2);
+		expect(at(T0 + 1.6 * DAY)?.id).toBe(3);
+		expect(at(T0 + 9 * DAY)?.id).toBe(3);
 		expect(eventNearest([], 0, () => 0)).toBeNull();
 		// A tie goes to the newer revision.
 		const tie = timelineEvents([rev(1, 1, T0), rev(2, 2, T0)]);
@@ -107,8 +102,7 @@ describe("events", () => {
 });
 
 describe("stepping through revisions", () => {
-	// Rev 2 (the head) was exported before rev 1, which came in late.
-	const events = timelineEvents([rev(1, 2, T0), rev(2, 1, T0 + DAY)]);
+	const events = timelineEvents([rev(1, 1, T0), rev(2, 2, T0 + DAY)]);
 	const walk = (from: number | null, dir: -1 | 1) => {
 		const seen: (number | null)[] = [from];
 		for (let i = 0; i < 10; i++) {

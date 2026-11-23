@@ -1212,10 +1212,6 @@ img.banner,
 	pointer-events: none;
 }
 
-.timeline-marker.odd {
-	background: color-mix(in srgb, var(--yellow) 55%, var(--muted));
-}
-
 .timeline-marker.hovered {
 	background: var(--text);
 	box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 30%, transparent);
@@ -2062,10 +2058,6 @@ img.banner,
 	order: 1;
 	flex: none;
 	width: auto;
-}
-
-.history-recompute {
-	margin-top: 24px;
 }
 
 /* ---------------------------------------------------------------------------------------------

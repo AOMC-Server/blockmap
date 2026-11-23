@@ -6,6 +6,7 @@ import { shortLinks } from "../db/schema";
 import { dimensionBySlug } from "../dimensionLookup";
 import { doc } from "../openapi";
 import { clientKey } from "../ratelimit";
+import { revOfSeq, seqOfRev } from "../tiles/history";
 import type { AppEnv } from "../types";
 import { validate } from "../validate";
 
@@ -24,15 +25,16 @@ function randomCode(): string {
 /**
  * The query string the web app reads for a view. The same view always gives the same string,
  * so it gets the same link: layers are sorted and deduplicated and the zoom is rounded the way
- * the app writes it in the address bar.
+ * the app writes it in the address bar. A revision is kept as the `seq` of its upload, so the
+ * link keeps its moment when uploads are added before it or deleted.
  */
-export function viewQuery(v: ShareView): string {
+export function viewQuery(v: ShareView, seq?: number): string {
 	const q = new URLSearchParams();
 	q.set("dim", v.dim);
 	q.set("x", String(v.x));
 	q.set("z", String(v.z));
 	q.set("zoom", String(Math.round(v.zoom * 100) / 100));
-	if (v.rev !== undefined) q.set("rev", String(v.rev));
+	if (seq !== undefined) q.set("seq", String(seq));
 	if (v.layers !== undefined)
 		q.set("layers", [...new Set(v.layers)].sort((a, b) => a - b).join(","));
 	return q.toString();
@@ -68,21 +70,25 @@ export const linkRoutes = new Hono<AppEnv>().post(
 		tag: "Map",
 		summary: "Make a short link to a view",
 		description:
-			"Saves a view (dimension, position, zoom, optionally a revision and the layers shown) and answers a short `url` that opens it. The same view always gets the same link. Anyone may make links, a limited number per minute.",
+			"Saves a view (dimension, position, zoom, optionally a revision and the layers shown) and answers a short `url` that opens it. A revision is kept as the upload it names, so the link keeps its moment when revision numbers shift. The same view always gets the same link. Anyone may make links, a limited number per minute.",
 		ok: { 200: "The view already had a link", 201: "Link created" },
 		fails: [400, 429],
 	}),
 	validate("json", shareViewSchema),
 	async (c) => {
-		const { db, env, svc, user } = c.var;
+		const { db, env, map, svc, user } = c.var;
 		if (!svc.linkLimiter.hit(user?.id ?? clientKey(c)))
 			return c.json({ error: "too many links, slow down" }, 429);
 		const view = c.req.valid("json");
 		if (!dimensionBySlug(db, view.dim))
 			return c.json({ error: "unknown dimension" }, 400);
+		const pinned =
+			view.rev !== undefined && view.rev <= map.headRev
+				? await seqOfRev(db, view.rev)
+				: undefined;
 		const { code, created } = findOrCreate(
 			db,
-			viewQuery(view),
+			viewQuery(view, pinned),
 			user?.id ?? null,
 		);
 		const url = new URL(`/s/${code}`, env.PUBLIC_URL).toString();
@@ -101,5 +107,13 @@ export const shortLinkRedirect = new Hono<AppEnv>().get("/:code", (c) => {
 				.get()
 		: undefined;
 	if (!link) return c.text("This link does not exist.", 404);
-	return c.redirect(`/v2/?${link.query}`, 302);
+	// The moment a link was made at is the upload it pinned, whichever revision number that has now.
+	const query = new URLSearchParams(
+		[...new URLSearchParams(link.query)].map(([key, value]) =>
+			key === "seq"
+				? ["rev", String(revOfSeq(c.var.db, Number(value)))]
+				: [key, value],
+		),
+	);
+	return c.redirect(`/v2/?${query}`, 302);
 });

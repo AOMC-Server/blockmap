@@ -11,7 +11,7 @@ import {
 	type TileFormat,
 	transcode,
 } from "../tiles/formats";
-import { tileHashesIn, tileVersionAt } from "../tiles/history";
+import { seqOfRev, tileHashAt, tileHashesIn } from "../tiles/history";
 import { isolatedTile, patchHash } from "../tiles/isolated";
 import type { AppEnv } from "../types";
 import { validate } from "../validate";
@@ -20,8 +20,8 @@ import { validate } from "../validate";
 export const MAX_HASH_AREA = 4096;
 
 /**
- * A pinned revision is only immutable under the current map epoch (`v`): an erase rewrites
- * history from its revision on, and revision numbers can be reused afterwards.
+ * A pinned revision is only immutable under the current map epoch (`v`): an erase, or an upload
+ * that goes in before newer ones, rewrites history from its place on and renumbers the revisions after it.
  */
 const pinnedCache = (vParam: string | undefined, epoch: number) =>
 	vParam === String(epoch) ? IMMUTABLE : "public, max-age=60";
@@ -35,7 +35,9 @@ const hashesQuerySchema = z.object({
 	rev: z
 		.string()
 		.optional()
-		.describe("Show the map as of this revision (default: latest)"),
+		.describe(
+			"Show the map as of this revision: the uploads up to it in export order (default: latest)",
+		),
 	v: z
 		.string()
 		.optional()
@@ -75,7 +77,7 @@ export const tileRoutes = new Hono<AppEnv>()
 			},
 			fails: [400, 404],
 			query: {
-				rev: "Show the map as of this revision (default: latest)",
+				rev: "Show the map as of this revision: the uploads up to it in export order (default: latest)",
 				v: "The map epoch (`epoch` of `GET /api/map`). `rev` and `only` responses are cached for good only when it matches",
 				only: "Upload revision id: show only what that upload added (finished uploads only)",
 				format:
@@ -166,9 +168,16 @@ export const tileRoutes = new Hono<AppEnv>()
 					: pinnedCache(c.req.query("v"), map.epoch),
 			);
 
-			const version = await tileVersionAt(db, dim.id, zoom, x, y, rev);
-			if (!version?.blobHash) return c.body(null, 204);
-			return c.redirect(`/blobs/${version.blobHash}.${suffix}`, 302);
+			const hash = await tileHashAt(
+				db,
+				dim.id,
+				zoom,
+				x,
+				y,
+				await seqOfRev(db, rev),
+			);
+			if (!hash) return c.body(null, 204);
+			return c.redirect(`/blobs/${hash}.${suffix}`, 302);
 		},
 	)
 	.get(
@@ -228,7 +237,7 @@ export const tileRoutes = new Hono<AppEnv>()
 				dim.id,
 				zoom,
 				{ minX, minY, maxX, maxY },
-				rev,
+				await seqOfRev(db, rev),
 			);
 			return c.json({ tiles });
 		},

@@ -1,5 +1,5 @@
 import { HOUR, type Role } from "@blockmap/shared";
-import { and, desc, eq, inArray, lt, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, ne, or, type SQL } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { announceUploads } from "../announce";
 import { requireUser, userOf } from "../auth/session";
@@ -8,9 +8,14 @@ import { jobs, revisions, uploadPatches, users } from "../db/schema";
 import { dimensionBySlug } from "../dimensionLookup";
 import type { RevisionEvent } from "../events";
 import { erasing } from "../jobs/queue";
-import { jobRevisionId } from "../jobs/target";
+import { removeUploads } from "../jobs/target";
 import { doc } from "../openapi";
-import { canDeleteUpload, canModerate, loadMap } from "../permissions";
+import {
+	canDeleteUpload,
+	canModerate,
+	canSeeUpload,
+	loadMap,
+} from "../permissions";
 import { topics } from "../topics";
 import type { AppEnv } from "../types";
 import { streamTopics } from "./events";
@@ -25,6 +30,7 @@ const revisionFields = {
 	authorName: users.username,
 	status: revisions.status,
 	error: revisions.error,
+	errorDetail: revisions.errorDetail,
 	bboxMinX: revisions.bboxMinX,
 	bboxMinZ: revisions.bboxMinZ,
 	bboxMaxX: revisions.bboxMaxX,
@@ -56,8 +62,18 @@ function deleteAccess(c: Context<AppEnv>): DeleteAccess {
 	};
 }
 
+/** Limits a query to the uploads the caller may see: failed ones only for their author and moderators. */
+function visibleTo(c: Context<AppEnv>): SQL | undefined {
+	if (canModerate(c.var.role)) return undefined;
+	const author = c.var.user ? eq(revisions.authorId, c.var.user.id) : undefined;
+	return or(ne(revisions.status, "failed"), author);
+}
+
+const canSee = (c: Context<AppEnv>, r: { status: string; authorId: string }) =>
+	canSeeUpload(c.var.user, c.var.role, r);
+
 function serialize(r: RevisionRow, access: DeleteAccess, deleting: boolean) {
-	const { bboxMinX, bboxMinZ, bboxMaxX, bboxMaxZ, ...rest } = r;
+	const { bboxMinX, bboxMinZ, bboxMaxX, bboxMaxZ, errorDetail, ...rest } = r;
 	const canDelete =
 		r.kind === "upload" &&
 		!deleting &&
@@ -75,7 +91,14 @@ function serialize(r: RevisionRow, access: DeleteAccess, deleting: boolean) {
 		bboxMaxZ === null
 			? null
 			: { minX: bboxMinX, minZ: bboxMinZ, maxX: bboxMaxX, maxZ: bboxMaxZ };
-	return { ...rest, bbox, canDelete, deletableUntil, deleting };
+	return {
+		...rest,
+		errorDetail: canModerate(access.role) ? errorDetail : null,
+		bbox,
+		canDelete,
+		deletableUntil,
+		deleting,
+	};
 }
 
 function loadRevision(db: Db, id: number) {
@@ -95,7 +118,7 @@ export const revisionRoutes = new Hono<AppEnv>()
 			tag: "Revisions",
 			summary: "List revisions, newest first",
 			description:
-				"`viaMod` is true for uploads sent by the in-game mod (recognised by its `User-Agent`, see `MOD_USER_AGENTS`). Page through older ones with `before`; `nextBefore` is the value for the next page, or null after the last one. `canDelete` says whether you may delete the upload, and `deletableUntil` when that ends for your own uploads (null = no limit or not yours). `deleting` is true while a delete of the upload is queued or running.",
+				"Failed uploads are listed only to their author and to moderators. `errorDetail` is the internal error behind a failure that was not the uploader's doing; moderators only (null for everyone else). `rev` is the upload's place in export order, counting from 1 without gaps; it changes when an older export is uploaded or an upload is deleted. `viaMod` is true for uploads sent by the in-game mod (recognised by its `User-Agent`, see `MOD_USER_AGENTS`). Page through older ones with `before`; `nextBefore` is the value for the next page, or null after the last one. `canDelete` says whether you may delete the upload, and `deletableUntil` when that ends for your own uploads (null = no limit or not yours). `deleting` is true while a delete of the upload is queued or running.",
 			query: {
 				limit: "At most this many (1 to 1000, default 200)",
 				before: "Only revisions with a smaller id (for paging)",
@@ -112,6 +135,8 @@ export const revisionRoutes = new Hono<AppEnv>()
 				1000,
 			);
 			const filters: SQL[] = [];
+			const visible = visibleTo(c);
+			if (visible) filters.push(visible);
 			const before = Number(c.req.query("before"));
 			if (c.req.query("before") && Number.isSafeInteger(before))
 				filters.push(lt(revisions.id, before));
@@ -139,7 +164,7 @@ export const revisionRoutes = new Hono<AppEnv>()
 						.select(revisionFields)
 						.from(revisions)
 						.innerJoin(users, eq(users.id, revisions.authorId))
-						.where(inArray(revisions.id, active))
+						.where(and(inArray(revisions.id, active), visible))
 				: [];
 			const access = deleteAccess(c);
 			const all = [...rows, ...extra];
@@ -161,12 +186,12 @@ export const revisionRoutes = new Hono<AppEnv>()
 			tag: "Revisions",
 			summary: "Get a revision",
 			description:
-				"`viaMod` is true for uploads sent by the in-game mod (recognised by its `User-Agent`, see `MOD_USER_AGENTS`).",
+				"404 for a failed upload that is not yours, unless you are a moderator. `viaMod` is true for uploads sent by the in-game mod (recognised by its `User-Agent`, see `MOD_USER_AGENTS`).",
 			fails: [404],
 		}),
 		(c) => {
 			const row = loadRevision(c.var.db, parseId(c.req.param("id")));
-			if (!row) return c.json({ error: "not found" }, 404);
+			if (!row || !canSee(c, row)) return c.json({ error: "not found" }, 404);
 			const deleting = erasing(c.var.db, [row.id]).has(row.id);
 			return c.json({ revision: serialize(row, deleteAccess(c), deleting) });
 		},
@@ -183,7 +208,8 @@ export const revisionRoutes = new Hono<AppEnv>()
 		async (c) => {
 			const { db } = c.var;
 			const id = parseId(c.req.param("id"));
-			if (!loadRevision(db, id)) return c.json({ error: "not found" }, 404);
+			const row = loadRevision(db, id);
+			if (!row || !canSee(c, row)) return c.json({ error: "not found" }, 404);
 			const rows = await db
 				.select({ x: uploadPatches.tileX, y: uploadPatches.tileY })
 				.from(uploadPatches)
@@ -208,7 +234,8 @@ export const revisionRoutes = new Hono<AppEnv>()
 		async (c) => {
 			const { db } = c.var;
 			const id = parseId(c.req.param("id"));
-			if (!loadRevision(db, id)) return c.json({ error: "not found" }, 404);
+			const row = loadRevision(db, id);
+			if (!row || !canSee(c, row)) return c.json({ error: "not found" }, 404);
 
 			return streamTopics(c, [`revision:${id}`], (stream, envelope) =>
 				"error" in envelope
@@ -232,7 +259,7 @@ export const revisionRoutes = new Hono<AppEnv>()
 			tag: "Revisions",
 			summary: "Delete an upload",
 			description:
-				"Moderators, or the upload's author within `SELF_DELETE_WINDOW_HOURS` of uploading it. Erases the upload from the map and from all of its history; this cannot be undone.",
+				"Moderators, or the upload's author within `SELF_DELETE_WINDOW_HOURS` of uploading it. A failed upload is just removed (404 unless you may see it). Erases the upload from the map and from all of its history, and the revisions after it move down one number; this cannot be undone.",
 			ok: {
 				200: "A failed upload was removed",
 				202: "Being erased in the background",
@@ -248,7 +275,7 @@ export const revisionRoutes = new Hono<AppEnv>()
 				.select()
 				.from(revisions)
 				.where(eq(revisions.id, id));
-			if (target?.kind !== "upload") {
+			if (target?.kind !== "upload" || !canSee(c, target)) {
 				return c.json({ error: "not found" }, 404);
 			}
 			const access = deleteAccess(c);
@@ -260,10 +287,7 @@ export const revisionRoutes = new Hono<AppEnv>()
 			}
 
 			if (target.status === "failed") {
-				db.transaction((tx) => {
-					tx.delete(jobs).where(eq(jobRevisionId, id)).run();
-					tx.delete(revisions).where(eq(revisions.id, id)).run();
-				});
+				removeUploads(db, [id]);
 				svc.events.emit("revision", id, { status: "gone" });
 				announceUploads(c, target.dimensionId);
 				svc.worker.kick();
@@ -277,7 +301,7 @@ export const revisionRoutes = new Hono<AppEnv>()
 			// still see it as part of the map.
 			db.transaction((tx) => {
 				tx.update(revisions)
-					.set({ error: null })
+					.set({ error: null, errorDetail: null })
 					.where(eq(revisions.id, id))
 					.run();
 				tx.insert(jobs)

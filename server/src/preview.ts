@@ -13,7 +13,7 @@ import { randomToken } from "./auth/tokens";
 import type { Db } from "./db/client";
 import { buildOverlay, loadIcons, loadOverlayLayers } from "./previewFeatures";
 import type { BlobStore } from "./tiles/blobstore";
-import { tileHashAt } from "./tiles/history";
+import { seqOfRev, tileHashAt } from "./tiles/history";
 
 const PREVIEW_W = 1200;
 const PREVIEW_H = 630;
@@ -83,10 +83,11 @@ async function renderPreview(
 		range = visibleTiles(view, SIZE, level, T);
 	}
 
+	const seq = await seqOfRev(db, p.rev);
 	const layers: OverlayOptions[] = [];
 	for (let ty = range.minY; ty <= range.maxY; ty++) {
 		for (let tx = range.minX; tx <= range.maxX; tx++) {
-			const hash = await tileHashAt(db, p.dimensionId, level, tx, ty, p.rev);
+			const hash = await tileHashAt(db, p.dimensionId, level, tx, ty, seq);
 			if (!hash) continue;
 
 			const r = tileRect(view, SIZE, level, T, tx, ty);

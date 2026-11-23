@@ -3,16 +3,9 @@ import type { Context } from "hono";
 import { z } from "zod";
 import type { Db } from "./db/client";
 import { dimensions, mapInfo, revisions as revisionsTable } from "./db/schema";
-import type {
-	Events,
-	Family,
-	MapEvent,
-	RecomputeEvent,
-	RevisionEvent,
-} from "./events";
+import type { Events, Family, MapEvent, RevisionEvent } from "./events";
 import { erasing, queueState, waiting } from "./jobs/queue";
-import { lastRecompute, type RecomputeProgress } from "./jobs/recomputeHistory";
-import { canManage } from "./permissions";
+import { canSeeUpload } from "./permissions";
 import type { AppEnv } from "./types";
 
 /** How one topic family is followed. Adding a family = an entry in `Events` and one here. */
@@ -44,7 +37,7 @@ const invalidation = z.object({}).strict();
 const revisionMessages = {
 	pending: {
 		summary:
-			"The job is queued. `message` says what it waits for (for example a running history recompute, or how many jobs are ahead); a new event follows whenever that changes.",
+			"The job is queued. `message` says what it waits for (for example a running history rebuild, or how many jobs are ahead); a new event follows whenever that changes.",
 		schema: z.object({
 			status: status("pending"),
 			message: z.string().optional(),
@@ -87,8 +80,7 @@ const revisionMessages = {
 	},
 } satisfies Record<RevisionEvent["status"], unknown>;
 
-const jobType = z.enum(["process_upload", "erase_upload", "recompute_history"]);
-const jobStatus = z.enum(["pending", "processing", "done", "failed"]);
+const jobType = z.enum(["process_upload", "erase_upload", "rebuild_history"]);
 
 /** Whether a dimension exists, for the keyed collection topics. */
 const dimensionExists = (db: Db, id: number | undefined) =>
@@ -112,11 +104,12 @@ export function revisionSnapshot(db: Db, id: number): RevisionEvent {
 		.get();
 	if (!current) return { status: "gone" };
 	const message = waiting(db, id);
-	// A delete waiting in the queue leaves the upload itself as it is until it starts.
-	if (message !== null)
-		return erasing(db, [id]).has(id)
-			? { status: "processing", message }
-			: { status: "pending", message };
+	// A delete leaves the upload's own status alone: it is done until it is gone.
+	if (erasing(db, [id]).has(id))
+		return message === null
+			? { status: "processing" }
+			: { status: "processing", message };
+	if (message !== null) return { status: "pending", message };
 	return { status: current.status, rev: current.rev, error: current.error };
 }
 
@@ -129,40 +122,27 @@ export function mapSnapshot(db: Db): MapEvent {
 	};
 }
 
-export function recomputeSnapshot(
-	db: Db,
-	progress: RecomputeProgress | null,
-): RecomputeEvent {
-	const job = lastRecompute(db);
-	return {
-		recompute: job
-			? {
-					status: job.status,
-					error: job.error,
-					queuedAt: job.createdAt,
-					completedAt: job.completedAt,
-					progress:
-						job.status === "processing" && progress
-							? {
-									message: progress.message,
-									done: progress.done ?? null,
-									total: progress.total ?? null,
-								}
-							: null,
-				}
-			: null,
-	};
-}
-
 export const topics: { [F in Family]: TopicDef<F> } = {
 	revision: {
 		title: "Revision progress",
 		key: "Revision id",
 		description:
-			"Progress of an upload or of its deletion. The first event is the revision's current status; after that an event is sent for each step. It ends after `done`, `failed` or `gone`. A revision that does not exist is `gone` rather than `not found`: an erased upload cannot be told apart from one that never was.",
+			"Progress of an upload or of its deletion. The first event is the revision's current status; after that an event is sent for each step. It ends after `done`, `failed` or `gone`. A revision that does not exist is `gone` rather than `not found`: an erased upload cannot be told apart from one that never was. A failed upload of someone else is `not found` unless you are a moderator.",
 		messages: revisionMessages,
 		name: (d) => d.status,
-		snapshot: (c, id) => revisionSnapshot(c.var.db, id as number),
+		snapshot: (c, id) => {
+			const upload = c.var.db
+				.select({
+					status: revisionsTable.status,
+					authorId: revisionsTable.authorId,
+				})
+				.from(revisionsTable)
+				.where(eq(revisionsTable.id, id as number))
+				.get();
+			return upload && !canSeeUpload(c.var.user, c.var.role, upload)
+				? null
+				: revisionSnapshot(c.var.db, id as number);
+		},
 		refreshOn: ["queue"],
 		terminal: (d) =>
 			d.status === "done" || d.status === "failed" || d.status === "gone",
@@ -209,7 +189,7 @@ export const topics: { [F in Family]: TopicDef<F> } = {
 	queue: {
 		title: "Job queue",
 		description:
-			"Uploads, deletions and history recomputes run one at a time. `pending` counts the jobs waiting; `running` is the one being run (`revisionId` null for a recompute).",
+			"Uploads, deletions and history rebuilds run one at a time. `pending` counts the jobs waiting; `running` is the one being run (`revisionId` null for a rebuild).",
 		messages: {
 			changed: {
 				summary: "The queue changed.",
@@ -223,36 +203,5 @@ export const topics: { [F in Family]: TopicDef<F> } = {
 		},
 		name: () => "changed",
 		snapshot: (c) => queueState(c.var.db),
-	},
-	recompute: {
-		title: "History recompute",
-		description:
-			"Owners. The newest history recompute (null if there never was one): its `status`, `error` when it failed, and while it runs, `progress`.",
-		messages: {
-			changed: {
-				summary: "The recompute changed or made progress.",
-				schema: z.object({
-					recompute: z
-						.object({
-							status: jobStatus,
-							error: z.string().nullable(),
-							queuedAt: z.number().int(),
-							completedAt: nullableInt,
-							progress: z
-								.object({
-									message: z.string(),
-									done: nullableInt,
-									total: nullableInt,
-								})
-								.nullable(),
-						})
-						.nullable(),
-				}),
-			},
-		},
-		name: () => "changed",
-		authorize: (c) => canManage(c.var.role),
-		snapshot: (c) =>
-			recomputeSnapshot(c.var.db, c.var.svc.worker.recomputeProgress()),
 	},
 };

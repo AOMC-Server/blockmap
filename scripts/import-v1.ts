@@ -12,7 +12,8 @@ import { orExit, positiveNumber } from "./args";
  * tile's top-left corner and black pixels mean "no data" (the same convention as uploads).
  *
  * Every tile is sent with an export date (see `date`), so the server layers the import under
- * newer exports instead of treating the tiles as made now.
+ * newer exports instead of treating the tiles as made now. Tiles are sent oldest first, so on a
+ * map with nothing newer each upload simply goes on top.
  */
 
 export type ImportOptions = {
@@ -145,11 +146,18 @@ export async function runImport(opts: ImportOptions): Promise<ImportResult> {
 				return [name, opts.date ?? Math.floor(mtime / DAY) * DAY];
 			}),
 		);
+		// Oldest day first, so each upload goes on top of the history instead of into its past.
+		const order = todo
+			.map((name, i) => ({ name, bytes: sizes[i] as number }))
+			.sort(
+				(a, b) =>
+					(exportedAt.get(a.name) as number) -
+					(exportedAt.get(b.name) as number),
+			);
 		const batches: string[][] = [];
 		let current: string[] = [];
 		let size = 0;
-		for (const [i, name] of todo.entries()) {
-			const bytes = sizes[i] as number;
+		for (const { name, bytes } of order) {
 			if (
 				current.length > 0 &&
 				(current.length >= batchSize || size + bytes > maxBytes)

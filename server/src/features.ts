@@ -7,6 +7,7 @@ import {
 import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { featureRevisions, features, layers, revisions } from "./db/schema";
+import { SEQS_PER_MS } from "./tiles/history";
 
 export type FeatureView = {
 	id: number;
@@ -196,18 +197,18 @@ export function moveFeature(
 }
 
 /**
- * Unix ms time of a revision, for "as of revision" reads. null means "now"; undefined means
+ * Unix ms export time of a revision, for "as of revision" reads. null means "now"; undefined means
  * there is no such revision (for example the upload was deleted).
  */
 export function timeOfRev(db: Db, headRev: number, at: number | null) {
 	if (at === null || at >= headRev) return null;
 	if (at <= 0) return 0;
 	const row = db
-		.select({ completedAt: revisions.completedAt })
+		.select({ seq: revisions.seq })
 		.from(revisions)
 		.where(eq(revisions.rev, at))
 		.get();
-	return row ? row.completedAt : undefined;
+	return row?.seq == null ? undefined : Math.floor(row.seq / SEQS_PER_MS);
 }
 
 /** The layers that existed at `at` (unix ms), or the live ones for null. */

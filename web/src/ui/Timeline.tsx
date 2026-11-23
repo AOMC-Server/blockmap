@@ -60,10 +60,9 @@ export function Timeline(props: {
 	events: Event[];
 	/** Uploads still being processed, drawn but not selectable. */
 	pending: RevisionInfo[];
-	outOfOrder: Set<number>;
 	describe: (r: RevisionInfo) => string;
 }) {
-	const { events, pending, outOfOrder } = props;
+	const { events, pending } = props;
 	const track = useRef<HTMLDivElement>(null);
 	const [width, setWidth] = useState(0);
 	/** The visible stretch of time, or null to fit everything. */
@@ -324,13 +323,12 @@ export function Timeline(props: {
 					const height = Math.max(...c.items.map(markerHeight));
 					const active =
 						!latest && current !== null && c.items.includes(current);
-					const odd = c.items.some((r) => outOfOrder.has(r.id));
 					const isHovered =
 						hovered !== null && c.items.some((r) => r.id === hovered.id);
 					return (
 						<span
 							key={top.id}
-							class={`timeline-marker ${active ? "active" : ""} ${isHovered ? "hovered" : ""} ${odd ? "odd" : ""}`}
+							class={`timeline-marker ${active ? "active" : ""} ${isHovered ? "hovered" : ""}`}
 							style={{ left: `${c.x}px`, height: `${height}px` }}
 						>
 							{c.items.length > 1 && (
@@ -372,12 +370,6 @@ export function Timeline(props: {
 						{hover.items.length > 1 && (
 							<span class="muted">
 								and {hover.items.length - 1} more close by
-							</span>
-						)}
-						{hover.items.some((r) => outOfOrder.has(r.id)) && (
-							<span class="warn-text">
-								⚠ Uploaded after newer exports, which the map at this point also
-								shows.
 							</span>
 						)}
 					</span>

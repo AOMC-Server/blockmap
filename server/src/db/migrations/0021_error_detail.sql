@@ -1,0 +1,1 @@
+ALTER TABLE `revisions` ADD `error_detail` text;

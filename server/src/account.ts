@@ -71,7 +71,7 @@ export function exportAccount(db: Db, userId: string) {
 			.from(revisions)
 			.where(eq(revisions.authorId, userId))
 			.all()
-			.map(({ authorId: _, dimensionId, ...r }) => ({
+			.map(({ authorId: _, errorDetail: __, dimensionId, ...r }) => ({
 				...r,
 				dimension: slugOf(dimensionId),
 			})),

@@ -1,11 +1,14 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { zipSync } from "fflate";
 
 afterAll(cleanupTempDirs);
 
 import { dimensions, jobs, revisions } from "../../src/db/schema";
+import { messages } from "../../src/jobs/messages";
 import { processUpload } from "../../src/jobs/processUpload";
 import { incomingDir } from "../../src/jobs/types";
 import {
@@ -227,8 +230,21 @@ describe("publishing", () => {
 		await t.services.worker.run();
 		const failed = await revisionOf(t, revisionId);
 		expect(failed.status).toBe("failed");
-		expect(failed.error).toBe("processing failed");
-		expect(String(failed.error)).not.toContain(t.env.DATA_DIR);
+		expect(failed.error).toBe(messages.failed.unreadableImage(0, 0));
+
+		// The blob store can't be written: nothing the uploader could fix.
+		const { revisionId: other } = await queueUpload(
+			t,
+			new Uint8Array(await solid(T, T, BLUE)),
+			null,
+		);
+		await rm(join(t.env.DATA_DIR, "blobs"), { recursive: true, force: true });
+		await Bun.write(join(t.env.DATA_DIR, "blobs"), "not a directory");
+		await t.services.worker.run();
+		const broken = await revisionOf(t, other);
+		expect(broken.error).toBe(messages.failed.internal);
+		expect(String(broken.error)).not.toContain(t.env.DATA_DIR);
+		expect(broken.errorDetail).toContain(t.env.DATA_DIR);
 	});
 
 	test("an upload that was interrupted too many times loses its files", async () => {
@@ -465,21 +481,18 @@ describe("stacking order", () => {
 			await erase(full.t, full.ids[skip] as number);
 			const without = await build(order, skip);
 			expect(await snapshot(full.t)).toEqual(await snapshot(without.t));
-			for (let rev = 0; rev <= order.length; rev++) {
-				const gap = skip + 1;
-				if (rev === gap) continue;
-				const there = rev < gap ? rev : rev - 1;
+			for (let rev = 0; rev < order.length; rev++) {
 				expect(await snapshot(full.t, rev)).toEqual(
-					await snapshot(without.t, there),
+					await snapshot(without.t, rev),
 				);
 			}
 		}
 	});
 
-	test("with equal export times the later upload is on top, however jobs run", async () => {
+	test("with equal export times the upload published last is on top", async () => {
 		const t = await bootTiles();
 		const at = Date.UTC(2026, 1, 10);
-		// The job of the later upload (higher id) is queued, and so runs, first.
+		// The job of the later upload (higher id) is queued, and so runs and is published, first.
 		const first = await queueUpload(
 			t,
 			new Uint8Array(await solid(T, T, RED)),
@@ -503,6 +516,9 @@ describe("stacking order", () => {
 		]);
 		await t.services.worker.run();
 		expect((await revisionOf(t, first.revisionId)).status).toBe("done");
-		expect(px((await readTile(t, 0, 0, 0)) as Buffer, 3, 3)).toEqual(BLUE_PX);
+		expect(px((await readTile(t, 0, 0, 0)) as Buffer, 3, 3)).toEqual(RED_PX);
+		expect(px((await readTile(t, 0, 0, 0, 1)) as Buffer, 3, 3)).toEqual(
+			BLUE_PX,
+		);
 	});
 });
