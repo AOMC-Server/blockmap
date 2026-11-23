@@ -1,4 +1,4 @@
-import { renumber, Tabs, Toggle } from "@aomc-server/block-ui";
+import { Badge, renumber, Tabs, Toggle } from "@aomc-server/block-ui";
 import { MAX_NAME } from "@blockmap/shared/features";
 import { canManage, canModerate } from "@blockmap/shared/roles";
 import {
@@ -72,29 +72,44 @@ function SettingsTab() {
 
 	return (
 		<>
-			<form class="settings-form" onSubmit={save}>
-				<label class="field flow">
-					<span class="label">Map name</span>
-					<input
-						type="text"
-						value={name}
-						maxLength={MAX_NAME}
-						onInput={(e) => setName(e.currentTarget.value)}
-					/>
-				</label>
-				<p class="muted hint">
-					Tile size: {detail.map.tileSize} blocks per tile edge (fixed).
-				</p>
-				<button
-					type="submit"
-					class="btn primary"
-					disabled={busy || !name.trim()}
-				>
-					Save
-				</button>
-			</form>
-			<MaintenanceToggle />
-			<FailedUploads />
+			<section class="admin-section">
+				<div class="admin-toolbar">
+					<h2>General</h2>
+				</div>
+				<form class="settings-form" onSubmit={save}>
+					<label class="field flow">
+						<span class="label">Map name</span>
+						<input
+							type="text"
+							value={name}
+							maxLength={MAX_NAME}
+							onInput={(e) => setName(e.currentTarget.value)}
+						/>
+					</label>
+					<p class="muted hint">
+						Tile size: {detail.map.tileSize} blocks per tile edge (fixed).
+					</p>
+					<button
+						type="submit"
+						class="btn primary"
+						disabled={busy || !name.trim() || name.trim() === detail.map.name}
+					>
+						Save
+					</button>
+				</form>
+			</section>
+			<section class="admin-section">
+				<div class="admin-toolbar">
+					<h2>Maintenance</h2>
+				</div>
+				<MaintenanceToggle />
+			</section>
+			<section class="admin-section">
+				<div class="admin-toolbar">
+					<h2>Danger zone</h2>
+				</div>
+				<FailedUploads />
+			</section>
 		</>
 	);
 }
@@ -137,15 +152,17 @@ function FailedUploads() {
 		}
 	};
 	return (
-		<div class="field flow">
-			<span class="label">Failed uploads</span>
-			<p class="muted hint">
-				Failed uploads are only visible to their uploader and moderators.
-				Purging permanently clears them from the log.
-			</p>
+		<div class="admin-danger">
+			<div class="admin-danger-text">
+				<b>Failed uploads</b>
+				<p class="muted hint">
+					Failed uploads are only visible to their uploader and moderators.
+					Purging permanently clears them from the log.
+				</p>
+			</div>
 			<button
 				type="button"
-				class="btn"
+				class="btn danger"
 				disabled={busy || count === 0}
 				onClick={purge}
 			>
@@ -269,12 +286,14 @@ function PreloadEditor(props: {
 
 	return (
 		<div class="dim-preload">
-			<span class="muted">
-				Preload around spawn:{" "}
-				{rings.length === 0
-					? "off"
-					: `${tiles} tile${tiles === 1 ? "" : "s"}${tiles >= MAX_PRELOAD_TILES ? " (limit reached; reduce a radius or resolution)" : ""}`}
-			</span>
+			<div class="dim-preload-head">
+				<span class="dim-label">Preload around spawn</span>
+				<span class="muted">
+					{rings.length === 0
+						? "off"
+						: `${tiles} tile${tiles === 1 ? "" : "s"}${tiles >= MAX_PRELOAD_TILES ? " (limit reached; reduce a radius or resolution)" : ""}`}
+				</span>
+			</div>
 			<div>
 				{rings.map((ring, i) => (
 					<PreloadRingRow
@@ -359,86 +378,93 @@ function DimensionRow(props: {
 	return (
 		<li class={d.archived ? "archived" : ""}>
 			<div class="dim-main">
-				<input
-					type="text"
-					value={name}
-					maxLength={MAX_NAME}
-					aria-label={`Name of ${d.slug}`}
-					onInput={(e) => setName(e.currentTarget.value)}
-					onBlur={() => {
-						const trimmed = name.trim();
-						if (trimmed && trimmed !== d.name)
-							props.run(() => updateDimension(d.slug, { name: trimmed }));
-						else setName(d.name);
-					}}
-					onKeyDown={(e) => {
-						if (e.key === "Enter") e.currentTarget.blur();
-					}}
-				/>
-				<span class="muted dim-slug">{d.slug}</span>
-				<label class="dim-scale" title={describeDimensionScale(d.scale)}>
-					<span class="muted">Scale ×</span>
+				<div class="dim-head">
 					<input
 						type="text"
-						inputMode="decimal"
-						placeholder="none"
-						value={scale}
-						aria-label={`Coordinate scale of ${d.slug}`}
-						onInput={(e) => setScale(e.currentTarget.value)}
+						value={name}
+						maxLength={MAX_NAME}
+						aria-label={`Name of ${d.slug}`}
+						onInput={(e) => setName(e.currentTarget.value)}
 						onBlur={() => {
-							const parsed = parseScale(scale);
-							if (parsed === undefined || parsed === d.scale) {
-								setScale(formatScale(d.scale));
-								return;
-							}
-							props.run(() => updateDimension(d.slug, { scale: parsed }));
+							const trimmed = name.trim();
+							if (trimmed && trimmed !== d.name)
+								props.run(() => updateDimension(d.slug, { name: trimmed }));
+							else setName(d.name);
 						}}
 						onKeyDown={(e) => {
 							if (e.key === "Enter") e.currentTarget.blur();
 						}}
 					/>
-				</label>
-				<div class="dim-scale">
-					<span class="muted">Theme</span>
-					<BlockIcon theme={d.theme} />
-					<ThemeSelect
-						value={d.theme}
-						label={`Theme of ${d.slug}`}
-						disabled={props.busy}
-						onChange={(theme) =>
-							props.run(() => updateDimension(d.slug, { theme }))
-						}
-					/>
+					<code class="dim-slug">{d.slug}</code>
+					{d.archived && <Badge>Archived</Badge>}
 				</div>
-				<label
-					class="dim-scale"
-					title="Dimension ID used in Xaero's Minimap waypoints (e.g. dim%0 Overworld, dim%-1 Nether, dim%1 End)"
-				>
-					<span class="muted">Xaero ID</span>
-					<input
-						type="text"
-						class="xaero-input"
-						value={xaero}
-						aria-label={`Xaero dimension ID of ${d.slug}`}
-						onInput={(e) => setXaero(e.currentTarget.value)}
-						onBlur={() => {
-							const parsed = xaeroDimensionSchema.safeParse(xaero);
-							if (!parsed.success || parsed.data === d.xaeroDimension) {
-								setXaero(d.xaeroDimension);
-								return;
-							}
-							props.run(() =>
-								updateDimension(d.slug, { xaeroDimension: parsed.data }),
-							);
-						}}
-						onKeyDown={(e) => {
-							if (e.key === "Enter") e.currentTarget.blur();
-						}}
-					/>
-				</label>
+				<div class="dim-fields">
+					<label class="dim-field" title={describeDimensionScale(d.scale)}>
+						<span class="dim-label">Scale ×</span>
+						<input
+							type="text"
+							inputMode="decimal"
+							placeholder="None"
+							value={scale}
+							aria-label={`Coordinate scale of ${d.slug}`}
+							onInput={(e) => setScale(e.currentTarget.value)}
+							onBlur={() => {
+								const parsed = parseScale(scale);
+								if (parsed === undefined || parsed === d.scale) {
+									setScale(formatScale(d.scale));
+									return;
+								}
+								props.run(() => updateDimension(d.slug, { scale: parsed }));
+							}}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") e.currentTarget.blur();
+							}}
+						/>
+					</label>
+					<div class="dim-field">
+						<span class="dim-label">Theme</span>
+						<div class="dim-theme">
+							<BlockIcon theme={d.theme} />
+							<ThemeSelect
+								value={d.theme}
+								label={`Theme of ${d.slug}`}
+								disabled={props.busy}
+								onChange={(theme) =>
+									props.run(() => updateDimension(d.slug, { theme }))
+								}
+							/>
+						</div>
+					</div>
+					<label
+						class="dim-field"
+						title="Dimension ID used in Xaero's Minimap waypoints (e.g. dim%0 for Overworld, dim%-1 for Nether, dim%1 for The End)"
+					>
+						<span class="dim-label">Xaero ID</span>
+						<input
+							type="text"
+							class="xaero-input"
+							value={xaero}
+							aria-label={`Xaero dimension ID of ${d.slug}`}
+							onInput={(e) => setXaero(e.currentTarget.value)}
+							onBlur={() => {
+								const parsed = xaeroDimensionSchema.safeParse(xaero);
+								if (!parsed.success || parsed.data === d.xaeroDimension) {
+									setXaero(d.xaeroDimension);
+									return;
+								}
+								props.run(() =>
+									updateDimension(d.slug, { xaeroDimension: parsed.data }),
+								);
+							}}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") e.currentTarget.blur();
+							}}
+						/>
+					</label>
+				</div>
 				<PreloadEditor d={d} busy={props.busy} run={props.run} />
 			</div>
-			<div class="group">
+			<div class="group dim-actions">
 				<button
 					type="button"
 					class="btn small"
@@ -526,9 +552,9 @@ function DimensionsTab() {
 	const problem = !newName.trim()
 		? null
 		: !newSlug
-			? "Slug is required (use lowercase letters, numbers, - or _)."
+			? "Slug is required (use lowercase letters, numbers, hyphens, or underscores)."
 			: !slugSchema.safeParse(newSlug).success
-				? "Slug may only contain lowercase letters, numbers, - and _, and must start with a letter or number."
+				? "Slug may only contain lowercase letters, numbers, hyphens, and underscores, and must start with a letter or number."
 				: scale === undefined
 					? "Scale must be a positive number or left blank."
 					: null;
@@ -558,31 +584,39 @@ function DimensionsTab() {
 
 	return (
 		<div>
-			<p class="muted">
-				Archived dimensions are hidden from the dimension switcher while keeping
-				their tiles and history. Owners can permanently delete archived
-				dimensions.
-			</p>
-			<p class="muted">
-				<b>Scale</b> maps a dimension's coordinates to the Overworld (e.g. 1 for
-				Overworld, 8 for Nether) so switching dimensions preserves your
-				location. Leave blank for dimensions with independent coordinates, like
-				The End.
-			</p>
-			<p class="muted">
-				<b>Theme</b> sets the dimension's icon and UI colour palette.
-			</p>
-			<p class="muted">
-				<b>Xaero ID</b> is the identifier used when copying waypoints for
-				Xaero's Minimap: <code>dim%0</code> (Overworld), <code>dim%-1</code>{" "}
-				(Nether), or <code>dim%1</code> (The End).
-			</p>
-			<p class="muted">
-				<b>Preload around spawn</b> fetches low-resolution tiles near 0, 0 in
-				the background so the map stays visible while zooming or panning.
-				Coarser rings cover wider areas using fewer tiles. Users can disable
-				preloading in their browser settings.
-			</p>
+			<details class="admin-help">
+				<summary>What do these settings mean?</summary>
+				<dl>
+					<dt>Archived</dt>
+					<dd>
+						Hides the dimension from the dimension switcher while keeping its
+						tiles and history. Owners can permanently delete archived
+						dimensions.
+					</dd>
+					<dt>Scale</dt>
+					<dd>
+						Maps a dimension's coordinates to the Overworld (e.g. 1 for
+						Overworld, 8 for Nether) so switching dimensions preserves your
+						location. Leave blank for dimensions with independent coordinates,
+						like The End.
+					</dd>
+					<dt>Theme</dt>
+					<dd>Sets the dimension's icon and UI colour palette.</dd>
+					<dt>Xaero ID</dt>
+					<dd>
+						The identifier used when copying waypoints for Xaero's Minimap:{" "}
+						<code>dim%0</code> (Overworld), <code>dim%-1</code> (Nether), or{" "}
+						<code>dim%1</code> (The End).
+					</dd>
+					<dt>Preload around spawn</dt>
+					<dd>
+						Fetches low-resolution tiles near 0, 0 in the background so the map
+						stays visible while zooming or panning. Coarser rings cover wider
+						areas using fewer tiles. Users can disable preloading in their
+						browser settings.
+					</dd>
+				</dl>
+			</details>
 			<ul class="dimension-list">
 				{dims.map((d, i) => (
 					<DimensionRow
@@ -595,6 +629,7 @@ function DimensionsTab() {
 					/>
 				))}
 			</ul>
+			<span class="dim-label dim-add-label">Add a dimension</span>
 			<form class="add-dimension" onSubmit={add}>
 				<input
 					type="text"
@@ -609,7 +644,7 @@ function DimensionsTab() {
 				/>
 				<input
 					type="text"
-					placeholder="slug"
+					placeholder="Slug"
 					aria-label="Dimension slug"
 					value={newSlug}
 					maxLength={40}
@@ -622,7 +657,7 @@ function DimensionsTab() {
 					type="text"
 					inputMode="decimal"
 					class="scale-input"
-					placeholder="scale"
+					placeholder="Scale"
 					aria-label="Coordinate scale of the new dimension"
 					value={newScale}
 					onInput={(e) => setNewScale(e.currentTarget.value)}
@@ -703,6 +738,11 @@ export function ManagePage() {
 	}
 
 	return (
-		<Page title={detail ? `Manage ${detail.map.name}` : "Manage"}>{body}</Page>
+		<Page
+			title={detail ? `Manage ${detail.map.name}` : "Manage"}
+			wide={active === "statistics" || active === "jobs"}
+		>
+			{body}
+		</Page>
 	);
 }

@@ -1,5 +1,10 @@
 import {
+	Avatar,
+	Badge,
 	Chart,
+	Empty,
+	ErrorBox,
+	Loading,
 	Segmented,
 	SortTh,
 	Tabs,
@@ -38,6 +43,8 @@ type Column = {
 		| "layersCreated";
 	label: string;
 	hint: string;
+	/** Part of the AOMC Webmapper group of columns. */
+	mod?: boolean;
 };
 
 const COLUMNS: Column[] = [
@@ -49,16 +56,6 @@ const COLUMNS: Column[] = [
 	},
 	{ key: "areaTiles", label: "Area", hint: "Unique area mapped" },
 	{
-		key: "modUploads",
-		label: "Webmapper uploads",
-		hint: "Uploads sent via AOMC Webmapper (included in Uploads)",
-	},
-	{
-		key: "modAreaTiles",
-		label: "Webmapper area",
-		hint: "Unique area mapped via AOMC Webmapper (included in Area)",
-	},
-	{
 		key: "featuresCreated",
 		label: "Features",
 		hint: "Pins, lines, and areas created",
@@ -69,11 +66,33 @@ const COLUMNS: Column[] = [
 		hint: "Subsequent edits to existing features",
 	},
 	{ key: "layersCreated", label: "Layers", hint: "Layers created" },
+	{
+		key: "modUploads",
+		label: "Uploads",
+		hint: "Uploads sent via AOMC Webmapper (included in Uploads)",
+		mod: true,
+	},
+	{
+		key: "modAreaTiles",
+		label: "Area",
+		hint: "Unique area mapped via AOMC Webmapper (included in Area)",
+		mod: true,
+	},
 ];
+
+const MAIN_COLUMNS = COLUMNS.filter((c) => !c.mod).length;
+const MOD_COLUMNS = COLUMNS.length - MAIN_COLUMNS;
+
+const MEDALS = ["gold", "silver", "bronze"];
+const PLACES = ["1st", "2nd", "3rd"];
 
 /** An area of square blocks in km² (a block is a metre). */
 function formatArea(blocks: number): string {
 	return `${(blocks / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 2 })} km²`;
+}
+
+function count(n: number, noun: string): string {
+	return `${formatNumber(n)} ${noun}${n === 1 ? "" : "s"}`;
 }
 
 function cell(s: UserStats, key: Column["key"]): string {
@@ -123,7 +142,7 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 					{
 						label: "Features created",
 						value: formatNumber(s.featuresCreated),
-						hint: `${formatNumber(byType.pin)} pins · ${formatNumber(byType.line)} lines · ${formatNumber(byType.polygon)} areas`,
+						hint: `${count(byType.pin, "pin")} · ${count(byType.line, "line")} · ${count(byType.polygon, "area")}`,
 					},
 					{ label: "Feature edits", value: formatNumber(s.featureEdits) },
 					{ label: "Layers created", value: formatNumber(s.layersCreated) },
@@ -210,23 +229,56 @@ function AreaChart(props: { data: StatsBody; signedIn: boolean }) {
 	);
 }
 
-function Leaderboard(props: { rows: Row[]; me: string | null }) {
-	const [sort, setSort] = useState<Column["key"]>("tiles");
-	const rows = [...props.rows].sort(
+/** Rows by `sort` (best first), each with its place: rows with the same value share one. */
+function rank(rows: Row[], sort: Column["key"]) {
+	const sorted = [...rows].sort(
 		(a, b) =>
 			b[sort] - a[sort] ||
 			b.tiles - a.tiles ||
 			a.username.localeCompare(b.username),
 	);
-	if (rows.length === 0)
-		return <p class="muted">No contributions in this time range.</p>;
+	let place = 0;
+	return sorted.map((row, i) => {
+		if (i === 0 || row[sort] !== sorted[i - 1]?.[sort]) place = i + 1;
+		return { row, place };
+	});
+}
+
+function RankChip(props: { place: number; medal: boolean }) {
+	const i = props.place - 1;
+	const medal = props.medal && i < MEDALS.length ? MEDALS[i] : undefined;
+	return (
+		<span
+			class={medal ? `rank-chip ${medal}` : "rank-chip"}
+			title={medal ? `${PLACES[i]} place` : undefined}
+		>
+			{props.place}
+		</span>
+	);
+}
+
+function Leaderboard(props: { rows: Row[]; me: string | null }) {
+	const [sort, setSort] = useState<Column["key"]>("tiles");
+	if (props.rows.length === 0)
+		return (
+			<Empty>No contributions in this time range yet. Try a longer one.</Empty>
+		);
+	const rows = rank(props.rows, sort);
 	return (
 		<div class="table-wrap flush">
-			<table class="table plain compact nowrap">
+			<table class="table plain compact nowrap leaderboard">
 				<thead>
+					<tr class="leaderboard-groups">
+						<th class="player-cell" />
+						<th colSpan={MAIN_COLUMNS} class="col-group">
+							Contributions
+						</th>
+						<th colSpan={MOD_COLUMNS} class="col-group mod">
+							AOMC Webmapper
+						</th>
+					</tr>
 					<tr>
-						<th class="rank">#</th>
-						<th>Player</th>
+						<th class="player-cell">Player</th>
 						{COLUMNS.map((c) => (
 							<SortTh
 								key={c.key}
@@ -242,27 +294,27 @@ function Leaderboard(props: { rows: Row[]; me: string | null }) {
 					</tr>
 				</thead>
 				<tbody>
-					{rows.map((r, i) => (
+					{rows.map(({ row: r, place }) => (
 						<tr key={r.userId} class={r.userId === props.me ? "me" : ""}>
-							<td class="rank">{i + 1}</td>
-							<td>
+							<td class="player-cell">
 								<span class="player-name">
-									{r.avatarUrl ? (
-										<img
-											class="avatar"
-											src={r.avatarUrl}
-											alt=""
-											width={24}
-											height={24}
-										/>
-									) : (
-										<span class="avatar placeholder" />
-									)}
-									{r.username}
+									<RankChip place={place} medal={r[sort] > 0} />
+									<Avatar name={r.username} src={r.avatarUrl ?? undefined} />
+									<span class="player-label">{r.username}</span>
+									{r.userId === props.me && <Badge kind="ok">You</Badge>}
 								</span>
 							</td>
-							{COLUMNS.map((c) => (
-								<td key={c.key} class="num">
+							{COLUMNS.map((c, i) => (
+								<td
+									key={c.key}
+									class={[
+										"num",
+										c.key === sort && "sorted",
+										i === MAIN_COLUMNS && "group-start",
+									]
+										.filter(Boolean)
+										.join(" ")}
+								>
 									{cell(r, c.key)}
 								</td>
 							))}
@@ -270,6 +322,28 @@ function Leaderboard(props: { rows: Row[]; me: string | null }) {
 					))}
 				</tbody>
 			</table>
+		</div>
+	);
+}
+
+function Account(props: {
+	user: { username: string; avatarUrl?: string | null };
+	rows: Row[];
+	me: string;
+}) {
+	const { user: u } = props;
+	const mine = rank(props.rows, "tiles").find((r) => r.row.userId === props.me);
+	return (
+		<div class="account-card stats-account">
+			<Avatar name={u.username} src={u.avatarUrl ?? undefined} size={48} />
+			<div>
+				<div>{u.username}</div>
+				<div class="muted hint">
+					{mine
+						? `#${mine.place} of ${props.rows.length} on the leaderboard (by tiles)`
+						: "Not on the leaderboard for this time range"}
+				</div>
+			</div>
 		</div>
 	);
 }
@@ -290,16 +364,17 @@ export function StatsPage() {
 		history.replaceState(null, "", url);
 	}, [range]);
 
-	const { data, error } = useStats(
+	const { data, error, loading, reload } = useStats(
 		() => api.api.stats.$get({ query: { range } }),
 		[range],
 	);
 
 	const u = user.value;
+	const section = loading && data ? "page-section fade" : "page-section";
 	// Until one is picked, show your own stats when logged in and the global ones otherwise.
 	const tab: StatTab = picked ?? (data && !data.me ? "global" : "me");
 	return (
-		<Page title="Statistics">
+		<Page title="Statistics" wide>
 			<Segmented
 				label="Time range"
 				value={range}
@@ -307,14 +382,19 @@ export function StatsPage() {
 				names={RANGE_NAMES}
 				onChange={setRange}
 			/>
-			{error && <p class="muted">Failed to load statistics: {error}</p>}
+			{error && (
+				<ErrorBox
+					message={`Failed to load statistics: ${error}`}
+					onRetry={reload}
+				/>
+			)}
 
 			<Tabs center tabs={STAT_TABS} value={tab} onChange={setPicked} />
 
-			<section class="page-section">
+			<section class={section}>
 				<h2>{tab === "me" ? "Your stats" : "Global stats"}</h2>
 				{!data ? (
-					<p class="muted">Loading…</p>
+					<Loading />
 				) : tab === "global" ? (
 					<StatTiles
 						stats={data.totals}
@@ -322,18 +402,7 @@ export function StatsPage() {
 					/>
 				) : data.me && u ? (
 					<>
-						<div class="account-card stats-account">
-							{u.avatarUrl && (
-								<img
-									class="avatar"
-									src={u.avatarUrl}
-									alt=""
-									width={40}
-									height={40}
-								/>
-							)}
-							<div>{u.username}</div>
-						</div>
+						<Account user={u} rows={data.leaderboard} me={u.id} />
 						<StatTiles stats={data.me} note="Includes your private layers." />
 					</>
 				) : (
@@ -346,25 +415,21 @@ export function StatsPage() {
 				)}
 			</section>
 
-			<section class="page-section">
+			<section class={section}>
 				<h2>Mapped area</h2>
 				<p class="muted">
 					Cumulative unique area mapped over time, ordered by export date (or
 					upload date when undated). Excludes deleted uploads.
 				</p>
-				{data ? (
-					<AreaChart data={data} signedIn={u !== null} />
-				) : (
-					<p class="muted">Loading…</p>
-				)}
+				{data ? <AreaChart data={data} signedIn={u !== null} /> : <Loading />}
 			</section>
 
-			<section class="page-section">
+			<section class={section}>
 				<h2>Leaderboard</h2>
 				{data ? (
 					<Leaderboard rows={data.leaderboard} me={u?.id ?? null} />
 				) : (
-					<p class="muted">Loading…</p>
+					<Loading />
 				)}
 			</section>
 		</Page>

@@ -67,11 +67,19 @@ function MaintenanceNotice() {
 	);
 }
 
-/** Layout of the standalone pages (/settings, /manage, /stats): a title bar with a way back, and the content. */
-export function Page(props: { title: string; children: ComponentChildren }) {
+/**
+ * Layout of the standalone pages (/settings, /manage, /stats): a title bar with a way back, and the content.
+ * `wide` gives wide tables and charts more room than the reading-width column.
+ */
+export function Page(props: {
+	title: string;
+	wide?: boolean;
+	children: ComponentChildren;
+}) {
 	return (
 		<BasePage
 			title={props.title}
+			class={props.wide ? "page-wide" : undefined}
 			back={{ href: "/", label: "Map" }}
 			banner={<MaintenanceNotice />}
 		>

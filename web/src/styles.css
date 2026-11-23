@@ -560,20 +560,21 @@ img.banner,
 }
 
 /* The manage page's Jobs tab. */
-.job-status {
-	font-weight: 600;
+.job-row.failed {
+	background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 
-.job-status.processing {
-	color: var(--ok);
+.job-row.processing {
+	background: color-mix(in srgb, var(--warn) 12%, transparent);
 }
 
-.job-status.failed {
-	color: var(--danger);
+.job-running {
+	margin-top: 6px;
 }
 
 .job-error {
 	max-width: 40ch;
+	margin-top: 4px;
 	white-space: normal;
 	overflow-wrap: anywhere;
 }
@@ -1931,13 +1932,8 @@ img.banner,
 	width: auto;
 }
 
-.dim-scale input,
 .scale-input {
 	width: 80px;
-}
-
-.dim-scale .xaero-input {
-	width: 160px;
 }
 
 .add-member,
@@ -1997,26 +1993,83 @@ img.banner,
 	opacity: 0.6;
 }
 
-.dim-main input[type="text"] {
-	max-width: 320px;
+/* A dimension: name and slug on top, its settings as labelled fields, then spawn preloading. */
+.dimension-list li {
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 10px 16px;
 }
 
-.dim-scale {
+.dim-main {
+	flex: 1 1 320px;
+}
+
+.dim-head {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
-	margin-top: 8px;
-	font-size: 13px;
+}
+
+.dim-head input[type="text"] {
+	flex: 1 1 180px;
+	max-width: 320px;
+	font-weight: 600;
 }
 
 .dim-slug {
-	display: block;
+	color: var(--muted);
+}
+
+.dim-fields {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+	gap: 8px 14px;
+	margin-top: 10px;
+	max-width: 520px;
+}
+
+.dim-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+.dim-field input,
+.dim-field select {
+	width: 100%;
+}
+
+.dim-theme {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.dim-label {
 	font-size: 13px;
+	font-weight: 600;
+	color: var(--muted);
+}
+
+.dim-actions {
+	flex: none;
+	align-self: flex-start;
 }
 
 .dim-preload {
-	margin-top: 8px;
+	margin-top: 12px;
+	padding-top: 10px;
 	font-size: 13px;
+	border-top: 1px solid var(--s3);
+}
+
+.dim-preload-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 10px;
 }
 
 .preload-ring {
@@ -2031,8 +2084,18 @@ img.banner,
 	width: auto;
 }
 
+.preload-ring .scale-input {
+	width: 80px;
+}
+
 .dim-preload .group {
 	margin-top: 6px;
+}
+
+.dim-add-label {
+	display: block;
+	margin-top: 18px;
+	margin-bottom: 6px;
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -2050,6 +2113,10 @@ img.banner,
 /* Under the tabs and the time range of the pages. */
 .tabs {
 	margin-bottom: 16px;
+}
+
+.page-root.page-wide {
+	--page-max: 1200px;
 }
 
 .page .segmented-set {
@@ -2110,22 +2177,145 @@ img.banner,
 
 /* Statistics page */
 .stats-group {
-	margin: 18px 0 2px;
+	margin: 22px 0 2px;
+	padding-top: 14px;
+	border-top: 1px dashed var(--line);
 }
 
 .stats-account {
 	margin-bottom: 12px;
+	padding: 10px 12px;
+	background: var(--s2);
+	border: var(--bw) solid var(--line);
+	border-radius: var(--radius);
+}
+
+.stats-account .hint {
+	margin: 2px 0 0;
 }
 
 .player-name {
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
+	max-width: 100%;
 	font-weight: 600;
 }
 
 .player-name .avatar {
 	--avatar-size: 24px;
+}
+
+.player-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.leaderboard {
+	--row-bg: var(--s1);
+	--sorted-bg: color-mix(in srgb, var(--accent) 14%, var(--row-bg));
+}
+
+.leaderboard tr.me {
+	--row-bg: var(--s2);
+}
+
+.leaderboard .col-group {
+	padding-bottom: 2px;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-align: center;
+	text-transform: uppercase;
+	color: var(--muted);
+	border-bottom: 1px solid var(--line);
+}
+
+.leaderboard-groups .player-cell {
+	border-bottom: 0;
+}
+
+.table.leaderboard .group-start,
+.leaderboard .col-group.mod {
+	border-left: 1px dashed var(--line);
+}
+
+.table.leaderboard td.sorted {
+	font-weight: 600;
+	background: var(--sorted-bg);
+}
+
+.table.leaderboard th[aria-sort="descending"] {
+	box-shadow: inset 0 calc(-2px - var(--bw)) 0 var(--accent);
+}
+
+/* Rank and player stay put while the numbers scroll sideways. */
+.table.leaderboard :is(th, td).player-cell {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	max-width: 220px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	text-align: left;
+	background: var(--row-bg);
+	box-shadow: 1px 0 0 var(--s3);
+}
+
+.table.leaderboard thead .player-cell {
+	background: var(--s1);
+}
+
+.table.leaderboard tr.me td.player-cell {
+	box-shadow:
+		inset 3px 0 0 var(--accent),
+		1px 0 0 var(--s3);
+}
+
+.rank-chip {
+	--medal: var(--muted);
+	border-radius: var(--radius-sm);
+	display: inline-block;
+	flex: none;
+	min-width: 26px;
+	padding: 1px 4px;
+	font-size: 13px;
+	font-weight: 700;
+	line-height: 1.4;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+	color: var(--muted);
+}
+
+.rank-chip.gold,
+.rank-chip.silver,
+.rank-chip.bronze {
+	color: var(--text);
+	background: color-mix(in srgb, var(--medal) 35%, var(--well));
+	border: 1px solid var(--medal);
+}
+
+.rank-chip.gold {
+	--medal: var(--chart-7);
+}
+
+.rank-chip.silver {
+	--medal: var(--chart-6);
+}
+
+.rank-chip.bronze {
+	--medal: var(--chart-3);
+}
+
+@media (max-width: 600px) {
+	.table.leaderboard :is(th, td).player-cell {
+		max-width: 160px;
+	}
+
+	.leaderboard .player-name .badge {
+		display: none;
+	}
 }
 
 /* A toggle row with a dropdown where the switch would be. */
@@ -2692,13 +2882,17 @@ img.banner,
 	}
 }
 
-.admin-stats h2 {
+/* Admin pages: a tab is a stack of sections, each with a header row (title and controls). */
+.admin-section {
 	margin-top: 22px;
+	padding-top: 18px;
+	border-top: var(--bw) solid var(--s2);
 }
 
-/* A row under another in the traffic table (an app's version, one of this site's browsers). */
-.admin-stats .domain-child {
-	color: var(--muted);
+.admin-section:first-child {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: 0;
 }
 
 .admin-toolbar {
@@ -2707,15 +2901,193 @@ img.banner,
 	justify-content: space-between;
 	flex-wrap: wrap;
 	gap: 8px;
-	margin: 22px 0 8px;
+	margin-bottom: 8px;
 }
 
 .admin-toolbar h2 {
 	margin: 0;
 }
 
+.admin-note {
+	margin: 0 0 10px;
+}
+
 .admin-block {
 	margin: 12px 0;
+}
+
+/* The time range and the refresh button above the statistics: one toolbar row. */
+.admin-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
+	margin-bottom: 20px;
+	padding-bottom: 14px;
+	border-bottom: var(--bw) solid var(--s2);
+}
+
+.admin-controls .segmented-set,
+.admin-toolbar .segmented-set {
+	margin: 0;
+}
+
+.admin-refresh {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px;
+	font-size: 13px;
+}
+
+.admin-body {
+	transition: opacity 0.15s 0.2s;
+}
+
+.admin-body.loading {
+	opacity: 0.6;
+}
+
+/* Stat tiles (statistics pages): centred rows of tiles, with label, figure and hint centred. */
+.page .tiles {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+}
+
+.page .tiles .tile {
+	flex: 1 1 var(--tile-min, 200px);
+	max-width: 260px;
+	text-align: center;
+}
+
+/* A figure with its action next to it. */
+.tile-action {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: 4px 12px;
+}
+
+.tile-action .btn {
+	font-family: var(--sans);
+	font-size: 13px;
+}
+
+/* A row of the traffic table that is left out of the chart. */
+.admin-stats tr.chart-off {
+	opacity: 0.5;
+}
+
+.admin-stats td.chart-toggle {
+	text-align: right;
+	vertical-align: middle;
+}
+
+.admin-stats td.chart-toggle input {
+	margin: 0;
+	vertical-align: middle;
+}
+
+/* A row under another in the traffic table (an app's version, one of this site's browsers). */
+.admin-stats .domain-child {
+	color: var(--muted);
+}
+
+.admin-empty {
+	padding: 14px 16px;
+	background: var(--s2);
+	border: var(--bw) dashed var(--s4);
+	border-radius: var(--radius);
+}
+
+.admin-empty p {
+	margin: 2px 0 0;
+}
+
+p.admin-empty {
+	margin: 0;
+}
+
+/* Long help text that is read once: folded away under a summary. */
+.admin-help {
+	margin: 0 0 12px;
+	font-size: 13px;
+}
+
+.admin-help summary {
+	cursor: pointer;
+	color: var(--muted);
+	font-weight: 600;
+}
+
+.admin-help summary:hover {
+	color: var(--text);
+}
+
+.admin-help p {
+	margin: 6px 0 0;
+}
+
+.admin-help dl {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 6px 16px;
+	margin: 8px 0 0;
+}
+
+.admin-help dt {
+	font-weight: 600;
+}
+
+.admin-help dd {
+	margin: 0;
+	color: var(--muted);
+}
+
+@media (max-width: 560px) {
+	.admin-help dl {
+		grid-template-columns: 1fr;
+		gap: 0;
+	}
+
+	.admin-help dd {
+		margin-bottom: 8px;
+	}
+}
+
+.settings-form {
+	max-width: 420px;
+}
+
+.settings-form .field.flow {
+	margin-top: 0;
+}
+
+.settings-form .btn {
+	margin-top: 6px;
+}
+
+/* A destructive action: what it does on the left, the button on the right. */
+.admin-danger {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px 16px;
+	padding: 12px 14px;
+	border: var(--bw) solid var(--danger);
+	border-radius: var(--radius);
+}
+
+.admin-danger-text {
+	flex: 1 1 260px;
+}
+
+.admin-danger-text p {
+	margin: 2px 0 0;
 }
 
 /* ---------------------------------------------------------------------------------------------

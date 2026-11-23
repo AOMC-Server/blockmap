@@ -1,3 +1,4 @@
+import { Badge, type BadgeKind, Count } from "@aomc-server/block-ui";
 import { formatRelative, formatTime } from "@aomc-server/block-ui/format";
 import {
 	type AdminJob,
@@ -14,6 +15,13 @@ const STATUS_NAMES: Record<AdminJob["status"], string> = {
 	processing: "Running",
 	done: "Done",
 	failed: "Failed",
+};
+
+const STATUS_KINDS: Record<AdminJob["status"], BadgeKind | undefined> = {
+	pending: undefined,
+	processing: "running",
+	done: "ok",
+	failed: "error",
 };
 
 function When(props: { at: number | null }) {
@@ -43,11 +51,11 @@ function JobRow(props: { job: AdminJob; open: boolean }) {
 				{subject && <div class="muted">{subject}</div>}
 			</td>
 			<td>
-				<span class={`job-status ${job.status}`}>
+				<Badge kind={STATUS_KINDS[job.status]}>
 					{STATUS_NAMES[job.status]}
-				</span>
+				</Badge>
 				{job.status === "processing" && (
-					<div>
+					<div class="job-running">
 						<Running />
 					</div>
 				)}
@@ -101,22 +109,37 @@ export function AdminJobs() {
 		return <p class="muted">{failed ? "Failed to load jobs." : "Loading…"}</p>;
 	return (
 		<>
-			<h2>Queue</h2>
-			<p class="muted">
-				Background jobs run one at a time in the order listed below. Updates
-				automatically.
-			</p>
-			{data.open.length === 0 ? (
-				<p class="muted">Queue is empty.</p>
-			) : (
-				<JobTable jobs={data.open} open />
-			)}
-			<h2>Recently finished</h2>
-			{data.recent.length === 0 ? (
-				<p class="muted">No recent jobs.</p>
-			) : (
-				<JobTable jobs={data.recent} open={false} />
-			)}
+			<section class="admin-section">
+				<div class="admin-toolbar">
+					<h2>Queue</h2>
+					{data.open.length > 0 && <Count>{data.open.length}</Count>}
+				</div>
+				<p class="muted admin-note">
+					Background jobs run one at a time in the order listed below. This
+					queue updates automatically.
+				</p>
+				{data.open.length === 0 ? (
+					<div class="admin-empty">
+						<b>All caught up</b>
+						<p class="muted">
+							Nothing is waiting or running. Uploads, deletions and cleanups
+							show up here while they run.
+						</p>
+					</div>
+				) : (
+					<JobTable jobs={data.open} open />
+				)}
+			</section>
+			<section class="admin-section">
+				<div class="admin-toolbar">
+					<h2>Recently finished</h2>
+				</div>
+				{data.recent.length === 0 ? (
+					<p class="admin-empty muted">No recent jobs.</p>
+				) : (
+					<JobTable jobs={data.recent} open={false} />
+				)}
+			</section>
 		</>
 	);
 }

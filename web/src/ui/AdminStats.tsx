@@ -10,12 +10,13 @@ import {
 	formatDay,
 	formatDuration,
 	formatNumber,
+	formatRelative,
 	formatTime,
 } from "@aomc-server/block-ui/format";
 import { ADMIN_STATS_RANGES, type AdminStatsRange } from "@blockmap/shared";
 import { DAY, HOUR } from "@blockmap/shared/time";
 import type { InferResponseType } from "hono/client";
-import { Fragment, type JSX } from "preact";
+import { type ComponentChildren, Fragment, type JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api, attempt, showNotice } from "../api";
 import { subscribe } from "../events";
@@ -31,8 +32,8 @@ type Body = InferResponseType<typeof api.api.admin.stats.$get, 200>;
 type Category = keyof Body["traffic"]["range"]["byCategory"];
 
 const RANGE_NAMES: Record<AdminStatsRange, string> = {
-	"1h": "Last hour",
-	"6h": "Last 6 hours",
+	"1h": "1 hour",
+	"6h": "6 hours",
 	"24h": "24 hours",
 	"7d": "7 days",
 	"30d": "30 days",
@@ -70,8 +71,28 @@ const formatDayTime = (t: number) =>
 		hour: "numeric",
 		minute: "2-digit",
 	});
+
+/** A titled block of the statistics page, with room in its header for controls. */
+function Section(props: {
+	title: string;
+	actions?: ComponentChildren;
+	note?: ComponentChildren;
+	children: ComponentChildren;
+}) {
+	return (
+		<section class="admin-section">
+			<div class="admin-toolbar">
+				<h2>{props.title}</h2>
+				{props.actions}
+			</div>
+			{props.note && <p class="muted admin-note">{props.note}</p>}
+			{props.children}
+		</section>
+	);
+}
+
 /** Queues the image cleanup and follows it on the queue topic; `onDone` runs when it has finished. */
-function CleanupButton(props: { onDone: () => void }) {
+function CleanupButton(props: { reclaimable: number; onDone: () => void }) {
 	const [queued, setQueued] = useState(false);
 	const [running, setRunning] = useState(false);
 	const waiting = useRef(false);
@@ -102,8 +123,9 @@ function CleanupButton(props: { onDone: () => void }) {
 	return (
 		<button
 			type="button"
-			class="btn"
-			disabled={queued || running}
+			class="btn small"
+			disabled={queued || running || props.reclaimable <= 0}
+			title={props.reclaimable <= 0 ? "No unused images to delete" : undefined}
 			onClick={start}
 		>
 			{queued || running ? "Cleaning up…" : "Clean up now"}
@@ -148,12 +170,10 @@ function Storage(props: { data: Body; onCleaned: () => void }) {
 				: formatDayTime;
 
 	return (
-		<>
-			<h2>Storage</h2>
-			<p class="muted">
-				Calculated from recorded image sizes rather than actual disk usage.
-				Updated after each upload, deletion, and cleanup.
-			</p>
+		<Section
+			title="Storage"
+			note="Calculated from recorded image sizes rather than actual disk usage. Updated after each upload, deletion, and cleanup."
+		>
 			<TileGrid
 				plain
 				tiles={[
@@ -169,15 +189,20 @@ function Storage(props: { data: Body; onCleaned: () => void }) {
 					},
 					{
 						label: "Unused images",
-						value: formatBytes(reclaimable),
+						value: (
+							<span class="tile-action">
+								{formatBytes(reclaimable)}
+								<CleanupButton
+									reclaimable={reclaimable}
+									onDone={props.onCleaned}
+								/>
+							</span>
+						),
 						hint: "Can be freed by running cleanup",
 					},
 					{ label: "Database", value: formatBytes(cur.dbBytes) },
 				]}
 			/>
-			<div class="admin-block">
-				<CleanupButton onDone={props.onCleaned} />
-			</div>
 			<div class="admin-block">
 				<Chart
 					kind="steps"
@@ -193,7 +218,7 @@ function Storage(props: { data: Body; onCleaned: () => void }) {
 					}
 				/>
 			</div>
-		</>
+		</Section>
 	);
 }
 
@@ -230,9 +255,10 @@ function Traffic(props: { data: Body }) {
 	const totalRequests = sum(traffic.allTime.byCategory, (r) => r.requests);
 	const errors = sum(range.byCategory, (r) => r.s4xx + r.s5xx);
 	return (
-		<>
-			<div class="admin-toolbar">
-				<h2>Network traffic</h2>
+		<Section
+			title="Network traffic"
+			note="Outgoing traffic from this server. Redirects and error responses transfer minimal data."
+			actions={
 				<Segmented
 					small
 					label="Metric"
@@ -241,11 +267,8 @@ function Traffic(props: { data: Body }) {
 					names={{ bytes: "Data sent", requests: "Requests" }}
 					onChange={setMetric}
 				/>
-			</div>
-			<p class="muted">
-				Outgoing traffic from this server. Redirects and error responses
-				transfer minimal data.
-			</p>
+			}
+		>
 			<TileGrid
 				plain
 				tiles={[
@@ -303,7 +326,7 @@ function Traffic(props: { data: Body }) {
 							const r = range.byCategory[c.key];
 							const on = !hidden.has(c.key);
 							return (
-								<tr key={c.key} style={{ opacity: on ? 1 : 0.5 }}>
+								<tr key={c.key} class={on ? "" : "chart-off"}>
 									<td>
 										<span
 											class="chart-swatch"
@@ -318,14 +341,10 @@ function Traffic(props: { data: Body }) {
 									<td class="num">
 										{formatBytes(traffic.allTime.byCategory[c.key].bytes)}
 									</td>
-									<td
-										class="num"
-										style={{ textAlign: "right", verticalAlign: "middle" }}
-									>
+									<td class="num chart-toggle">
 										<input
 											type="checkbox"
 											class="switch"
-											style={{ margin: 0, verticalAlign: "middle" }}
 											checked={on}
 											aria-label={`Show ${c.label} in chart`}
 											onChange={() => toggle(c.key)}
@@ -337,7 +356,7 @@ function Traffic(props: { data: Body }) {
 					</tbody>
 				</table>
 			</div>
-		</>
+		</Section>
 	);
 }
 
@@ -368,7 +387,7 @@ function Domains(props: { data: Body; onChange: () => void }) {
 				: `"${label}"`;
 		if (
 			!confirm(
-				`Remove ${what} from this list? Its traffic is added to "Other". It shows up again if it requests tiles again.`,
+				`Remove ${what} from this list? Its traffic is added to "Other". It will reappear if it requests tiles again.`,
 			)
 		)
 			return;
@@ -463,17 +482,19 @@ function Domains(props: { data: Body; onChange: () => void }) {
 	};
 
 	return (
-		<>
-			<h2>Tile traffic by domain</h2>
-			<p class="muted">
-				Grouped by the request's Origin or Referer header, this site's own
-				traffic by browser. Tools that send neither are listed by the name and
-				version their User-Agent starts with (such as{" "}
-				<code>AOMCGuessr/1.4</code>); “No referrer” is everything else, such as
-				direct downloads.
-			</p>
+		<Section title="Tile traffic by domain">
+			<details class="admin-help">
+				<summary>How requests are grouped</summary>
+				<p class="muted">
+					Requests are grouped by their Origin or Referer header, with this
+					site's own traffic broken down by browser. Tools that send neither are
+					listed by the name and version their User-Agent starts with (such as{" "}
+					<code>AOMCGuessr/1.4</code>); “No referrer” is everything else, such
+					as direct downloads.
+				</p>
+			</details>
 			{rows.length === 0 ? (
-				<p class="muted">No tile requests in this period.</p>
+				<p class="admin-empty muted">No tile requests in this period.</p>
 			) : (
 				<div class="table-wrap flush">
 					<table class="table plain compact nowrap">
@@ -502,15 +523,14 @@ function Domains(props: { data: Body; onChange: () => void }) {
 					</table>
 				</div>
 			)}
-		</>
+		</Section>
 	);
 }
 
 function Overview(props: { data: Body }) {
 	const o = props.data.overview;
 	return (
-		<>
-			<h2>Server</h2>
+		<Section title="Server">
 			<TileGrid
 				plain
 				tiles={[
@@ -556,37 +576,54 @@ function Overview(props: { data: Body }) {
 					},
 				]}
 			/>
-		</>
+		</Section>
 	);
 }
 
 /** The owners' view of storage, network traffic and the server. */
 export function AdminStats() {
 	const [range, setRange] = useState<AdminStatsRange>("7d");
-	const { data, error, reload } = useStats(
+	const { data, error, loading, reload } = useStats(
 		() => api.api.admin.stats.$get({ query: { range } }),
 		[range],
 	);
 
 	return (
-		<div class="admin-stats">
-			<Segmented
-				label="Time range"
-				value={range}
-				options={ADMIN_STATS_RANGES}
-				names={RANGE_NAMES}
-				onChange={setRange}
-			/>
+		<div class="admin-stats" aria-busy={loading}>
+			<div class="admin-controls">
+				<Segmented
+					label="Time range"
+					value={range}
+					options={ADMIN_STATS_RANGES}
+					names={RANGE_NAMES}
+					onChange={setRange}
+				/>
+				<div class="admin-refresh">
+					{data && (
+						<span class="muted" title={formatTime(data.now)}>
+							Updated {formatRelative(data.now)}
+						</span>
+					)}
+					<button
+						type="button"
+						class="btn small"
+						disabled={loading}
+						onClick={reload}
+					>
+						{loading ? "Refreshing…" : "Refresh"}
+					</button>
+				</div>
+			</div>
 			{error && <p class="error-text">Failed to load statistics: {error}</p>}
 			{!data ? (
 				!error && <p class="muted">Loading…</p>
 			) : (
-				<>
+				<div class={loading ? "admin-body loading" : "admin-body"}>
 					<Storage data={data} onCleaned={reload} />
 					<Traffic data={data} />
 					<Domains data={data} onChange={reload} />
 					<Overview data={data} />
-				</>
+				</div>
 			)}
 		</div>
 	);
