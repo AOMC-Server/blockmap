@@ -1,8 +1,9 @@
-import { copyText, Modal, Toggle } from "@aomc-server/block-ui";
+import { Modal, Toggle } from "@aomc-server/block-ui";
 import type { ShareView } from "@blockmap/shared/schemas";
 import { signal } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { api, attempt } from "../api";
+import { copyText } from "../clipboard";
 import { mapView } from "../controller";
 import { currentMap, dimSlug, isLayerHidden, layersData, rev } from "../state";
 

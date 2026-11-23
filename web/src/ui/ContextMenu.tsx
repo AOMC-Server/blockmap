@@ -1,7 +1,7 @@
-import { copyText } from "@aomc-server/block-ui";
 import type { Dye } from "@blockmap/shared/colors";
 import { MAX_NAME } from "@blockmap/shared/features";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { copyText } from "../clipboard";
 import { mapView } from "../controller";
 import { createLayer } from "../layers";
 import {

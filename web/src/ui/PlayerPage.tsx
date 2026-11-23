@@ -1,9 +1,10 @@
-import { copyText, Empty, ErrorBox, Loading } from "@aomc-server/block-ui";
+import { Empty, ErrorBox, Loading } from "@aomc-server/block-ui";
 import { formatTime } from "@aomc-server/block-ui/format";
 import { useAsync } from "@aomc-server/block-ui/hooks";
 import type { Dye } from "@blockmap/shared/colors";
 import { useState } from "preact/hooks";
 import { api, attempt } from "../api";
+import { copyText } from "../clipboard";
 import { TYPE_LABEL } from "../featureInfo";
 import { featureMapUrl, playerPageUrl } from "../players";
 import { currentMap, isModerator, readOnly } from "../state";

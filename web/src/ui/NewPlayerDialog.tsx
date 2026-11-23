@@ -1,4 +1,4 @@
-import { copyText, Modal } from "@aomc-server/block-ui";
+import { Modal } from "@aomc-server/block-ui";
 import { useDebounced } from "@aomc-server/block-ui/hooks";
 import {
 	isPlayerName,
@@ -8,6 +8,7 @@ import {
 } from "@blockmap/shared/players";
 import { useEffect, useState } from "preact/hooks";
 import { api, attempt } from "../api";
+import { copyText } from "../clipboard";
 import { LookupHead } from "./PlayerHead";
 
 type Existing = Player & { owned: number; built: number };

@@ -1702,12 +1702,13 @@ img.banner,
 /* Each row of buttons shares its width equally, so the rows line up. */
 .popup-actions {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 6px;
 }
 
 .popup-actions .btn {
 	flex: 1 1 0;
-	min-width: 0;
+	min-width: max-content;
 	padding-inline: 6px;
 }
 

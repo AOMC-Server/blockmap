@@ -1,5 +1,5 @@
-import { copyText } from "@aomc-server/block-ui";
 import type { Dye } from "@blockmap/shared/colors";
+import { copyText } from "../clipboard";
 import { currentMap, dimSlug } from "../state";
 import { xaeroWaypoint } from "../waypoint";
 

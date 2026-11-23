@@ -1,11 +1,13 @@
-import { copyText, PopupText } from "@aomc-server/block-ui";
+import { PopupText } from "@aomc-server/block-ui";
 import { curveOf, resolveStyle } from "@blockmap/shared/featureStyle";
+import { copyText } from "../clipboard";
 import { mapView } from "../controller";
 import { featureStats, featureTitle, TYPE_LABEL } from "../featureInfo";
 import { deleteFeature } from "../layers";
-import { playerPageUrl } from "../players";
+import { featureMapUrl, playerPageUrl } from "../players";
 import {
 	canEditMap,
+	dimSlug,
 	editor,
 	embed,
 	layerOfFeature,
@@ -135,6 +137,23 @@ export function Popup() {
 				{feature.popup && <PopupText text={feature.popup} />}
 				<div class="popup-footer">
 					<div class="popup-actions">
+						<button
+							type="button"
+							class="btn small"
+							title="Copy a link that opens the map at this feature"
+							onClick={() => {
+								const dim = dimSlug.value;
+								if (!dim) return;
+								const url = featureMapUrl({
+									id: feature.id,
+									dimension: dim,
+									center: [spot.x, spot.z],
+								});
+								void copyText(`${location.origin}${url}`, "Link copied");
+							}}
+						>
+							Copy link
+						</button>
 						<button
 							type="button"
 							class="btn small"
