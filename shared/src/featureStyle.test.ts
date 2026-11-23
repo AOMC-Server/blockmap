@@ -14,14 +14,25 @@ describe("resolveStyle", () => {
 			opacity: 1,
 			fill: "solid",
 			fillOpacity: 0.2,
-			smooth: false,
+			curve: "straight",
 		});
 		expect(resolveStyle(undefined, true).width).toBe(2);
-		expect(resolveStyle({ smooth: true }, false).smooth).toBe(true);
-		expect(resolveStyle(null, false, { smooth: true }).smooth).toBe(true);
+		expect(resolveStyle({ curve: "smooth" }, false).curve).toBe("smooth");
+		expect(resolveStyle(null, false, { curve: "curved" }).curve).toBe("curved");
 		expect(
-			resolveStyle({ smooth: false }, false, { smooth: true }).smooth,
-		).toBe(false);
+			resolveStyle({ curve: "straight" }, false, { curve: "smooth" }).curve,
+		).toBe("straight");
+	});
+
+	test("the old smooth switch is read as a curve", () => {
+		expect(resolveStyle({ smooth: true }, false).curve).toBe("curved");
+		expect(
+			resolveStyle({ smooth: false }, false, { curve: "smooth" }).curve,
+		).toBe("straight");
+		expect(resolveStyle(null, false, { smooth: true }).curve).toBe("curved");
+		expect(resolveStyle({ smooth: true, curve: "smooth" }, false).curve).toBe(
+			"smooth",
+		);
 	});
 
 	test("what is set wins, the rest stays default", () => {

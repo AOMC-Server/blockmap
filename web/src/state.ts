@@ -6,6 +6,7 @@ import type {
 } from "@blockmap/shared/features";
 import { canEdit, canModerate, isReadOnly } from "@blockmap/shared/roles";
 import type { DimensionTheme } from "@blockmap/shared/schemas";
+import type { CurveKind } from "@blockmap/shared/spline";
 import type { View } from "@blockmap/shared/view";
 import { batch, computed, signal } from "@preact/signals";
 import type { InferResponseType } from "hono/client";
@@ -202,8 +203,8 @@ export const editor = signal<EditorTarget | null>(null);
 export const draftLook = signal<{
 	color: Dye | null;
 	style: FeatureStyle | null;
-	/** The feature is drawn as a curve, from its style and its layer's. */
-	smooth: boolean;
+	/** The curve the feature is drawn as, from its style and its layer's; null when straight. */
+	curve: CurveKind | null;
 } | null>(null);
 /** The layer a feature was last saved to, which new features start in. */
 export const lastEditLayer = signal<number | null>(null);

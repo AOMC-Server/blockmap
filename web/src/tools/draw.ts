@@ -14,7 +14,7 @@ export {
  * the feature being made.
  */
 export const featureShape = createShapeEditor({
-	smooth: () => draftLook.value?.smooth ?? false,
+	curve: () => draftLook.value?.curve ?? null,
 	mapDrawsShape: () => draftLook.value !== null,
 	style: {
 		line: "#ffe866",

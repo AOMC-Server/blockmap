@@ -84,6 +84,12 @@ export const AREA_FILLS = [
 	"crosshatch",
 	"dots",
 ] as const;
+/**
+ * How a line goes through its points: straight segments, a curve that keeps its direction
+ * (Catmull-Rom), or one that also keeps its curvature (a cubic spline), which is rounder.
+ */
+export const LINE_CURVES = ["straight", "curved", "smooth"] as const;
+export type LineCurve = (typeof LINE_CURVES)[number];
 export const MIN_LINE_WIDTH = 1;
 export const MAX_LINE_WIDTH = 10;
 export const DEFAULT_LINE_WIDTH = 3;
@@ -92,8 +98,8 @@ export const DEFAULT_FILL_OPACITY = 0.2;
 
 /**
  * How a line or an area is drawn; what is left out is the default (a solid line of 3 pixels, or
- * 2 for the outline of an area, fully opaque, with a solid fill of 20% opacity, not smoothed).
- * `width` is in screen pixels. `dash`, `width`, `opacity` and `smooth` are about the line (or an
+ * 2 for the outline of an area, fully opaque, with a solid fill of 20% opacity, straight).
+ * `width` is in screen pixels. `dash`, `width`, `opacity` and `curve` are about the line (or an
  * area's outline), `fill` and `fillOpacity` about an area's inside.
  */
 export const styleSchema = z.strictObject({
@@ -104,19 +110,27 @@ export const styleSchema = z.strictObject({
 	opacity: z.optional(z.number().check(z.minimum(0.1), z.maximum(1))),
 	fill: z.optional(z.enum(AREA_FILLS)),
 	fillOpacity: z.optional(z.number().check(z.minimum(0), z.maximum(1))),
-	/** Draw the line (or outline) as a curve through its points; forks stay sharp corners. */
+	/** How the line (or outline) goes through its points; forks stay sharp corners. */
+	curve: z.optional(z.enum(LINE_CURVES)),
+	/** Before `curve`: true was what is now "curved". Read, and turned into `curve` by `cleanStyle`. */
 	smooth: z.optional(z.boolean()),
 });
 export type FeatureStyle = z.infer<typeof styleSchema>;
 
-/** The style without the fields that are not set, or null when none is. */
+/**
+ * The style without the fields that are not set, or null when none is. The old `smooth` is
+ * turned into `curve`.
+ */
 export function cleanStyle(
 	style: FeatureStyle | null | undefined,
 ): FeatureStyle | null {
 	if (!style) return null;
+	const { smooth, ...rest } = style;
 	const out = Object.fromEntries(
-		Object.entries(style).filter(([, v]) => v !== undefined),
+		Object.entries(rest).filter(([, v]) => v !== undefined),
 	) as FeatureStyle;
+	if (smooth !== undefined && out.curve === undefined)
+		out.curve = smooth ? "curved" : "straight";
 	return Object.keys(out).length > 0 ? out : null;
 }
 

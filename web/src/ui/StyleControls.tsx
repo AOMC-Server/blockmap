@@ -1,4 +1,4 @@
-import { PreviewSelect, Toggle } from "@aomc-server/block-ui";
+import { PreviewSelect } from "@aomc-server/block-ui";
 import type { Dye } from "@blockmap/shared/colors";
 import {
 	AREA_FILLS,
@@ -7,17 +7,24 @@ import {
 	DEFAULT_FILL_OPACITY,
 	DEFAULT_LINE_WIDTH,
 	type FeatureStyle,
+	LINE_CURVES,
 	LINE_DASHES,
+	type LineCurve,
 	MAX_LINE_WIDTH,
 	MIN_LINE_WIDTH,
 	mergeStyle,
 } from "@blockmap/shared/features";
-import { DashPreview, FillPreview } from "./StylePreview";
+import { CurvePreview, DashPreview, FillPreview } from "./StylePreview";
 
 const DASH_LABEL: Record<(typeof LINE_DASHES)[number], string> = {
 	solid: "Solid",
 	dashed: "Dashed",
 	dotted: "Dotted",
+};
+const CURVE_LABEL: Record<LineCurve, string> = {
+	straight: "Straight",
+	curved: "Curved",
+	smooth: "Smooth",
 };
 const FILL_LABEL: Record<(typeof AREA_FILLS)[number], string> = {
 	none: "None",
@@ -33,14 +40,14 @@ const percent = (n: number) => `${Math.round(n * 100)}%`;
 export type StyleKind = "line" | "polygon" | "layer";
 
 /** The style as it is without any setting at all. */
-function builtIn(kind: StyleKind): Required<FeatureStyle> {
+function builtIn(kind: StyleKind): Required<Omit<FeatureStyle, "smooth">> {
 	return {
 		dash: "solid",
 		width: kind === "polygon" ? DEFAULT_AREA_LINE_WIDTH : DEFAULT_LINE_WIDTH,
 		opacity: 1,
 		fill: "solid",
 		fillOpacity: DEFAULT_FILL_OPACITY,
-		smooth: false,
+		curve: "straight",
 	};
 }
 
@@ -67,7 +74,7 @@ export function StyleControls(props: {
 		key: K,
 		value: FeatureStyle[K],
 	) => {
-		const next = { ...style, [key]: value };
+		const next = { ...cleanStyle(style), [key]: value };
 		if (kind !== "layer" && value === base[key]) delete next[key];
 		onChange(next);
 	};
@@ -123,12 +130,27 @@ export function StyleControls(props: {
 					onInput={(e) => set("opacity", Number(e.currentTarget.value) / 100)}
 				/>
 			</label>
-			<Toggle
-				inline
-				checked={shown.smooth}
-				onChange={(smooth) => set("smooth", smooth)}
-				label="Smooth curves"
-			/>
+			<div class="field flow">
+				<span class="sublabel">Line type</span>
+				<PreviewSelect
+					label="Line type"
+					wide
+					value={shown.curve}
+					onChange={(curve) => set("curve", curve)}
+					options={LINE_CURVES.map((curve) => ({
+						value: curve,
+						label: CURVE_LABEL[curve],
+						preview: (
+							<CurvePreview
+								curve={curve}
+								width={shown.width}
+								opacity={shown.opacity}
+								color={props.color}
+							/>
+						),
+					}))}
+				/>
+			</div>
 			{area && (
 				<>
 					<span class="sublabel">

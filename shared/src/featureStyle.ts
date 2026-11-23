@@ -5,8 +5,10 @@ import {
 	DEFAULT_LINE_WIDTH,
 	type FeatureStyle,
 	type LINE_DASHES,
+	type LineCurve,
 	mergeStyle,
 } from "./features";
+import type { CurveKind } from "./spline";
 
 export type ResolvedStyle = {
 	dash: (typeof LINE_DASHES)[number];
@@ -14,7 +16,7 @@ export type ResolvedStyle = {
 	opacity: number;
 	fill: (typeof AREA_FILLS)[number];
 	fillOpacity: number;
-	smooth: boolean;
+	curve: LineCurve;
 };
 
 /**
@@ -33,9 +35,13 @@ export function resolveStyle(
 		opacity: s.opacity ?? 1,
 		fill: s.fill ?? "solid",
 		fillOpacity: s.fillOpacity ?? DEFAULT_FILL_OPACITY,
-		smooth: s.smooth ?? false,
+		curve: s.curve ?? "straight",
 	};
 }
+
+/** The curve a line in this style is drawn as, or null when it is straight. */
+export const curveOf = (style: ResolvedStyle): CurveKind | null =>
+	style.curve === "straight" ? null : style.curve;
 
 /** Canvas dash lengths (screen px) for a line of the given width; dots need round caps. */
 export function dashPattern(

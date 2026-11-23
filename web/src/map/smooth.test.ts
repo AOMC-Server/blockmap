@@ -35,6 +35,8 @@ const fork: Pt[][] = [
 	],
 ];
 
+const CURVES = ["curved", "smooth"] as const;
+
 describe("chainsOf", () => {
 	test("a plain path is one chain, in order", () => {
 		expect(chainsOf([bend])).toEqual([{ points: bend, closed: false }]);
@@ -98,9 +100,9 @@ describe("chainsOf", () => {
 	});
 });
 
-describe("smoothShape", () => {
+describe.each(CURVES)("smoothShape, %s", (kind) => {
 	test("the curve goes through every point", () => {
-		const { strokes } = smoothShape("line", [bend]);
+		const { strokes } = smoothShape("line", [bend], kind);
 		expect(strokes).toHaveLength(1);
 		const through = [
 			strokes[0]?.start,
@@ -115,25 +117,29 @@ describe("smoothShape", () => {
 	});
 
 	test("two points stay a straight line", () => {
-		const { strokes } = smoothShape("line", [
+		const { strokes } = smoothShape(
+			"line",
 			[
-				[0, 0],
-				[90, 30],
+				[
+					[0, 0],
+					[90, 30],
+				],
 			],
-		]);
+			kind,
+		);
 		for (const [x, z] of strokes[0]?.samples ?? [])
 			expect(Math.abs(z - x / 3)).toBeLessThan(1e-9);
 	});
 
 	test("a curve is longer than the straight lines through its points, but not by much", () => {
-		const curved = smoothShape("line", [bend]).strokes[0]?.samples ?? [];
+		const curved = smoothShape("line", [bend], kind).strokes[0]?.samples ?? [];
 		const straight = polylineLength(bend);
 		expect(polylineLength(curved)).toBeGreaterThan(straight - 1e-9);
 		expect(polylineLength(curved)).toBeLessThan(straight * 1.2);
 	});
 
 	test("an area is a closed curve with a rounded corner, smaller than its square", () => {
-		const { strokes } = smoothShape("polygon", [square]);
+		const { strokes } = smoothShape("polygon", [square], kind);
 		const stroke = strokes[0];
 		expect(stroke?.closed).toBe(true);
 		const samples = stroke?.samples ?? [];
@@ -146,7 +152,7 @@ describe("smoothShape", () => {
 	});
 
 	test("a closed curve has no corner where it starts", () => {
-		const stroke = smoothShape("polygon", [square]).strokes[0];
+		const stroke = smoothShape("polygon", [square], kind).strokes[0];
 		const first = stroke?.beziers[0] as Bezier;
 		const last = stroke?.beziers.at(-1) as Bezier;
 		const start = stroke?.start as Pt;
@@ -160,11 +166,11 @@ describe("smoothShape", () => {
 	});
 
 	test("a fork is a corner: each branch is its own curve", () => {
-		expect(smoothShape("line", fork).strokes).toHaveLength(3);
+		expect(smoothShape("line", fork, kind).strokes).toHaveLength(3);
 	});
 
 	test("the bounds hold the whole curve", () => {
-		const { bounds, strokes } = smoothShape("line", [bend]);
+		const { bounds, strokes } = smoothShape("line", [bend], kind);
 		for (const [x, z] of strokes.flatMap((s) => s.samples)) {
 			expect(x).toBeGreaterThanOrEqual(bounds.minX);
 			expect(x).toBeLessThanOrEqual(bounds.maxX);
@@ -174,14 +180,18 @@ describe("smoothShape", () => {
 	});
 
 	test("repeated points do not break it", () => {
-		const { strokes } = smoothShape("polygon", [
+		const { strokes } = smoothShape(
+			"polygon",
 			[
-				[0, 0],
-				[0, 0],
-				[100, 0],
-				[100, 100],
+				[
+					[0, 0],
+					[0, 0],
+					[100, 0],
+					[100, 100],
+				],
 			],
-		]);
+			kind,
+		);
 		for (const [x, z] of strokes[0]?.samples ?? []) {
 			expect(Number.isFinite(x)).toBe(true);
 			expect(Number.isFinite(z)).toBe(true);
@@ -189,14 +199,14 @@ describe("smoothShape", () => {
 	});
 });
 
-describe("segmentMids", () => {
+describe.each(CURVES)("segmentMids, %s", (kind) => {
 	const g: Pt[] = [
 		[0, 0],
 		[300, 0],
 		[300, 300],
 		[600, 300],
 	];
-	const mids = segmentMids(smoothShape("line", [g]));
+	const mids = segmentMids(smoothShape("line", [g], kind));
 
 	test("has the middle of the curve of every segment, whichever way round it is asked", () => {
 		expect(mids.size).toBe(3);
@@ -208,7 +218,9 @@ describe("segmentMids", () => {
 	test("is on the curve, off the straight segment where the line bends", () => {
 		const mid = mids.get(segmentKey(g[0] as Pt, g[1] as Pt)) as Pt;
 		expect(Math.abs(mid[1])).toBeGreaterThan(10);
-		const samples = smoothShape("line", [g]).strokes.flatMap((s) => s.samples);
+		const samples = smoothShape("line", [g], kind).strokes.flatMap(
+			(s) => s.samples,
+		);
 		const nearest = Math.min(
 			...samples.map((p) => Math.hypot(p[0] - mid[0], p[1] - mid[1])),
 		);
@@ -216,22 +228,44 @@ describe("segmentMids", () => {
 	});
 
 	test("of a straight line is the middle of it", () => {
-		const straight = smoothShape("line", [
+		const straight = smoothShape(
+			"line",
 			[
-				[0, 0],
-				[100, 40],
+				[
+					[0, 0],
+					[100, 40],
+				],
 			],
-		]);
+			kind,
+		);
 		const [mid] = [...segmentMids(straight).values()];
 		expect(mid?.[0]).toBeCloseTo(50);
 		expect(mid?.[1]).toBeCloseTo(20);
 	});
 
 	test("of a closed curve includes the segment that closes it", () => {
-		const ring = smoothShape("polygon", [square]);
+		const ring = smoothShape("polygon", [square], kind);
 		expect(segmentMids(ring).size).toBe(4);
 		expect(
 			segmentMids(ring).has(segmentKey(square[3] as Pt, square[0] as Pt)),
 		).toBe(true);
+	});
+});
+
+describe("the kinds of curve", () => {
+	test("curved and smooth go through the same points but differ between them", () => {
+		const zigzag: Pt[] = [
+			[0, 0],
+			[40, 30],
+			[60, -10],
+			[150, 20],
+			[160, 0],
+		];
+		const curved = smoothShape("line", [zigzag], "curved").strokes[0];
+		const smooth = smoothShape("line", [zigzag], "smooth").strokes[0];
+		expect(curved?.beziers.map((b) => b[2])).toEqual(
+			smooth?.beziers.map((b) => b[2]) ?? [],
+		);
+		expect(curved?.beziers).not.toEqual(smooth?.beziers ?? []);
 	});
 });

@@ -128,7 +128,9 @@ describe("buildOverlay", () => {
 					buildOverlay([layer([line(corner, style)])], VIEW, SIZE) as string
 				).match(/L/g) ?? []
 			).length;
-		expect(count({ smooth: true })).toBeGreaterThan(count(null) * 5);
+		expect(count({ curve: "curved" })).toBeGreaterThan(count(null) * 5);
+		expect(count({ curve: "smooth" })).toBeGreaterThan(count(null) * 5);
+		expect(count({ smooth: true })).toBe(count({ curve: "curved" }));
 	});
 
 	test("pins use the icon when there is one, a dot when not", () => {

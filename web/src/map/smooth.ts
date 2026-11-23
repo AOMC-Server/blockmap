@@ -1,4 +1,5 @@
 import type { Point } from "@blockmap/shared/features";
+import { type CurveKind, curveBeziers } from "@blockmap/shared/spline";
 import { graphFromPaths } from "../tools/lineGraph";
 import { type Bounds, boundsOf, type Pt } from "./geometry";
 
@@ -18,8 +19,6 @@ export type Stroke = {
 
 export type SmoothShape = { strokes: Stroke[]; bounds: Bounds };
 
-/** Knot spacing exponent of the centripetal Catmull-Rom curve: no overshoot, no loops at sharp turns. */
-const ALPHA = 0.5;
 const MIN_STEPS = 6;
 const MAX_STEPS = 48;
 /** About this many blocks per straight piece when a curve is sampled. */
@@ -83,54 +82,6 @@ export function chainsOf(
 	return out;
 }
 
-/** The pieces of the Catmull-Rom curve through `pts`, as cubic Béziers. */
-function toBeziers(pts: readonly Pt[], closed: boolean): Bezier[] {
-	const n = pts.length;
-	const at = (i: number): Pt => {
-		if (closed) return pts[((i % n) + n) % n] as Pt;
-		if (i < 0) {
-			const [a, b] = [pts[0] as Pt, pts[1] as Pt];
-			return [2 * a[0] - b[0], 2 * a[1] - b[1]];
-		}
-		if (i >= n) {
-			const [a, b] = [pts[n - 1] as Pt, pts[n - 2] as Pt];
-			return [2 * a[0] - b[0], 2 * a[1] - b[1]];
-		}
-		return pts[i] as Pt;
-	};
-	const knot = (a: Pt, b: Pt) => Math.max(dist(a, b) ** ALPHA, 1e-3);
-	const out: Bezier[] = [];
-	const count = closed ? n : n - 1;
-	for (let i = 0; i < count; i++) {
-		const p0 = at(i - 1);
-		const p1 = at(i);
-		const p2 = at(i + 1);
-		const p3 = at(i + 2);
-		const d1 = knot(p0, p1);
-		const d2 = knot(p1, p2);
-		const d3 = knot(p2, p3);
-		const tangent = (k: 0 | 1) => {
-			const t1 =
-				(p1[k] - p0[k]) / d1 -
-				(p2[k] - p0[k]) / (d1 + d2) +
-				(p2[k] - p1[k]) / d2;
-			const t2 =
-				(p2[k] - p1[k]) / d2 -
-				(p3[k] - p1[k]) / (d2 + d3) +
-				(p3[k] - p2[k]) / d3;
-			return [d2 * t1, d2 * t2] as const;
-		};
-		const [x1, x2] = tangent(0);
-		const [z1, z2] = tangent(1);
-		out.push([
-			[p1[0] + x1 / 3, p1[1] + z1 / 3],
-			[p2[0] - x2 / 3, p2[1] - z2 / 3],
-			p2,
-		]);
-	}
-	return out;
-}
-
 function sample(
 	start: Pt,
 	beziers: Bezier[],
@@ -165,24 +116,29 @@ function sample(
 	return { samples: out, ends };
 }
 
-function strokeOf(points: readonly Pt[], closed: boolean): Stroke {
+function strokeOf(
+	points: readonly Pt[],
+	closed: boolean,
+	curve: CurveKind,
+): Stroke {
 	const start = points[0] as Pt;
-	const beziers = toBeziers(points, closed);
+	const beziers: Bezier[] = curveBeziers(points, closed, curve);
 	return { start, beziers, closed, ...sample(start, beziers) };
 }
 
 /**
  * The smooth version of a line (its paths, which may branch and loop) or of an area (its one
- * outline, closed). The curves go through every point.
+ * outline, closed), as the given kind of curve. The curves go through every point.
  */
 export function smoothShape(
 	kind: "line" | "polygon",
 	paths: readonly (readonly Pt[])[],
+	curve: CurveKind,
 ): SmoothShape {
 	const strokes: Stroke[] =
 		kind === "polygon"
-			? [strokeOf(paths[0] ?? [], true)]
-			: chainsOf(paths).map((c) => strokeOf(c.points, c.closed));
+			? [strokeOf(paths[0] ?? [], true, curve)]
+			: chainsOf(paths).map((c) => strokeOf(c.points, c.closed, curve));
 	const all = strokes.flatMap((s) => s.samples);
 	return { strokes, bounds: boundsOf(all) };
 }

@@ -1,5 +1,6 @@
 import { DYE_HEX, type Dye } from "@blockmap/shared/colors";
 import {
+	curveOf,
 	dashPattern,
 	emphasisedWidth,
 	hitTolerance,
@@ -110,15 +111,15 @@ type DrawnCluster = {
 function prepare(feature: RenderFeature, layer: RenderLayer): Prepared {
 	const paths = pathsOf(feature);
 	const points = paths.flat();
-	const smooth =
-		feature.type !== "pin" &&
-		resolveStyle(feature.style, feature.type === "polygon", layer.style).smooth
-			? smoothShape(feature.type, paths)
-			: null;
 	const style =
 		feature.type === "pin"
 			? null
 			: resolveStyle(feature.style, feature.type === "polygon", layer.style);
+	const curve = style && curveOf(style);
+	const smooth =
+		feature.type !== "pin" && curve
+			? smoothShape(feature.type, paths, curve)
+			: null;
 	return {
 		feature,
 		layer,

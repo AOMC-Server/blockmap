@@ -467,7 +467,11 @@ describe("the cursor", () => {
 
 describe("the smooth preview while drawing", () => {
 	const look = (smooth: boolean) => {
-		draftLook.value = { color: null, style: null, smooth };
+		draftLook.value = {
+			color: null,
+			style: null,
+			curve: smooth ? "smooth" : null,
+		};
 	};
 	const move = (sx: number, sy: number) => emit("move", { sx, sy });
 	afterAll(() => {
@@ -675,7 +679,7 @@ describe("the + handle of a smooth line", () => {
 	const straightMid = [150, 0] as const;
 
 	test("sits on the curve instead of the middle of the segment", () => {
-		draftLook.value = { color: null, style: null, smooth: true };
+		draftLook.value = { color: null, style: null, curve: "curved" };
 		startDraw("line", [bend], () => {});
 		expect(drawCursor(map, onCurve[0] + 0.5, onCurve[1] + 0.5)).toBe("copy");
 		expect(drawCursor(map, straightMid[0] + 0.5, straightMid[1] + 0.5)).toBe(
@@ -684,7 +688,7 @@ describe("the + handle of a smooth line", () => {
 	});
 
 	test("pulls out a new point from where it is on the curve", () => {
-		draftLook.value = { color: null, style: null, smooth: true };
+		draftLook.value = { color: null, style: null, curve: "curved" };
 		startDraw("line", [bend], () => {});
 		const drag = grabDrawPoint(map, onCurve[0] + 0.5, onCurve[1] + 0.5);
 		expect(drag).not.toBeNull();
@@ -694,7 +698,7 @@ describe("the + handle of a smooth line", () => {
 	});
 
 	test("stays in the middle of the segment when the line is not smooth", () => {
-		draftLook.value = { color: null, style: null, smooth: false };
+		draftLook.value = { color: null, style: null, curve: null };
 		startDraw("line", [bend], () => {});
 		expect(drawCursor(map, straightMid[0] + 0.5, straightMid[1] + 0.5)).toBe(
 			"copy",
@@ -705,7 +709,7 @@ describe("the + handle of a smooth line", () => {
 	});
 
 	test("is on the curve of an area too", () => {
-		draftLook.value = { color: null, style: null, smooth: true };
+		draftLook.value = { color: null, style: null, curve: "curved" };
 		startDraw(
 			"polygon",
 			[
@@ -718,14 +722,18 @@ describe("the + handle of a smooth line", () => {
 			],
 			() => {},
 		);
-		const ring = smoothShape("polygon", [
+		const ring = smoothShape(
+			"polygon",
 			[
-				[0, 0],
-				[300, 0],
-				[300, 300],
-				[0, 300],
+				[
+					[0, 0],
+					[300, 0],
+					[300, 300],
+					[0, 300],
+				],
 			],
-		]);
+			"curved",
+		);
 		const [mid] = [...segmentMids(ring).values()] as [Pt];
 		expect(drawCursor(map, mid[0] + 0.5, mid[1] + 0.5)).toBe("copy");
 	});

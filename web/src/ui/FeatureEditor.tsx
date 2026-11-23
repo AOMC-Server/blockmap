@@ -1,6 +1,6 @@
 import { Panel } from "@aomc-server/block-ui";
 import type { Dye } from "@blockmap/shared/colors";
-import { resolveStyle } from "@blockmap/shared/featureStyle";
+import { curveOf, resolveStyle } from "@blockmap/shared/featureStyle";
 import {
 	cleanStyle,
 	type FeatureInput,
@@ -125,9 +125,10 @@ export function FeatureEditor() {
 		draftLook.value = {
 			color,
 			style: own,
-			smooth:
-				type !== "pin" &&
-				resolveStyle(own, type === "polygon", dest?.style).smooth,
+			curve:
+				type === "pin"
+					? null
+					: curveOf(resolveStyle(own, type === "polygon", dest?.style)),
 		};
 		return () => {
 			draftLook.value = null;

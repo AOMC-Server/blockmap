@@ -7,13 +7,18 @@ import {
 	type FeatureStyle,
 	type Point,
 } from "@blockmap/shared";
-import { dashPattern, resolveStyle } from "@blockmap/shared/featureStyle";
+import {
+	curveOf,
+	dashPattern,
+	resolveStyle,
+} from "@blockmap/shared/featureStyle";
 import { linePaths } from "@blockmap/shared/features";
 import {
 	fillPatternMarkup,
 	PATTERN_SIZE,
 	type PatternFill,
 } from "@blockmap/shared/fillPattern";
+import { type CurveKind, curveBeziers } from "@blockmap/shared/spline";
 import { blockToScreen, type Size, type View } from "@blockmap/shared/view";
 import { and, eq } from "drizzle-orm";
 import type { Db } from "./db/client";
@@ -167,10 +172,8 @@ function clipPolygon(points: Pt[], r: [number, number, number, number]): Pt[] {
 	return poly;
 }
 
-const knot = (a: Pt, b: Pt) => Math.hypot(b[0] - a[0], b[1] - a[1]) ** 0.5;
-
-/** A centripetal Catmull-Rom curve through the points, as short straight pieces. */
-function smoothen(points: Pt[], closed: boolean): Pt[] {
+/** The curve of the given kind through the points, as the map draws it, in short straight pieces. */
+function smoothen(points: Pt[], closed: boolean, curve: CurveKind): Pt[] {
 	const pts = points.filter(
 		(p, i) =>
 			i === 0 ||
@@ -182,48 +185,30 @@ function smoothen(points: Pt[], closed: boolean): Pt[] {
 		const b = pts[pts.length - 1] as Pt;
 		if (a[0] === b[0] && a[1] === b[1]) pts.pop();
 	}
-	const n = pts.length;
-	if (n < 3) return points;
-	const at = (i: number): Pt =>
-		closed
-			? (pts[((i % n) + n) % n] as Pt)
-			: i < 0
-				? [
-						2 * (pts[0] as Pt)[0] - (pts[1] as Pt)[0],
-						2 * (pts[0] as Pt)[1] - (pts[1] as Pt)[1],
-					]
-				: i >= n
-					? [
-							2 * (pts[n - 1] as Pt)[0] - (pts[n - 2] as Pt)[0],
-							2 * (pts[n - 1] as Pt)[1] - (pts[n - 2] as Pt)[1],
-						]
-					: (pts[i] as Pt);
-	const out: Pt[] = [pts[0] as Pt];
-	const segments = closed ? n : n - 1;
-	for (let i = 0; i < segments; i++) {
-		const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
-		const t0 = 0;
-		const t1 = t0 + knot(p0, p1);
-		const t2 = t1 + knot(p1, p2);
-		const t3 = t2 + knot(p2, p3);
+	if (pts.length < 3) return points;
+	let from = pts[0] as Pt;
+	const out: Pt[] = [from];
+	for (const [c1, c2, end] of curveBeziers(pts, closed, curve)) {
 		const steps = Math.min(
 			32,
-			Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 6)),
+			Math.max(
+				2,
+				Math.ceil(Math.hypot(end[0] - from[0], end[1] - from[1]) / 6),
+			),
 		);
-		const mix = (a: Pt, b: Pt, ta: number, tb: number, t: number): Pt =>
-			tb === ta
-				? a
-				: [
-						((tb - t) / (tb - ta)) * a[0] + ((t - ta) / (tb - ta)) * b[0],
-						((tb - t) / (tb - ta)) * a[1] + ((t - ta) / (tb - ta)) * b[1],
-					];
 		for (let s = 1; s <= steps; s++) {
-			const t = t1 + ((t2 - t1) * s) / steps;
-			const a1 = mix(p0, p1, t0, t1, t);
-			const a2 = mix(p1, p2, t1, t2, t);
-			const a3 = mix(p2, p3, t2, t3, t);
-			out.push(mix(mix(a1, a2, t0, t2, t), mix(a2, a3, t1, t3, t), t1, t3, t));
+			const t = s / steps;
+			const u = 1 - t;
+			const a = u * u * u;
+			const b = 3 * u * u * t;
+			const c = 3 * u * t * t;
+			const d = t * t * t;
+			out.push([
+				a * from[0] + b * c1[0] + c * c2[0] + d * end[0],
+				a * from[1] + b * c1[1] + c * c2[1] + d * end[1],
+			]);
 		}
+		from = end;
 	}
 	return out;
 }
@@ -311,6 +296,7 @@ export function buildOverlay(
 
 			const closed = feature.type === "polygon";
 			const style = resolveStyle(feature.style, closed, layer.style);
+			const kind = curveOf(style);
 			const paths: Pt[][] = (
 				closed
 					? [feature.geometry as Point[]]
@@ -320,7 +306,7 @@ export function buildOverlay(
 
 			let pieces: Pt[][] = [];
 			for (const path of paths) {
-				const curve = style.smooth ? smoothen(path, closed) : path;
+				const curve = kind ? smoothen(path, closed, kind) : path;
 				if (closed) {
 					const cut = clipPolygon(curve, clip);
 					if (cut.length >= 3) pieces.push(cut);
@@ -330,8 +316,8 @@ export function buildOverlay(
 						(path[0] as Pt)[1] === (path[path.length - 1] as Pt)[1];
 					pieces.push(
 						...clipLine(
-							style.smooth && loop
-								? smoothen(path, true).concat([path[0] as Pt])
+							kind && loop
+								? smoothen(path, true, kind).concat([path[0] as Pt])
 								: curve,
 							clip,
 						),

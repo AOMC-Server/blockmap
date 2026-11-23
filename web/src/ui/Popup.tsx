@@ -1,5 +1,5 @@
 import { copyText, PopupText } from "@aomc-server/block-ui";
-import { resolveStyle } from "@blockmap/shared/featureStyle";
+import { curveOf, resolveStyle } from "@blockmap/shared/featureStyle";
 import { mapView } from "../controller";
 import { featureStats, featureTitle, TYPE_LABEL } from "../featureInfo";
 import { deleteFeature } from "../layers";
@@ -34,7 +34,9 @@ export function Popup() {
 	const spot = p.at;
 	const stats = featureStats(
 		feature,
-		resolveStyle(feature.style, feature.type === "polygon", layer.style).smooth,
+		curveOf(
+			resolveStyle(feature.style, feature.type === "polygon", layer.style),
+		),
 	);
 
 	return (

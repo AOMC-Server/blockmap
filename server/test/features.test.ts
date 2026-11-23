@@ -271,6 +271,21 @@ describe("feature validation", () => {
 		],
 		[
 			"smooth line",
+			{ type: "line", name: "x", geometry: line, style: { curve: "smooth" } },
+			true,
+		],
+		[
+			"curved line",
+			{ type: "line", name: "x", geometry: line, style: { curve: "curved" } },
+			true,
+		],
+		[
+			"line with an unknown curve",
+			{ type: "line", name: "x", geometry: line, style: { curve: "wavy" } },
+			false,
+		],
+		[
+			"old smooth switch",
 			{ type: "line", name: "x", geometry: line, style: { smooth: true } },
 			true,
 		],
@@ -1615,7 +1630,12 @@ describe("feature style", () => {
 describe("layer default style", () => {
 	test("is set on creation, changed, cleared and validated", async () => {
 		const t = await bootTiles();
-		const style = { dash: "dotted", width: 4, fill: "stripes", smooth: true };
+		const style = {
+			dash: "dotted",
+			width: 4,
+			fill: "stripes",
+			curve: "smooth",
+		};
 		const layer = await makeLayer(t, t.editor, { style });
 		const first = (await call(t, null, "GET", "/api/layers")).body.layers[0];
 		expect(first.style).toEqual(style);

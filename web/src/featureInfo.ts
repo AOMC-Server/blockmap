@@ -1,9 +1,11 @@
 import {
 	type FeatureType,
+	type LineCurve,
 	type LineGeometry,
 	linePaths,
 	type Point,
 } from "@blockmap/shared/features";
+import type { CurveKind } from "@blockmap/shared/spline";
 
 import { polylineArea, polylineLength, smoothShape } from "./map/smooth";
 import { graphFromPaths, lineLength } from "./tools/lineGraph";
@@ -47,34 +49,34 @@ export type FeatureStats = {
 
 const statsCache = new WeakMap<
 	object,
-	{ straight?: FeatureStats; smooth?: FeatureStats }
+	Partial<Record<LineCurve, FeatureStats>>
 >();
 
 /**
- * Length of a line, or perimeter and area of an area; nothing for a pin. `smooth`: measured
- * along the curve the feature is drawn as. Cached per feature.
+ * Length of a line, or perimeter and area of an area; nothing for a pin. `curve`: the curve the
+ * feature is drawn as, which it is measured along (null when straight). Cached per feature.
  */
 export function featureStats(
 	f: { type: FeatureType; geometry: unknown },
-	smooth = false,
+	curve: CurveKind | null = null,
 ): FeatureStats {
-	const key = smooth ? "smooth" : "straight";
+	const key = curve ?? "straight";
 	const cached = statsCache.get(f)?.[key];
 	if (cached) return cached;
 	let out: FeatureStats = {};
 	if (f.type === "line") {
 		out = {
-			length: smooth
-				? smoothShape("line", pathsOf(f)).strokes.reduce(
+			length: curve
+				? smoothShape("line", pathsOf(f), curve).strokes.reduce(
 						(sum, s) => sum + polylineLength(s.samples),
 						0,
 					)
 				: lineLength(graphFromPaths(pathsOf(f))),
 		};
 	} else if (f.type === "polygon") {
-		if (smooth) {
+		if (curve) {
 			const samples =
-				smoothShape("polygon", pathsOf(f)).strokes[0]?.samples ?? [];
+				smoothShape("polygon", pathsOf(f), curve).strokes[0]?.samples ?? [];
 			out = {
 				perimeter: polylineLength(samples),
 				area: polylineArea(samples),

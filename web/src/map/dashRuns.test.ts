@@ -49,7 +49,7 @@ describe("dashRuns", () => {
 	});
 
 	test("a smooth area is measured along its curve", () => {
-		const smooth = smoothShape("polygon", [square]);
+		const smooth = smoothShape("polygon", [square], "smooth");
 		const [run] = dashRuns("polygon", [square], smooth);
 		expect(run?.closed).toBe(true);
 		expect(run?.pieces).toHaveLength(4);

@@ -320,16 +320,18 @@ describe("FeatureLayer styles", () => {
 		const straight = new FeatureLayer(() => {});
 		straight.setFeatures([layerOf(bend)]);
 		const curvy = new FeatureLayer(() => {});
-		curvy.setFeatures([layerOf({ ...bend, style: { smooth: true } })]);
+		curvy.setFeatures([layerOf({ ...bend, style: { curve: "smooth" } })]);
 		// Both go through every point.
 		for (const l of [straight, curvy]) {
 			expect(name(l.hitTest(v, size, 500.5, 350.5))).toBe("Bend");
 			expect(name(l.hitTest(v, size, 500.5, 750.5))).toBe("Bend");
 		}
 		// The point of the curve that is furthest from the straight segments.
-		const samples = smoothShape("line", [
-			geometry as unknown as Pt[],
-		]).strokes.flatMap((st) => st.samples);
+		const samples = smoothShape(
+			"line",
+			[geometry as unknown as Pt[]],
+			"smooth",
+		).strokes.flatMap((st) => st.samples);
 		const off = (p: Pt) =>
 			distToPolyline(p[0], p[1], geometry as unknown as Pt[], false);
 		const far = samples.reduce((best, p) => (off(p) > off(best) ? p : best));
@@ -342,7 +344,7 @@ describe("FeatureLayer styles", () => {
 
 	test("a smoothed area is hit inside its curve", () => {
 		const l = new FeatureLayer(() => {});
-		l.setFeatures([layerOf(area({ smooth: true }))]);
+		l.setFeatures([layerOf(area({ curve: "smooth" }))]);
 		expect(name(l.hitTest(v, size, 500, 350))).toBe("Area");
 		expect(l.hitTest(v, size, 900, 700)).toBeNull();
 	});

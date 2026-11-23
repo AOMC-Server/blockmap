@@ -61,7 +61,7 @@ describe("featureStats", () => {
 		];
 		const straight = featureStats({ type: "line", geometry: bend }).length ?? 0;
 		const curved =
-			featureStats({ type: "line", geometry: bend }, true).length ?? 0;
+			featureStats({ type: "line", geometry: bend }, "smooth").length ?? 0;
 		expect(straight).toBe(200);
 		// A curve through the same points cuts the corner... or bulges; either way it is not 200.
 		expect(Math.abs(curved - straight)).toBeGreaterThan(0.5);
@@ -76,12 +76,12 @@ describe("featureStats", () => {
 			],
 		};
 		const plain = featureStats(square);
-		const round = featureStats(square, true);
+		const round = featureStats(square, "smooth");
 		expect(plain.perimeter).toBe(400);
 		expect(round.perimeter).toBeGreaterThan(400);
 		expect(round.area).toBeGreaterThan(10_000);
 		// Both are kept, one does not replace the other.
 		expect(featureStats(square)).toBe(plain);
-		expect(featureStats(square, true)).toBe(round);
+		expect(featureStats(square, "smooth")).toBe(round);
 	});
 });

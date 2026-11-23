@@ -1,4 +1,5 @@
 import type { FeatureType, Point } from "@blockmap/shared/features";
+import type { CurveKind } from "@blockmap/shared/spline";
 import { computed, signal } from "@preact/signals";
 import {
 	type DragSession,
@@ -152,8 +153,8 @@ export type ShapeOptions = {
 	pointerAims?: () => boolean;
 	/** Esc on a shape that is only being looked at clears it, instead of leaving it. */
 	escapeClears?: boolean;
-	/** The shape is shown as a smooth curve through its points. */
-	smooth?: () => boolean;
+	/** The shape is shown as this kind of curve through its points; null or absent when straight. */
+	curve?: () => CurveKind | null;
 	/**
 	 * The map draws the shape itself (as a feature in its real style, with a highlighted outline),
 	 * so the overlay only adds the points, the handles and the segment to the pointer.
@@ -196,7 +197,7 @@ function midHandle(
 	const sa = center(map, a);
 	const sb = center(map, b);
 	if (Math.hypot(sb.x - sa.x, sb.y - sa.y) < MIN_MID_SEGMENT_PX) return null;
-	// On a smooth line the "+" sits on the curve, not on the straight segment.
+	// On a curved line the "+" sits on the curve, not on the straight segment.
 	const onCurve = curveMid?.(a, b);
 	return onCurve
 		? center(map, onCurve)
@@ -293,7 +294,7 @@ export function createShapeEditor(opts: ShapeOptions) {
 	});
 
 	/**
-	 * While smoothing is on: the shape as the map draws it, with the segment a click at the
+	 * While the line is a curve: the shape as the map draws it, with the segment a click at the
 	 * pointer would add already part of it (it bends the curve before it), and that segment's two
 	 * ends, `edge`, so that it can be dashed as not placed yet.
 	 */
@@ -303,14 +304,15 @@ export function createShapeEditor(opts: ShapeOptions) {
 		edge: [Point, Point] | null;
 	} | null>(() => {
 		const d = state.value;
-		if (!d || d.type === "pin" || !opts.smooth?.()) return null;
+		const kind = opts.curve?.() ?? null;
+		if (!d || d.type === "pin" || !kind) return null;
 		if (d.type === "line") {
 			const aim = aimed.value;
 			if (!aim || aim.edges.length === 0) return null;
 			const paths = pathsFromGraph(aim);
 			const e = aim.preview ? aim.edges.at(-1) : undefined;
 			return {
-				shape: smoothShape("line", paths),
+				shape: smoothShape("line", paths, kind),
 				draft: { type: "line", geometry: lineGeometry(paths) },
 				edge: e ? [aim.points[e[0]] as Point, aim.points[e[1]] as Point] : null,
 			};
@@ -318,7 +320,7 @@ export function createShapeEditor(opts: ShapeOptions) {
 		if (d.mode === "placed")
 			return d.points.length >= 3
 				? {
-						shape: smoothShape("polygon", [d.points]),
+						shape: smoothShape("polygon", [d.points], kind),
 						draft: { type: "polygon", geometry: d.points },
 						edge: null,
 					}
@@ -333,13 +335,13 @@ export function createShapeEditor(opts: ShapeOptions) {
 		const edge: [Point, Point] | null = cursor && last ? [last, cursor] : null;
 		if (through.length >= 3)
 			return {
-				shape: smoothShape("polygon", [through]),
+				shape: smoothShape("polygon", [through], kind),
 				draft: { type: "polygon", geometry: through },
 				edge,
 			};
 		if (through.length === 2)
 			return {
-				shape: smoothShape("line", [through]),
+				shape: smoothShape("line", [through], kind),
 				draft: { type: "line", geometry: through },
 				edge,
 			};
@@ -352,7 +354,7 @@ export function createShapeEditor(opts: ShapeOptions) {
 		return d ? (curve.value?.draft ?? draftOf(d)) : null;
 	});
 
-	/** Where the curve the map draws is in the middle of each segment, while smoothing is on. */
+	/** Where the curve the map draws is in the middle of each segment, while the line is a curve. */
 	const mids = computed<Map<string, readonly [number, number]> | null>(() =>
 		curve.value ? segmentMids(curve.value.shape) : null,
 	);
