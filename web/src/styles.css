@@ -33,6 +33,40 @@ body,
 	overscroll-behavior: none;
 }
 
+/*
+ * The standalone pages (/settings, /manage, /stats, …) scroll the document itself rather than a
+ * box inside a fixed layer, so the browser's own tools work: full-page screenshots, scroll
+ * restoration, Space and Page Down. The title bar stays at the top while scrolling.
+ */
+:root:has(.page-root:not(.embedded, .invite-page)),
+:root:has(.page-root:not(.embedded, .invite-page)) body,
+:root:has(.page-root:not(.embedded, .invite-page)) #app {
+	height: auto;
+	min-height: 100%;
+	overflow: visible;
+}
+
+.page-root:not(.embedded, .invite-page) {
+	position: relative;
+	inset: auto;
+	min-height: 100dvh;
+	background-attachment: fixed;
+}
+
+.page-root:not(.embedded, .invite-page) > .page-head {
+	position: sticky;
+	top: 0;
+}
+
+.page-root:not(.embedded, .invite-page) > .page {
+	overflow: visible;
+}
+
+/* A section jumped to (such as /settings#your-data) lands below the title bar. */
+.page-root:not(.embedded, .invite-page) [id] {
+	scroll-margin-top: 72px;
+}
+
 img.banner,
 .block-icon {
 	image-rendering: pixelated;
