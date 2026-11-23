@@ -389,10 +389,14 @@ export function StatsPage() {
 				/>
 			)}
 
-			<Tabs center tabs={STAT_TABS} value={tab} onChange={setPicked} />
-
 			<section class={section}>
-				<h2>{tab === "me" ? "Your stats" : "Global stats"}</h2>
+				<Tabs
+					center
+					label="Whose stats"
+					tabs={STAT_TABS}
+					value={tab}
+					onChange={setPicked}
+				/>
 				{!data ? (
 					<Loading />
 				) : tab === "global" ? (
