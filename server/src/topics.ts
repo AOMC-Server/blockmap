@@ -4,7 +4,8 @@ import { z } from "zod";
 import type { Db } from "./db/client";
 import { dimensions, mapInfo, revisions as revisionsTable } from "./db/schema";
 import type { Events, Family, MapEvent, RevisionEvent } from "./events";
-import { erasing, queueState, waiting } from "./jobs/queue";
+import { erasing, type LiveJob, queueState, waiting } from "./jobs/queue";
+import { progressEvent } from "./jobs/report";
 import { canSeeUpload } from "./permissions";
 import type { AppEnv } from "./types";
 
@@ -34,6 +35,25 @@ const nullableInt = z.number().int().nullable();
 const status = <S extends string>(s: S) => z.literal(s);
 const invalidation = z.object({}).strict();
 
+const jobProgress = z
+	.object({
+		step: z.number().int().describe("1-based"),
+		steps: z.number().int(),
+		message: z.string().describe("The step, as a sentence"),
+		done: z.number().int().optional(),
+		total: z.number().int().optional(),
+		unit: z
+			.string()
+			.optional()
+			.describe(
+				'What done and total count: "images", "tiles", "files" or "uploads"',
+			),
+		rate: z.number().optional().describe("Units a second in this step so far"),
+		facts: z.array(z.string()).describe("Facts about the work, as short lines"),
+		startedAt: z.number().int().describe("When the job started (ms)"),
+	})
+	.describe("What a running job is doing");
+
 const revisionMessages = {
 	pending: {
 		summary:
@@ -47,12 +67,13 @@ const revisionMessages = {
 	},
 	processing: {
 		summary:
-			"The job is running; `message`, `done` and `total` tell how far. As the first event, with a `message` that says what it waits for, the upload is waiting for its queued delete to start and is otherwise unchanged.",
+			"The job is running; `message`, `done` and `total` tell how far, and `progress` the detail: the step of how many, the rate and facts about the work. As the first event, with a `message` that says what it waits for, the upload is waiting for its queued delete to start and is otherwise unchanged.",
 		schema: z.object({
 			status: status("processing"),
 			message: z.string().optional(),
 			done: z.number().int().optional(),
 			total: z.number().int().optional(),
+			progress: jobProgress.optional(),
 			rev: nullableInt.optional(),
 			error: z.string().nullable().optional(),
 		}),
@@ -98,7 +119,14 @@ const dimensionExists = (db: Db, id: number | undefined) =>
 		.get() !== undefined;
 
 /** A revision's state right now, as its first event. */
-export function revisionSnapshot(db: Db, id: number): RevisionEvent {
+export function revisionSnapshot(
+	db: Db,
+	id: number,
+	live: LiveJob | null = null,
+): RevisionEvent {
+	// What the running job last said, exactly as it said it, so a refresh resends nothing.
+	if (live?.revisionId === id && live.progress)
+		return progressEvent(live.progress);
 	const current = db
 		.select({
 			status: revisionsTable.status,
@@ -147,7 +175,7 @@ export const topics: { [F in Family]: TopicDef<F> } = {
 				.get();
 			return upload && !canSeeUpload(c.var.user, c.var.role, upload)
 				? null
-				: revisionSnapshot(c.var.db, id as number);
+				: revisionSnapshot(c.var.db, id as number, c.var.svc.worker.live());
 		},
 		refreshOn: ["queue"],
 		terminal: (d) =>
@@ -195,19 +223,23 @@ export const topics: { [F in Family]: TopicDef<F> } = {
 	queue: {
 		title: "Job queue",
 		description:
-			"Uploads, deletions, history rebuilds, image cleanups and dimension deletions run one at a time. `pending` counts the jobs waiting; `running` is the one being run (`revisionId` null for all but uploads and deletions).",
+			"Uploads, deletions, history rebuilds, image cleanups and dimension deletions run one at a time. `pending` counts the jobs waiting; `running` is the one being run (`revisionId` null for all but uploads and deletions), with `progress`: what it is doing, sent again as it goes on (at most a few times a second).",
 		messages: {
 			changed: {
 				summary: "The queue changed.",
 				schema: z.object({
 					pending: z.number().int(),
 					running: z
-						.object({ type: jobType, revisionId: nullableInt })
+						.object({
+							type: jobType,
+							revisionId: nullableInt,
+							progress: jobProgress.nullable(),
+						})
 						.nullable(),
 				}),
 			},
 		},
 		name: () => "changed",
-		snapshot: (c) => queueState(c.var.db),
+		snapshot: (c) => queueState(c.var.db, c.var.svc.worker.live()),
 	},
 };

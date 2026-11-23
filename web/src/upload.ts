@@ -1,4 +1,5 @@
 import { signal } from "@preact/signals";
+import type { JobProgress } from "../../server/src/events";
 import { showNotice } from "./api";
 import { mapView, refreshMap, selectDimension, setRev } from "./controller";
 import { type Bounds, boundsOf } from "./map/geometry";
@@ -16,6 +17,9 @@ export type UploadState =
 			message: string;
 			done?: number;
 			total?: number;
+			/** What the server is doing, once it says; `prefix` names the export when there are several. */
+			progress?: JobProgress;
+			prefix?: string;
 	  }
 	| {
 			phase: "done";
@@ -150,10 +154,9 @@ async function follow(revisionIds: number[], skipped: SkippedFile[]) {
 	const succeeded: number[] = [];
 	let firstError: string | null = null;
 	for (const [i, id] of revisionIds.entries()) {
-		const prefix =
-			revisionIds.length > 1
-				? `Export ${i + 1} of ${revisionIds.length}: `
-				: "";
+		const exportOf =
+			revisionIds.length > 1 ? `Export ${i + 1} of ${revisionIds.length}` : "";
+		const prefix = exportOf && `${exportOf}: `;
 		const outcome = await watchRevision(id, (p) => {
 			uploadState.value = {
 				phase: "processing",
@@ -161,6 +164,8 @@ async function follow(revisionIds: number[], skipped: SkippedFile[]) {
 				message: prefix + (p.message ?? "Processing"),
 				done: p.done,
 				total: p.total,
+				progress: p.progress,
+				prefix: exportOf || undefined,
 			};
 		});
 		if (outcome.status === "failed") {

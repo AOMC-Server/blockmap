@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, count, countDistinct, eq, gt, inArray, sql } from "drizzle-orm";
 import {
 	jobs,
 	mapInfo,
@@ -15,7 +15,7 @@ import {
 	writeRows,
 } from "../tiles/rebuild";
 import { messages } from "./messages";
-import { type ProgressStep, throttled } from "./report";
+import { noProgress } from "./report";
 import { jobRevisionId } from "./target";
 import { type EraseUploadPayload, type JobContext, UserError } from "./types";
 
@@ -33,12 +33,8 @@ export async function eraseUpload(
 	ctx: JobContext,
 	payload: EraseUploadPayload,
 ) {
-	const { db, env, blobs, events } = ctx;
-	const report = throttled((p: ProgressStep) =>
-		events.emit("revision", payload.revisionId, { status: "processing", ...p }),
-	);
-	const say = (message: string, done?: number, total?: number) =>
-		report({ message, done, total });
+	const { db, env, blobs } = ctx;
+	const progress = ctx.progress ?? noProgress;
 
 	const [target] = await db
 		.select()
@@ -61,6 +57,48 @@ export async function eraseUpload(
 		.from(uploadPatches)
 		.where(eq(uploadPatches.revisionId, target.id));
 
+	progress.steps(env.MAX_ZOOM + 2);
+	progress.fact("tiles", messages.facts.tilesTouched(touched.length));
+	// The later uploads on the same tiles are laid over what was under it again.
+	const mine = db
+		.select({ x: uploadPatches.tileX, y: uploadPatches.tileY })
+		.from(uploadPatches)
+		.where(eq(uploadPatches.revisionId, target.id));
+	const newer = db
+		.select({
+			uploads: countDistinct(uploadPatches.revisionId),
+			tiles: countDistinct(
+				sql`${uploadPatches.tileX} || ',' || ${uploadPatches.tileY}`,
+			),
+		})
+		.from(uploadPatches)
+		.innerJoin(revisions, eq(revisions.id, uploadPatches.revisionId))
+		.where(
+			and(
+				eq(revisions.dimensionId, dimId),
+				gt(revisions.seq, seq),
+				sql`(${uploadPatches.tileX}, ${uploadPatches.tileY}) IN ${mine}`,
+			),
+		)
+		.get();
+	progress.fact(
+		"newer",
+		newer && newer.uploads > 0
+			? messages.facts.newerUploads(newer.uploads, newer.tiles)
+			: messages.facts.noNewerUploads,
+	);
+	const later =
+		db
+			.select({ n: count() })
+			.from(revisions)
+			.where(gt(revisions.seq, seq))
+			.get()?.n ?? 0;
+	if (later > 0) progress.fact("later", messages.facts.renumbered(later));
+	progress.step(messages.erase.tiles, {
+		total: touched.length,
+		unit: "tiles",
+	});
+
 	const base = await rebuildBase({
 		blobs,
 		tileSize: T,
@@ -69,7 +107,7 @@ export async function eraseUpload(
 		patchesOf: async (x, y) =>
 			(await tilePatches(db, dimId, x, y, seq)).filter((p) => p.seq !== seq),
 		existing,
-		onProgress: (done, total) => say(messages.erase.tiles, done, total),
+		onProgress: (done) => progress.advance(done),
 	});
 	const rewrites = [
 		...base,
@@ -80,12 +118,17 @@ export async function eraseUpload(
 			concurrency: env.JOB_CONCURRENCY,
 			changed: base,
 			existing,
-			onProgress: (zoom, done, total) =>
-				say(messages.erase.zoom(zoom), done, total),
+			onLevel: (zoom, total) =>
+				progress.step(messages.erase.zoom(zoom), {
+					at: 1 + zoom,
+					total,
+					unit: "tiles",
+				}),
+			onProgress: (_zoom, done) => progress.advance(done),
 		})),
 	];
 
-	say(messages.erase.publishing);
+	progress.step(messages.erase.publishing, { at: env.MAX_ZOOM + 2 });
 	const ids = [target.id];
 	db.transaction((tx) => {
 		writeRows(tx, dimId, seq, rewrites);

@@ -4,6 +4,13 @@ import { effect } from "@preact/signals";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { isolateUpload, mapView, setRev } from "../controller";
 import { subscribe } from "../events";
+import {
+	describeCount,
+	describeStep,
+	type JobProgress,
+	overall,
+	useQueueState,
+} from "../jobs";
 import type { Bounds } from "../map/geometry";
 import { inFlight } from "../revisionLog";
 import { deleting, loadRevisions } from "../revisions";
@@ -69,8 +76,22 @@ function deletable(r: RevisionInfo, now: number) {
 	);
 }
 
-function RevisionRow(props: { r: RevisionInfo; now: number }) {
-	const { r } = props;
+/** A badge for a running job: how far it is in all, and its step in the tooltip. */
+function running(verb: string, p: JobProgress) {
+	const count = describeCount(p);
+	return {
+		label: `${verb} ${Math.round(overall(p) * 100)}%`,
+		detail: count ? `${describeStep(p)} (${count})` : describeStep(p),
+	};
+}
+
+function RevisionRow(props: {
+	r: RevisionInfo;
+	now: number;
+	/** What the server is doing with it, while its job runs. */
+	progress: JobProgress | null;
+}) {
+	const { r, progress } = props;
 	const row = useRef<HTMLLIElement>(null);
 	const active =
 		r.rev !== null && rev.value !== null && effectiveRev.value === r.rev;
@@ -78,11 +99,17 @@ function RevisionRow(props: { r: RevisionInfo; now: number }) {
 	const removing =
 		deleting.value.get(r.id) ??
 		(r.deleting
-			? {
-					label: "deleting…",
-					detail: "Queued for deletion",
-				}
+			? progress
+				? running("deleting", progress)
+				: {
+						label: "deleting…",
+						detail: "Queued for deletion",
+					}
 			: undefined);
+	const processing =
+		progress && r.status === "processing"
+			? running("processing", progress)
+			: undefined;
 	const busy = inFlight(r) || removing !== undefined;
 	const canView = r.rev !== null && r.status === "done" && !removing;
 	const canDelete = deletable(r, props.now) && !busy;
@@ -129,12 +156,14 @@ function RevisionRow(props: { r: RevisionInfo; now: number }) {
 						class="badge"
 						title={
 							removing?.detail ??
+							processing?.detail ??
 							(r.status === "pending"
 								? "Waiting in the background job queue"
 								: "Processing upload…")
 						}
 					>
 						{removing?.label ??
+							processing?.label ??
 							(r.status === "pending" ? "queued" : "processing…")}
 					</span>
 				)}
@@ -223,6 +252,7 @@ export function HistoryPanel() {
 	const mine = historyMineOnly && me !== null;
 	const bounds = useViewBounds(inView);
 	const [now, setNow] = useState(Date.now());
+	const runningJob = useQueueState()?.running;
 
 	// Reload when a new head, rewritten history or another dimension appears.
 	useEffect(() => {
@@ -367,7 +397,14 @@ export function HistoryPanel() {
 					</h4>
 					<ul class="revisions">
 						{g.items.map((r) => (
-							<RevisionRow key={r.id} r={r} now={now} />
+							<RevisionRow
+								key={r.id}
+								r={r}
+								now={now}
+								progress={
+									runningJob?.revisionId === r.id ? runningJob.progress : null
+								}
+							/>
 						))}
 					</ul>
 				</section>

@@ -1,8 +1,8 @@
 import { floorDiv } from "@blockmap/shared";
-import { and, eq, gte, lt, max } from "drizzle-orm";
+import { and, eq, gt, gte, lt, max } from "drizzle-orm";
 import { mapLimit } from "../concurrency";
 import type { Db } from "../db/client";
-import { dimensions, revisions } from "../db/schema";
+import { dimensions, revisions, uploadPatches } from "../db/schema";
 import { loadMap } from "../permissions";
 import { decodeRaw, emptyTile, overRegion, storeTile } from "../tiles/compose";
 import {
@@ -20,7 +20,7 @@ import {
 } from "../tiles/rebuild";
 import { blackToAlpha } from "../tiles/xaero";
 import { messages } from "./messages";
-import { type ProgressStep, throttled } from "./report";
+import { noProgress } from "./report";
 import {
 	incomingDir,
 	type JobContext,
@@ -53,13 +53,9 @@ export async function processUpload(
 	jobId?: number,
 	batchBytes = BATCH_BYTES,
 ) {
-	const { db, env, blobs, events } = ctx;
+	const { db, env, blobs } = ctx;
+	const progress = ctx.progress ?? noProgress;
 	const { revisionId, files } = payload;
-	const report = throttled((p: ProgressStep) =>
-		events.emit("revision", revisionId, { status: "processing", ...p }),
-	);
-	const say = (message: string, done?: number, total?: number) =>
-		report({ message, done, total });
 
 	const [revision] = await db
 		.select()
@@ -109,6 +105,15 @@ export async function processUpload(
 		return patches;
 	};
 
+	progress.fact("tiles", messages.facts.tilesTouched(byTile.size));
+	const newer = newerOver(db, dim.id, seq, byTile);
+	progress.fact(
+		"newer",
+		newer.uploads > 0
+			? messages.facts.newerUploads(newer.uploads, newer.tiles)
+			: messages.facts.noNewerUploads,
+	);
+
 	// One patch per touched tile, files pasted in upload order, and composited into its tile
 	// while it is still in memory. Tiles are done in batches to bound memory; within a batch each
 	// file is decoded once and pasted into every tile it covers, and the tiles are then encoded
@@ -117,9 +122,11 @@ export async function processUpload(
 	const rewrites: Rewrite[] = [];
 	const tiles = [...byTile.values()];
 	const batchSize = Math.max(1, Math.floor(batchBytes / (T * T * 4)));
-	let n = 0;
-	// Decoding a source image can take a while and nothing else is reported meanwhile, so it
-	// counts as progress too: how many images each batch reads, in total.
+	// Each batch is three steps (read the images, build the tiles, merge them into the history),
+	// then one per zoom level and the publishing.
+	const batches = Math.max(1, Math.ceil(tiles.length / batchSize));
+	const zoomStep = 3 * batches;
+	progress.steps(zoomStep + env.MAX_ZOOM + 1);
 	let reads = 0;
 	for (let start = 0; start < tiles.length; start += batchSize) {
 		reads += new Set(
@@ -127,8 +134,10 @@ export async function processUpload(
 		).size;
 	}
 	let read = 0;
+	let empty = 0;
 	for (let start = 0; start < tiles.length; start += batchSize) {
 		const batch = tiles.slice(start, start + batchSize);
+		const batchNo = start / batchSize + 1;
 		const canvases = batch.map(() => emptyTile(T));
 		const covered = new Map<number, number[]>();
 		for (const [b, tile] of batch.entries()) {
@@ -138,15 +147,24 @@ export async function processUpload(
 				covered.set(index, list);
 			}
 		}
+		progress.step(messages.batch(messages.upload.reading, batchNo, batches), {
+			total: covered.size,
+			unit: "images",
+		});
+		let readHere = 0;
 		for (const index of [...covered.keys()].sort((a, b) => a - b)) {
 			const f = files[index] as (typeof files)[number];
-			say(messages.upload.reading, read++, reads);
 			const img = await decodeRaw(
 				`${incomingDir(env, revisionId)}/${index}.png`,
 				env.MAX_IMAGE_DIM,
 			).catch(() => {
 				throw new UserError(messages.failed.unreadableImage(f.x, f.z));
 			});
+			progress.advance(++readHere);
+			read++;
+			// With one batch, the step already counts them.
+			if (batches > 1)
+				progress.fact("images", messages.facts.images(read, reads));
 			blackToAlpha(img.data);
 			for (const b of covered.get(index) as number[]) {
 				const { tx, ty } = batch[b] as (typeof batch)[number];
@@ -164,6 +182,11 @@ export async function processUpload(
 		// Storing zeroes the colour under transparent pixels, so a canvas is then exactly what
 		// the stored patch decodes to.
 		const preloaded = new Map<string, Buffer>();
+		progress.step(messages.batch(messages.upload.tiles, batchNo, batches), {
+			total: batch.length,
+			unit: "tiles",
+		});
+		let built = 0;
 		const done = await mapLimit(
 			batch,
 			env.JOB_CONCURRENCY,
@@ -171,11 +194,17 @@ export async function processUpload(
 				const patch = canvases[b] as Buffer;
 				const hash = await storeTile(blobs, patch, T);
 				if (hash) preloaded.set(hash, patch);
-				say(messages.upload.tiles, ++n, tiles.length);
+				progress.advance(++built);
 				return hash ? { x: tx, y: ty, hash } : null;
 			},
 		);
 		const stored = done.filter((tile) => tile !== null);
+		empty += batch.length - stored.length;
+		if (empty > 0) progress.fact("empty", messages.facts.emptyTiles(empty));
+		progress.step(messages.batch(messages.upload.merging, batchNo, batches), {
+			total: stored.length,
+			unit: "tiles",
+		});
 		for (const tile of stored) {
 			patches.push(tile);
 			mine.set(tileKey(tile.x, tile.y), tile.hash);
@@ -189,6 +218,7 @@ export async function processUpload(
 				patchesOf,
 				existing,
 				preloaded,
+				onProgress: (n) => progress.advance(n),
 			})),
 		);
 	}
@@ -202,8 +232,13 @@ export async function processUpload(
 			concurrency: env.JOB_CONCURRENCY,
 			changed: rewrites,
 			existing,
-			onProgress: (zoom, done, total) =>
-				say(messages.upload.zoom(zoom), done, total),
+			onLevel: (zoom, total) =>
+				progress.step(messages.upload.zoom(zoom), {
+					at: zoomStep + zoom,
+					total,
+					unit: "tiles",
+				}),
+			onProgress: (_zoom, done) => progress.advance(done),
 		})),
 	);
 
@@ -213,7 +248,9 @@ export async function processUpload(
 		maxX: Math.max(...files.map((f) => f.x + f.width - 1)),
 		maxZ: Math.max(...files.map((f) => f.z + f.height - 1)),
 	};
-	say(messages.upload.publishing);
+	progress.step(messages.upload.publishing, {
+		at: zoomStep + env.MAX_ZOOM + 1,
+	});
 	commitRevision(db, {
 		revisionId,
 		jobId,
@@ -224,4 +261,31 @@ export async function processUpload(
 		patches,
 		bbox,
 	});
+}
+
+/**
+ * The published uploads after `seq` that cover any of `tiles`: they are laid over the new
+ * tiles again. How many of them, and on how many tiles.
+ */
+function newerOver(
+	db: Db,
+	dimensionId: number,
+	seq: number,
+	tiles: Map<string, unknown>,
+): { uploads: number; tiles: number } {
+	const rows = db
+		.select({
+			id: uploadPatches.revisionId,
+			x: uploadPatches.tileX,
+			y: uploadPatches.tileY,
+		})
+		.from(uploadPatches)
+		.innerJoin(revisions, eq(revisions.id, uploadPatches.revisionId))
+		.where(and(eq(revisions.dimensionId, dimensionId), gt(revisions.seq, seq)))
+		.all()
+		.filter((r) => tiles.has(tileKey(r.x, r.y)));
+	return {
+		uploads: new Set(rows.map((r) => r.id)).size,
+		tiles: new Set(rows.map((r) => tileKey(r.x, r.y))).size,
+	};
 }

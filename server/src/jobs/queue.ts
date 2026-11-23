@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { dimensions, jobs, revisions, users } from "../db/schema";
-import type { QueueEvent } from "../events";
+import type { JobProgress, QueueEvent } from "../events";
 import { waitingMessage } from "./messages";
 import { jobRevisionId } from "./target";
 
@@ -36,10 +36,22 @@ export function waiting(db: Db, revisionId: number): string | null {
 	return waitingMessage(open.slice(0, at));
 }
 
-/** How many jobs wait, and which one runs. */
-export function queueState(db: Db): QueueEvent {
+/** The job the worker runs, and what it last said it is doing. */
+export type LiveJob = {
+	jobId: number;
+	revisionId: number | null;
+	progress: JobProgress | null;
+};
+
+/** How many jobs wait, and which one runs (with its progress, when `live` is about it). */
+export function queueState(db: Db, live: LiveJob | null = null): QueueEvent {
 	const open = db
-		.select({ type: jobs.type, status: jobs.status, revisionId: jobRevisionId })
+		.select({
+			id: jobs.id,
+			type: jobs.type,
+			status: jobs.status,
+			revisionId: jobRevisionId,
+		})
 		.from(jobs)
 		.where(inArray(jobs.status, ["pending", "processing"]))
 		.orderBy(asc(jobs.id))
@@ -54,6 +66,7 @@ export function queueState(db: Db): QueueEvent {
 						running.type !== "process_upload" && running.type !== "erase_upload"
 							? null
 							: (running.revisionId as number | null),
+					progress: live?.jobId === running.id ? live.progress : null,
 				}
 			: null,
 	};

@@ -5,8 +5,9 @@ import {
 	JOB_LABELS,
 	jobSubject,
 	useJobList,
-	useJobProgress,
+	useQueueState,
 } from "../jobs";
+import { JobProgress } from "./JobProgress";
 
 const STATUS_NAMES: Record<AdminJob["status"], string> = {
 	pending: "Queued",
@@ -20,9 +21,14 @@ function When(props: { at: number | null }) {
 	return <span title={formatTime(props.at)}>{formatRelative(props.at)}</span>;
 }
 
-function Progress(props: { job: AdminJob }) {
-	const progress = useJobProgress(props.job.revisionId);
-	return <span class="muted">{progress ?? "Running…"}</span>;
+/** What the running job is doing, from the queue topic (only one job runs at a time). */
+function Running() {
+	const progress = useQueueState()?.running?.progress;
+	return progress ? (
+		<JobProgress progress={progress} />
+	) : (
+		<span class="muted">Running…</span>
+	);
 }
 
 function JobRow(props: { job: AdminJob; open: boolean }) {
@@ -42,7 +48,7 @@ function JobRow(props: { job: AdminJob; open: boolean }) {
 				</span>
 				{job.status === "processing" && (
 					<div>
-						<Progress job={job} />
+						<Running />
 					</div>
 				)}
 				{job.status === "failed" && error && (

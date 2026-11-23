@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import {
+	dimensions,
 	jobs,
 	mapInfo,
 	revisions,
@@ -18,6 +19,8 @@ import {
 	type TilePatch,
 	tileKey,
 } from "../tiles/rebuild";
+import { messages } from "./messages";
+import { noProgress } from "./report";
 import type { JobContext } from "./types";
 
 const FLUSH_ROWS = 2000;
@@ -69,6 +72,7 @@ export function queueRebuildIfPending(db: Db): boolean {
  */
 export async function rebuildHistory(ctx: JobContext, jobId: number) {
 	const { db, env, blobs } = ctx;
+	const progress = ctx.progress ?? noProgress;
 	const map = await loadMap(db);
 	const T = map.tileSize;
 	const startHead = map.headRev;
@@ -77,6 +81,7 @@ export async function rebuildHistory(ctx: JobContext, jobId: number) {
 
 	db.delete(tileVersionsRebuild).run();
 	let pending: (typeof tileVersionsRebuild.$inferInsert)[] = [];
+	let written = 0;
 	const flush = () => {
 		if (pending.length === 0) return;
 		const chunk = pending;
@@ -88,6 +93,8 @@ export async function rebuildHistory(ctx: JobContext, jobId: number) {
 					.run();
 			}
 		});
+		written += chunk.length;
+		progress.fact("written", messages.facts.versionsWritten(written));
 	};
 	const write = (dimensionId: number, rewrites: Rewrite[]) => {
 		for (const w of rewrites) {
@@ -110,7 +117,24 @@ export async function rebuildHistory(ctx: JobContext, jobId: number) {
 			uploads.flatMap((u) => (u.dimensionId === null ? [] : [u.dimensionId])),
 		),
 	];
-	for (const dimId of dimIds) {
+	// Per dimension one step for its map tiles and one per zoom level, then the swap.
+	const perDim = 1 + env.MAX_ZOOM;
+	progress.steps(dimIds.length * perDim + 1);
+	progress.fact("uploads", messages.facts.uploads(uploads.length));
+	const names = new Map(
+		db
+			.select({ id: dimensions.id, name: dimensions.name })
+			.from(dimensions)
+			.all()
+			.map((d) => [d.id, d.name]),
+	);
+	for (const [d, dimId] of dimIds.entries()) {
+		const name = names.get(dimId) ?? `dimension ${dimId}`;
+		const first = d * perDim + 1;
+		progress.fact(
+			"dimension",
+			messages.facts.dimension(name, d + 1, dimIds.length),
+		);
 		const patches = db
 			.select({
 				seq: sql<number>`${revisions.seq}`,
@@ -130,6 +154,11 @@ export async function rebuildHistory(ctx: JobContext, jobId: number) {
 			byTile.set(key, list);
 		}
 
+		progress.step(messages.rebuild.tiles(name), {
+			at: first,
+			total: byTile.size,
+			unit: "tiles",
+		});
 		const base = await rebuildBase({
 			blobs,
 			tileSize: T,
@@ -140,6 +169,7 @@ export async function rebuildHistory(ctx: JobContext, jobId: number) {
 			}),
 			patchesOf: async (x, y) => byTile.get(tileKey(x, y)) ?? [],
 			existing: emptyExisting,
+			onProgress: (done) => progress.advance(done),
 		});
 		write(dimId, base);
 		write(
@@ -151,10 +181,20 @@ export async function rebuildHistory(ctx: JobContext, jobId: number) {
 				concurrency: env.JOB_CONCURRENCY,
 				changed: base,
 				existing: emptyExisting,
+				onLevel: (zoom, total) =>
+					progress.step(messages.rebuild.zoom(name, zoom), {
+						at: first + zoom,
+						total,
+						unit: "tiles",
+					}),
+				onProgress: (_zoom, done) => progress.advance(done),
 			}),
 		);
 	}
 	flush();
+	progress.step(messages.rebuild.publishing, {
+		at: dimIds.length * perDim + 1,
+	});
 
 	db.transaction((tx) => {
 		// Only the worker publishes or deletes uploads, and it runs one job at a time; this guards

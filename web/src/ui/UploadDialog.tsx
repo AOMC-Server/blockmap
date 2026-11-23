@@ -28,6 +28,7 @@ import {
 	type UploadItem,
 } from "../upload-files";
 import { exportDates, validateFiles } from "../upload-validate";
+import { JobProgress } from "./JobProgress";
 
 function ProgressBar(props: { percent?: number; label: string }) {
 	const p = props.percent;
@@ -271,12 +272,18 @@ export function UploadDialog() {
 
 			{state.phase === "processing" && (
 				<>
-					<ProgressBar
-						percent={
-							state.total ? ((state.done ?? 0) / state.total) * 100 : undefined
-						}
-						label={formatProgress(state.message, state.done, state.total)}
-					/>
+					{state.progress ? (
+						<JobProgress progress={state.progress} prefix={state.prefix} />
+					) : (
+						<ProgressBar
+							percent={
+								state.total
+									? ((state.done ?? 0) / state.total) * 100
+									: undefined
+							}
+							label={formatProgress(state.message, state.done, state.total)}
+						/>
+					)}
 					<p class="muted">
 						You can safely close this dialog. Processing will continue in the
 						background.

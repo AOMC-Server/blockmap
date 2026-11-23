@@ -17,8 +17,9 @@ import { deleteDimension } from "./deleteDimension";
 import { eraseUpload } from "./eraseUpload";
 import { messages } from "./messages";
 import { processUpload } from "./processUpload";
-import { openJobs, queueState } from "./queue";
+import { type LiveJob, openJobs, queueState } from "./queue";
 import { rebuildHistory } from "./rebuildHistory";
+import { createProgress, progressEvent } from "./report";
 import {
 	type DeleteDimensionPayload,
 	type EraseUploadPayload,
@@ -36,10 +37,15 @@ export function createWorker(ctx: JobContext) {
 	let running: Promise<void> | null = null;
 	let timer: ReturnType<typeof setInterval> | undefined;
 
+	/** The running job and what it last said it is doing. */
+	let live: LiveJob | null = null;
+	/** The context the running job gets: the worker's, with somewhere to report progress. */
+	let jobCtx: JobContext = ctx;
+
 	let lastQueue = "";
 	/** Tells followers about the queue, when it changed since it last did. */
 	const announceQueue = () => {
-		const state = queueState(db);
+		const state = queueState(db, live);
 		const json = JSON.stringify(state);
 		if (json === lastQueue) return;
 		lastQueue = json;
@@ -107,7 +113,7 @@ export function createWorker(ctx: JobContext) {
 		announceMap();
 		try {
 			// Publishing marks the job done in the same transaction.
-			await rebuildHistory(ctx, job.id);
+			await rebuildHistory(jobCtx, job.id);
 			recordStorage(db, "rebuild");
 		} catch (err) {
 			console.error(`job ${job.id} failed:`, err);
@@ -139,7 +145,7 @@ export function createWorker(ctx: JobContext) {
 			.run();
 		announceQueue();
 		try {
-			await cleanupBlobs(db, blobsDir(env.DATA_DIR));
+			await cleanupBlobs(db, blobsDir(env.DATA_DIR), jobCtx.progress);
 			recordStorage(db, "gc");
 			db.update(jobs)
 				.set({ status: "done", completedAt: Date.now() })
@@ -170,7 +176,7 @@ export function createWorker(ctx: JobContext) {
 		let removed: number[] | null = null;
 		try {
 			removed = await deleteDimension(
-				ctx,
+				jobCtx,
 				job.payload as DeleteDimensionPayload,
 			);
 			recordStorage(db, "erase");
@@ -197,6 +203,36 @@ export function createWorker(ctx: JobContext) {
 		events.emit("revisions", dimensionId, {});
 		for (const dim of db.select({ id: dimensions.id }).from(dimensions).all()) {
 			events.emit("revisions", dim.id, {});
+		}
+	}
+
+	/** Runs a job with a progress reporter of its own, told on the queue and its revision's topic. */
+	async function track(job: typeof jobs.$inferSelect) {
+		const revisionId =
+			job.type === "process_upload" || job.type === "erase_upload"
+				? (job.payload as { revisionId: number }).revisionId
+				: null;
+		const current: LiveJob = { jobId: job.id, revisionId, progress: null };
+		live = current;
+		jobCtx = {
+			...ctx,
+			progress: createProgress((p) => {
+				if (live !== current) return;
+				current.progress = p;
+				if (revisionId !== null)
+					events.emit("revision", revisionId, progressEvent(p));
+				try {
+					announceQueue();
+				} catch (err) {
+					console.error("announcing the queue failed:", err);
+				}
+			}),
+		};
+		try {
+			await runJob(job);
+		} finally {
+			live = null;
+			jobCtx = ctx;
 		}
 	}
 
@@ -244,9 +280,13 @@ export function createWorker(ctx: JobContext) {
 		try {
 			// Publishing marks the job done in the same transaction (an erase deletes its job row).
 			if (job.type === "process_upload") {
-				await processUpload(ctx, job.payload as ProcessUploadPayload, job.id);
+				await processUpload(
+					jobCtx,
+					job.payload as ProcessUploadPayload,
+					job.id,
+				);
 			} else if (job.type === "erase_upload") {
-				await eraseUpload(ctx, job.payload as EraseUploadPayload);
+				await eraseUpload(jobCtx, job.payload as EraseUploadPayload);
 			} else {
 				throw new Error(`unknown job type ${job.type}`);
 			}
@@ -318,7 +358,7 @@ export function createWorker(ctx: JobContext) {
 					const job = db.select().from(jobs).where(eq(jobs.id, next.id)).get();
 					if (!job) continue;
 					try {
-						await runJob(job);
+						await track(job);
 					} catch (err) {
 						// Setup before the job's own error handling failed; don't leave it stuck.
 						console.error(`job ${job.id} could not run:`, err);
@@ -346,6 +386,8 @@ export function createWorker(ctx: JobContext) {
 
 	return {
 		run,
+		/** The running job and what it is doing, or null when none runs. */
+		live: () => live,
 		/** Starts on queued jobs, and tells followers about the queue if it changed. */
 		kick() {
 			try {

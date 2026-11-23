@@ -2,22 +2,28 @@ import { Modal } from "@aomc-server/block-ui";
 import { formatRelative } from "@aomc-server/block-ui/format";
 import { signal } from "@preact/signals";
 import {
+	describeStep,
 	fetchQueue,
+	type JobProgress as Info,
 	JOB_LABELS,
 	jobSubject,
+	overall,
 	type QueuedJob,
 	useJobList,
-	useJobProgress,
 	useQueueState,
 } from "../jobs";
 import { isModerator } from "../state";
+import { JobProgress } from "./JobProgress";
 
 export const queueOpen = signal(false);
 
-function JobItem(props: { job: QueuedJob; position: number }) {
-	const { job } = props;
+function JobItem(props: {
+	job: QueuedJob;
+	position: number;
+	progress: Info | null;
+}) {
+	const { job, progress } = props;
 	const running = job.status === "processing";
-	const progress = useJobProgress(running ? job.revisionId : null);
 	const subject = jobSubject(job);
 	return (
 		<li class={`queue-job ${running ? "running" : ""}`}>
@@ -25,11 +31,15 @@ function JobItem(props: { job: QueuedJob; position: number }) {
 				<b>{JOB_LABELS[job.type]}</b>
 				{subject && <span class="muted"> · {subject}</span>}
 			</div>
-			<div class="muted queue-job-meta">
-				{running
-					? (progress ?? "Running…")
-					: `#${props.position} in queue · added ${formatRelative(job.createdAt)}`}
-			</div>
+			{running && progress ? (
+				<JobProgress progress={progress} />
+			) : (
+				<div class="muted queue-job-meta">
+					{running
+						? "Running…"
+						: `#${props.position} in queue · added ${formatRelative(job.createdAt)}`}
+				</div>
+			)}
 		</li>
 	);
 }
@@ -37,6 +47,7 @@ function JobItem(props: { job: QueuedJob; position: number }) {
 /** The jobs the server is working through, in the order it runs them. */
 export function QueueDialog() {
 	const { data, failed } = useJobList(fetchQueue);
+	const progress = useQueueState()?.running?.progress ?? null;
 	const close = () => {
 		queueOpen.value = false;
 	};
@@ -56,6 +67,7 @@ export function QueueDialog() {
 							key={job.id}
 							job={job}
 							position={i + (data[0]?.status === "processing" ? 0 : 1)}
+							progress={job.status === "processing" ? progress : null}
 						/>
 					))}
 				</ol>
@@ -74,18 +86,32 @@ export function QueueButton() {
 	const state = useQueueState();
 	const count = state ? state.pending + (state.running ? 1 : 0) : 0;
 	if (count === 0) return null;
+	const running = state?.running;
+	const progress = running?.progress;
 	return (
 		<div class="dock queue-dock">
 			<button
 				type="button"
 				class={`btn queue-button ${queueOpen.value ? "active" : ""}`}
-				title="Background job queue"
+				title={
+					running && progress
+						? `${JOB_LABELS[running.type]}: ${describeStep(progress)}`
+						: "Background job queue"
+				}
 				onClick={() => {
 					queueOpen.value = true;
 				}}
 			>
 				<span class="queue-spinner" aria-hidden="true" />
 				{count} job{count === 1 ? "" : "s"}
+				{progress && (
+					<span class="queue-button-bar" aria-hidden="true">
+						<span
+							class="queue-button-fill"
+							style={{ width: `${Math.round(overall(progress) * 100)}%` }}
+						/>
+					</span>
+				)}
 			</button>
 		</div>
 	);

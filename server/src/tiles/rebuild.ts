@@ -189,6 +189,8 @@ export async function rebuildParents(opts: {
 	changed: Rewrite[];
 	existing: Existing;
 	onProgress?: (zoom: number, done: number, total: number) => void;
+	/** A zoom level is started, with how many tiles of it are built. */
+	onLevel?: (zoom: number, total: number) => void;
 }): Promise<Rewrite[]> {
 	const { blobs, tileSize: T, existing } = opts;
 	const baseCache = new Map<string, string | null>();
@@ -213,6 +215,7 @@ export async function rebuildParents(opts: {
 		const next = new Map<string, Row[]>();
 		const mixes = new Map<string, string | null>();
 		let built = 0;
+		opts.onLevel?.(zoom, parents.size);
 		await mapLimit([...parents], opts.concurrency, async (parentKey) => {
 			const [px, py] = parseKey(parentKey);
 			const kids = await Promise.all(

@@ -1,5 +1,6 @@
 import { formatProgress } from "@aomc-server/block-ui/format";
 import { signal } from "@preact/signals";
+import type { JobProgress } from "../../server/src/events";
 import { api, attempt, run, showNotice } from "./api";
 import { refreshMap, setRev } from "./controller";
 import { subscribe } from "./events";
@@ -13,7 +14,13 @@ import {
 	revisionsData,
 } from "./state";
 
-export type Progress = { message?: string; done?: number; total?: number };
+export type Progress = {
+	message?: string;
+	done?: number;
+	total?: number;
+	/** The detail, while the job runs: its step of how many, the rate and facts. */
+	progress?: JobProgress;
+};
 export type Outcome = { status: "done" | "failed"; error: string | null };
 
 const POLL_MS = 1500;
@@ -319,7 +326,9 @@ export async function deleteUpload(id: number): Promise<boolean> {
 				label: p.total
 					? `deleting ${Math.round(((p.done ?? 0) / p.total) * 100)}%`
 					: "deleting…",
-				detail: formatProgress(p.message ?? "Deleting", p.done, p.total),
+				detail: p.progress
+					? `Step ${p.progress.step} of ${p.progress.steps}: ${formatProgress(p.message ?? "Deleting", p.done, p.total)}`
+					: formatProgress(p.message ?? "Deleting", p.done, p.total),
 			}),
 	});
 	const error =

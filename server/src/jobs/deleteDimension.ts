@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { count, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
 	dimensions,
 	jobs,
@@ -8,6 +8,8 @@ import {
 	revisions,
 	shortLinks,
 } from "../db/schema";
+import { messages } from "./messages";
+import { noProgress } from "./report";
 import { jobRevisionId } from "./target";
 import {
 	type DeleteDimensionPayload,
@@ -26,7 +28,42 @@ export async function deleteDimension(
 	payload: DeleteDimensionPayload,
 ): Promise<number[]> {
 	const { db, env } = ctx;
+	const progress = ctx.progress ?? noProgress;
 	const id = payload.dimensionId;
+	const name = db
+		.select({ name: dimensions.name })
+		.from(dimensions)
+		.where(eq(dimensions.id, id))
+		.get()?.name;
+	if (name !== undefined) {
+		const n = (q: { n: number } | undefined) => q?.n ?? 0;
+		progress.steps(2);
+		progress.fact(
+			"uploads",
+			messages.facts.uploadCount(
+				n(
+					db
+						.select({ n: count() })
+						.from(revisions)
+						.where(eq(revisions.dimensionId, id))
+						.get(),
+				),
+			),
+		);
+		progress.fact(
+			"layers",
+			messages.facts.layers(
+				n(
+					db
+						.select({ n: count() })
+						.from(layers)
+						.where(eq(layers.dimensionId, id))
+						.get(),
+				),
+			),
+		);
+		progress.step(messages.deleteDimension.deleting(name));
+	}
 	const removed = db.transaction((tx) => {
 		const dim = tx.select().from(dimensions).where(eq(dimensions.id, id)).get();
 		if (!dim) return [];
@@ -77,7 +114,13 @@ export async function deleteDimension(
 			.run();
 		return ids;
 	});
-	for (const revisionId of removed)
+	progress.step(messages.deleteDimension.files, {
+		total: removed.length,
+		unit: "uploads",
+	});
+	for (const [i, revisionId] of removed.entries()) {
 		await rm(incomingDir(env, revisionId), { recursive: true, force: true });
+		progress.advance(i + 1);
+	}
 	return removed;
 }

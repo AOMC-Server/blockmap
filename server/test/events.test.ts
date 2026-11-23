@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { mapInfo, revisions } from "../src/db/schema";
-import type { Envelope } from "../src/events";
+import type { Envelope, QueueEvent } from "../src/events";
+import { messages } from "../src/jobs/messages";
 import { queueRebuildIfPending } from "../src/jobs/rebuildHistory";
 import {
 	type Auth,
@@ -288,8 +289,21 @@ describe("a waiting revision", () => {
 		expect(seen[0]).toEqual({ pending: 1, running: null });
 		expect(seen).toContainEqual({
 			pending: 0,
-			running: { type: "process_upload", revisionId: 1 },
+			running: { type: "process_upload", revisionId: 1, progress: null },
 		});
+		// While it runs, the queue tells what it is doing.
+		const steps = seen.flatMap((q) => {
+			const p = (q as QueueEvent).running?.progress;
+			return p ? [p] : [];
+		});
+		expect(steps.length).toBeGreaterThan(0);
+		expect(steps.at(-1)).toMatchObject({
+			message: messages.upload.publishing,
+			step: steps.at(-1)?.steps,
+		});
+		expect(steps.some((p) => p.facts.includes("1 map tile touched"))).toBe(
+			true,
+		);
 		expect(seen.at(-1)).toEqual({ pending: 0, running: null });
 	});
 });

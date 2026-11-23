@@ -4,6 +4,7 @@ import type { Env } from "../env";
 import type { EventHub } from "../events";
 import { incomingRoot } from "../paths";
 import type { BlobStore } from "../tiles/blobstore";
+import type { Progress } from "./report";
 
 /** An error whose message is meant for the person who uploaded; any other error is only logged. */
 export class UserError extends Error {}
@@ -13,6 +14,8 @@ export type JobContext = {
 	env: Env;
 	blobs: BlobStore;
 	events: EventHub;
+	/** Where the running job tells what it is doing; nowhere when left out. */
+	progress?: Progress;
 };
 
 export type UploadFile = {

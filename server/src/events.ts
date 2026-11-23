@@ -4,6 +4,27 @@
  * each family is snapshotted and who may follow it, and `routes/events.ts` streams them.
  */
 
+/**
+ * What a running job is doing: which step of how many, how far it is in it and how fast, and
+ * facts about the work ("40 tiles touched", "3 newer uploads to lay over it").
+ */
+export type JobProgress = {
+	/** 1-based. */
+	step: number;
+	steps: number;
+	/** The step, as a sentence. */
+	message: string;
+	done?: number;
+	total?: number;
+	/** What `done` and `total` count: "images", "tiles", "files" or "uploads". */
+	unit?: string;
+	/** `unit`s a second in this step so far, once that can be told. */
+	rate?: number;
+	facts: string[];
+	/** When the job started (ms). */
+	startedAt: number;
+};
+
 /** A revision's job: how far it is, and how it ended. `gone` = it no longer exists (erased). */
 export type RevisionEvent =
 	| {
@@ -11,6 +32,8 @@ export type RevisionEvent =
 			message?: string;
 			done?: number;
 			total?: number;
+			/** While it runs: the detail behind `message`, `done` and `total`. */
+			progress?: JobProgress;
 			rev?: number | null;
 			error?: string | null;
 	  }
@@ -30,6 +53,8 @@ export type QueueEvent = {
 			| "gc_blobs"
 			| "delete_dimension";
 		revisionId: number | null;
+		/** What it is doing; null until it says, or when it was started before the server restarted. */
+		progress: JobProgress | null;
 	} | null;
 };
 
