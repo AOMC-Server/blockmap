@@ -13,6 +13,7 @@ import {
 } from "@blockmap/shared";
 import {
 	type AnySQLiteColumn,
+	blob,
 	index,
 	integer,
 	primaryKey,
@@ -305,11 +306,69 @@ export const featureRevisions = sqliteTable(
 		/** How a line or an area is drawn; null: the defaults. */
 		style: text("style", { mode: "json" }).$type<FeatureStyle>(),
 		geometry: text("geometry", { mode: "json" }).notNull(),
+		/** The player who owns the build or land, as of this revision. */
+		ownerId: integer("owner_player_id").references(() => players.id),
+		/** Ids of the other players who built it. */
+		builderIds: text("builder_ids", { mode: "json" })
+			.$type<number[]>()
+			.notNull()
+			.default([]),
 	},
 	(t) => [
 		index("feature_revisions_feature").on(t.featureId, t.createdAt),
 		index("feature_revisions_author").on(t.authorId),
 		index("feature_revisions_layer").on(t.layerId),
+		index("feature_revisions_owner").on(t.ownerId),
+	],
+);
+
+/**
+ * Minecraft players that features are attributed to. Not tied to the site's accounts: anyone
+ * who can edit a feature can attribute it to anyone. Always a real account, found by its UUID.
+ */
+export const players = sqliteTable(
+	"players",
+	{
+		id: id(),
+		/** Dashed lowercase UUID. */
+		uuid: text("uuid").notNull().unique(),
+		/** The name as of the last check with Mojang. */
+		name: text("name").notNull(),
+		/** The 8x8 face with the hat layer, as a PNG; null until the skin has been fetched. */
+		head: blob("head", { mode: "buffer" }),
+		/** The skin's texture URL the head was made from, to skip unchanged skins. */
+		skinUrl: text("skin_url"),
+		/** When the name and skin were last checked with Mojang; 0 = never (added by an import). */
+		checkedAt: integer("checked_at").notNull().default(0),
+		createdBy: text("created_by").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		createdAt: createdAt(),
+	},
+	(t) => [
+		index("players_name").on(t.name),
+		index("players_checked").on(t.checkedAt),
+	],
+);
+
+/**
+ * Who the live features are attributed to now; kept in step with the features' latest revisions
+ * by insertRevision, so a player's features can be found without reading every revision.
+ */
+export const featurePlayers = sqliteTable(
+	"feature_players",
+	{
+		featureId: integer("feature_id")
+			.notNull()
+			.references(() => features.id, { onDelete: "cascade" }),
+		playerId: integer("player_id")
+			.notNull()
+			.references(() => players.id, { onDelete: "cascade" }),
+		role: text("role", { enum: ["owner", "builder"] }).notNull(),
+	},
+	(t) => [
+		primaryKey({ columns: [t.featureId, t.playerId, t.role] }),
+		index("feature_players_player").on(t.playerId),
 	],
 );
 

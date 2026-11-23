@@ -3,12 +3,14 @@ import { curveOf, resolveStyle } from "@blockmap/shared/featureStyle";
 import { mapView } from "../controller";
 import { featureStats, featureTitle, TYPE_LABEL } from "../featureInfo";
 import { deleteFeature } from "../layers";
+import { playerPageUrl } from "../players";
 import { canEditMap, editor, embed, layersData, popup, view } from "../state";
 import { dyeScope } from "../theme";
 import { measureFrom } from "../tools/measure";
 import { formatBlocks } from "../tools/measureMath";
 import { featureHistoryFor } from "./FeatureHistory";
 import { Banner } from "./icons";
+import { PlayerHead, PlayerLink } from "./PlayerHead";
 import { copyWaypoint } from "./shareCommon";
 
 /** DOM popup for the clicked feature, anchored to the map position and following pans and zooms. */
@@ -77,6 +79,32 @@ export function Popup() {
 						{spot.x}, {spot.z}
 					</button>
 				</div>
+				{(feature.owner || feature.builders.length > 0) && (
+					<div class="popup-players">
+						{feature.owner && (
+							<span class="popup-owner">
+								Owned by{" "}
+								<PlayerLink player={feature.owner} newTab={embed.value} />
+							</span>
+						)}
+						{feature.builders.length > 0 && (
+							<span class="popup-builders">
+								Built by
+								{feature.builders.map((b) => (
+									<a
+										key={b.id}
+										class="popup-builder"
+										href={playerPageUrl(b)}
+										target={embed.value ? "_blank" : undefined}
+										rel={embed.value ? "noopener" : undefined}
+									>
+										<PlayerHead player={b} size={20} />
+									</a>
+								))}
+							</span>
+						)}
+					</div>
+				)}
 				{(stats.length !== undefined || stats.area !== undefined) && (
 					<p class="popup-stats">
 						{stats.length !== undefined && (

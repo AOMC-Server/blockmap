@@ -80,15 +80,10 @@ export function initFeatureInteraction(map: MapView) {
 		}
 		openFeaturePopup(hit.feature, e);
 	});
-	// A right click on a vertex being placed removes it; on a feature it opens the same popup as a
-	// click; anywhere else, the map's menu.
+	// A right click on a vertex being placed removes it; anywhere else, the map's menu.
 	map.on("contextmenu", (e) => {
 		if (featureShape.removeAt(map, e.sx, e.sy)) return;
 		if (measureShape.removeAt(map, e.sx, e.sy)) return;
-		if (!busy() && e.hit?.kind === "feature") {
-			openFeaturePopup(e.hit.feature, e);
-			return;
-		}
 		popup.value = null;
 		contextMenu.value = { ...floorBlock(e), anchor: { x: e.x, z: e.z } };
 	});

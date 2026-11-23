@@ -11,6 +11,7 @@ import {
 	type View,
 	zoomAt,
 } from "@blockmap/shared/view";
+import type { HoverLook } from "../settings";
 import { drawBlockHighlight } from "./blockHighlight";
 import {
 	type DebugOptions,
@@ -282,6 +283,11 @@ export class MapView {
 	/** Sets how close (in px) pins must be to merge into a cluster. */
 	setPinClusterDistance(px: number) {
 		this.features.setClusterDistance(px);
+	}
+
+	/** How hovered and selected lines and areas are drawn, in percent of their normal look. */
+	setHoverLook(look: HoverLook) {
+		this.features.setHoverLook(look);
 	}
 
 	/** Outlines the block under the mouse when zoomed in far enough to see single blocks. */

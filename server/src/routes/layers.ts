@@ -25,6 +25,9 @@ import {
 	layerLiveAt,
 	liveFeatureCount,
 	nextFeatureOrder,
+	playerIdsOf,
+	portableContentOf,
+	resolveContent,
 	timeOfRev,
 } from "../features";
 import { doc } from "../openapi";
@@ -38,6 +41,7 @@ import {
 	canViewLayer,
 	effectiveLayerRole,
 } from "../permissions";
+import { playersById } from "../players";
 import type { AppEnv } from "../types";
 import { validate } from "../validate";
 import { layerInviteRoutes } from "./invites";
@@ -88,8 +92,15 @@ function serializeLayer(layer: LayerRow, canEdit: boolean, canManage: boolean) {
 }
 
 const layersQuerySchema = z.object({
-	dim: z.string().optional(),
-	at: z.string().regex(/^\d+$/).optional(),
+	dim: z
+		.string()
+		.optional()
+		.describe("Only the layers of this dimension, by slug (default: all)"),
+	at: z
+		.string()
+		.regex(/^\d+$/)
+		.optional()
+		.describe("Revision number to read the layers as of (default: latest)"),
 });
 
 export const layerRoutes = new Hono<AppEnv>()
@@ -273,7 +284,8 @@ export const layerRoutes = new Hono<AppEnv>()
 			tag: "Layers",
 			summary: "Update a layer",
 			description:
-				"Name, colour, `hiddenByDefault`, visibility and `style` (the default look of its lines and areas; null clears it). Order is changed with `POST /api/layers/reorder`.",
+				"Anyone who may edit the layer can change its name, colour, `hiddenByDefault` and `style` (the default look of its lines and areas; `null` clears it); changing `visibility` requires the layer's creator or a moderator. Order is changed with `POST /api/layers/reorder`.",
+			params: { id: "Layer id" },
 			fails: [400, 403, 404, 429],
 			login: true,
 		}),
@@ -336,6 +348,7 @@ export const layerRoutes = new Hono<AppEnv>()
 			tag: "Layers",
 			summary: "Delete a layer",
 			description: "The creator or a moderator.",
+			params: { id: "Layer id" },
 			fails: [403, 404, 429],
 			login: true,
 		}),
@@ -360,6 +373,8 @@ export const layerRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Layers",
 			summary: "Add a feature to a layer",
+			description: `Anyone who may edit the layer. Returns the new feature, placed last. A layer holds at most ${MAX_FEATURES_PER_LAYER} features (409 beyond that).`,
+			params: { id: "Layer id" },
 			ok: { 201: "Feature created" },
 			fails: [400, 403, 404, 409, 429],
 			login: true,
@@ -380,15 +395,19 @@ export const layerRoutes = new Hono<AppEnv>()
 				if (!layerIsLive(tx, layerId)) return "gone";
 				if (liveFeatureCount(tx, layerId) >= MAX_FEATURES_PER_LAYER)
 					return "full";
+				const resolved = resolveContent(tx, content, user.id);
+				if ("unknownPlayer" in resolved) return "no player";
 				return insertFeature(
 					tx,
 					layerId,
 					nextFeatureOrder(tx, layerId),
 					user.id,
-					content,
+					resolved,
 				);
 			});
 			if (view === "gone") return c.json({ error: "not found" }, 404);
+			if (view === "no player")
+				return c.json({ error: "player not found" }, 404);
 			if (view === "full") return c.json({ error: "layer is full" }, 409);
 			announceLayers(c, found.layer.dimensionId);
 			return c.json({ feature: view }, 201);
@@ -399,6 +418,9 @@ export const layerRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Layers",
 			summary: "Reorder the features of a layer",
+			description:
+				"Anyone who may edit the layer. `ids` must contain all current feature ids of the layer in their new order; answers 409 if the list is out of date.",
+			params: { id: "Layer id" },
 			fails: [400, 403, 404, 409, 429],
 			login: true,
 		}),
@@ -444,7 +466,8 @@ export const layerRoutes = new Hono<AppEnv>()
 			tag: "Layers",
 			summary: "Export a layer as JSON",
 			description:
-				"An array of `{type, name, popup, color, style, geometry}`; `style` is only there for lines and areas.",
+				"An array of `{type, name, popup, color, style, geometry, owner, builders}`; `style` is only there for lines and areas, and players are given as `{uuid, name}` so the file can be imported into another map.",
+			params: { id: "Layer id" },
 			fails: [404],
 		}),
 		async (c) => {
@@ -456,7 +479,8 @@ export const layerRoutes = new Hono<AppEnv>()
 				"Content-Disposition",
 				`attachment; filename="layer-${found.layer.id}.json"`,
 			);
-			return c.json(list.map(contentOf));
+			const players = playersById(db, list.flatMap(playerIdsOf));
+			return c.json(list.map((f) => portableContentOf(f, players)));
 		},
 	)
 	.post(
@@ -465,13 +489,24 @@ export const layerRoutes = new Hono<AppEnv>()
 			tag: "Layers",
 			summary: "Import features into a layer",
 			description:
-				"Adds to the layer, or replaces its features with `replace=1`, which only the layer's creator or a moderator may do.",
+				"Anyone who may edit the layer can add to it; replacing its features with `replace=1` requires the layer's creator or a moderator. Replaced features are deleted as revisions, so they stay in the history. Answers 409 if the layer would exceed its feature limit, and returns the numbers `imported` and `replaced`.",
+			params: { id: "Layer id" },
 			ok: { 201: "Imported" },
 			fails: [400, 403, 404, 409, 429],
 			login: true,
 		}),
 		requireUser,
-		validate("query", z.object({ replace: z.enum(["0", "1"]).optional() })),
+		validate(
+			"query",
+			z.object({
+				replace: z
+					.enum(["0", "1"])
+					.optional()
+					.describe(
+						"`1` replaces the layer's current features with the imported ones; `0` or omitted adds to them",
+					),
+			}),
+		),
 		validate("json", featureImportSchema),
 		async (c) => {
 			const { db } = c.var;
@@ -492,6 +527,12 @@ export const layerRoutes = new Hono<AppEnv>()
 				const existing = replace ? layerFeatures(tx, layerId) : [];
 				const kept = replace ? 0 : liveFeatureCount(tx, layerId);
 				if (kept + items.length > MAX_FEATURES_PER_LAYER) return "full";
+				const ids = items.flatMap((i) =>
+					[i.owner, ...i.builders].filter(
+						(r): r is number => typeof r === "number",
+					),
+				);
+				if (playersById(tx, ids).size !== new Set(ids).size) return "no player";
 
 				for (const f of existing) {
 					insertRevision(tx, f, user.id, {
@@ -500,11 +541,17 @@ export const layerRoutes = new Hono<AppEnv>()
 					});
 				}
 				let order = nextFeatureOrder(tx, layerId);
-				for (const item of items)
-					insertFeature(tx, layerId, order++, user.id, item);
+				for (const item of items) {
+					const resolved = resolveContent(tx, item, user.id);
+					// Checked above, so this cannot happen.
+					if ("unknownPlayer" in resolved) throw new Error("unknown player");
+					insertFeature(tx, layerId, order++, user.id, resolved);
+				}
 				return existing.length;
 			});
 			if (out === "gone") return c.json({ error: "not found" }, 404);
+			if (out === "no player")
+				return c.json({ error: "player not found" }, 404);
 			if (out === "full")
 				return c.json(
 					{ error: `a layer holds at most ${MAX_FEATURES_PER_LAYER} features` },

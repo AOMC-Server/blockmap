@@ -2,7 +2,6 @@ import { DYE_HEX, type Dye } from "@blockmap/shared/colors";
 import {
 	curveOf,
 	dashPattern,
-	emphasisedWidth,
 	hitTolerance,
 	type ResolvedStyle,
 	resolveStyle,
@@ -16,7 +15,7 @@ import {
 	type View,
 } from "@blockmap/shared/view";
 import { pathsOf } from "../featureInfo";
-import { DEFAULT_SETTINGS } from "../settings";
+import { DEFAULT_SETTINGS, type HoverLook } from "../settings";
 import { ClusterIndex, type ClusterNode } from "./cluster";
 import { hexToRgb, mixColors, type Rgb, rgbToHex, textOn } from "./colorMix";
 import {
@@ -139,6 +138,8 @@ function prepare(feature: RenderFeature, layer: RenderLayer): Prepared {
 export class FeatureLayer {
 	private prepared: Prepared[] = [];
 	private clusterPx = DEFAULT_SETTINGS.pinClusterDistance;
+	/** How hovered and selected lines and areas are drawn, in percent of their normal look. */
+	private hoverLook: HoverLook = DEFAULT_SETTINGS.hoverLook;
 	private clusters = this.buildClusters();
 	private icons = new Map<Dye, HTMLImageElement>();
 	private drawnPins: DrawnPin[] = [];
@@ -203,6 +204,30 @@ export class FeatureLayer {
 		this.clusterPx = px;
 		this.rebuildClusters();
 		this.onChange();
+	}
+
+	setHoverLook(look: HoverLook) {
+		const old = this.hoverLook;
+		if (
+			look.width === old.width &&
+			look.opacity === old.opacity &&
+			look.fill === old.fill
+		)
+			return;
+		this.hoverLook = look;
+		this.onChange();
+	}
+
+	/**
+	 * The cached picture has the hovered and selected shapes in it, drawn normally, with their
+	 * emphasised look laid over them; a look thinner or fainter than normal would not show then.
+	 */
+	private hoverHidesCache() {
+		const { width, opacity, fill } = this.hoverLook;
+		return (
+			(this.hoveredId !== null || this.selectedId !== null) &&
+			(width < 100 || opacity < 100 || fill < 100)
+		);
 	}
 
 	/** Whether lines and areas are drawn from a cached image while the map moves; see `drawShapesCached`. */
@@ -437,7 +462,8 @@ export class FeatureLayer {
 			!this.cacheEnabled ||
 			!dpr ||
 			typeof document === "undefined" ||
-			this.draft
+			this.draft ||
+			this.hoverHidesCache()
 		) {
 			this.shapeCache = null;
 			this.drawShapes(ctx, view, size, 48);
@@ -565,11 +591,11 @@ export class FeatureLayer {
 				project,
 				closed && style.fill !== "none" ? undefined : cull,
 			);
+		const look = emphasised
+			? this.hoverLook
+			: { width: 100, opacity: 100, fill: 100 };
 		if (closed && style.fill !== "none") {
-			ctx.globalAlpha = Math.min(
-				1,
-				style.fillOpacity + (emphasised ? 0.13 : 0),
-			);
+			ctx.globalAlpha = Math.min(1, (style.fillOpacity * look.fill) / 100);
 			ctx.fillStyle =
 				style.fill === "solid"
 					? hex
@@ -580,7 +606,7 @@ export class FeatureLayer {
 				for (const run of p.runs) traceRun(ctx, run, 0, project, cull);
 			}
 		}
-		const width = emphasised ? emphasisedWidth(style.width) : style.width;
+		const width = (style.width * look.width) / 100;
 		if (isDraft) {
 			// The shape being edited: a solid glow around it, whatever its dash pattern.
 			ctx.globalAlpha = 1;
@@ -588,8 +614,10 @@ export class FeatureLayer {
 			ctx.lineWidth = width + 10;
 			ctx.stroke();
 		}
-		ctx.globalAlpha = style.opacity;
+		ctx.globalAlpha = Math.min(1, (style.opacity * look.opacity) / 100);
 		const outline = () => {
+			// A width of 0 would leave the canvas at the last width it had.
+			if (width <= 0) return;
 			ctx.strokeStyle = "rgba(0,0,0,0.55)";
 			ctx.lineWidth = width + 2;
 			ctx.stroke();

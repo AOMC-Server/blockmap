@@ -53,8 +53,5 @@ export function dashPattern(
 	return [];
 }
 
-/** Width of a line when it is hovered or selected: a little thicker, and never thinner than 5. */
-export const emphasisedWidth = (width: number) => Math.max(width + 2, 5);
-
 /** How far from a line (in screen pixels) a click still hits it. */
 export const hitTolerance = (width: number) => Math.max(7, width / 2 + 4);

@@ -36,6 +36,11 @@ export const tags = [
 	{ name: "Images", description: "Blobs and link previews" },
 	{ name: "Stats", description: "Contribution statistics and leaderboard" },
 	{
+		name: "Players",
+		description:
+			"Minecraft players that pins, lines and areas are attributed to, as owner or builder. Players are Minecraft accounts known by their UUID, not site accounts; their names and heads come from Mojang.",
+	},
+	{
 		name: "Files",
 		description:
 			"The file library: folders of downloads, such as Voxy data or Xaero presets. Everything in it is for logged-in users only. A file is downloaded from its `url` (`/files/<folder>/<name>`, with the session cookie or a token with `read`). Moderators may change anything; others only the folders they were given and what is below them.",
@@ -91,7 +96,7 @@ export const errors = {
 	411: errorResponse("The request has no Content-Length"),
 	413: errorResponse("Request body too large"),
 	429: errorResponse("Rate limited"),
-	502: errorResponse("Discord could not be reached"),
+	502: errorResponse("Discord or Mojang could not be reached"),
 	503: errorResponse("Busy, try again shortly"),
 	507: errorResponse("Not enough storage left"),
 } as const;
@@ -108,6 +113,8 @@ type Doc = {
 	login?: boolean;
 	/** Query parameters the handler reads itself, without a zod validator. */
 	query?: Record<string, string>;
+	/** Descriptions of the path parameters, which are otherwise listed bare. */
+	params?: Record<string, string>;
 	/** For bodies a zod validator can't describe, such as multipart uploads. */
 	requestBody?: Record<string, unknown>;
 };
@@ -125,12 +132,21 @@ export function doc(d: Doc) {
 		summary: d.summary,
 		description: d.description,
 		security: d.login ? requiresLogin : undefined,
-		parameters: Object.entries(d.query ?? {}).map(([name, description]) => ({
-			name,
-			in: "query" as const,
-			description,
-			schema: { type: "string" as const },
-		})),
+		parameters: [
+			...Object.entries(d.params ?? {}).map(([name, description]) => ({
+				name,
+				in: "path" as const,
+				required: true,
+				description,
+				schema: { type: "string" as const },
+			})),
+			...Object.entries(d.query ?? {}).map(([name, description]) => ({
+				name,
+				in: "query" as const,
+				description,
+				schema: { type: "string" as const },
+			})),
+		],
 		requestBody: d.requestBody as never,
 		responses: responses as never,
 	});

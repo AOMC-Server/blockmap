@@ -3,16 +3,21 @@ import type { FeatureData, LayerData } from "./state";
 
 const normalize = (s: string) => s.trim().toLowerCase();
 
-/** A feature matches when the query is in its name, its popup text or its type (pin, line, area). */
+/** A feature matches when the query is in its name, its popup text, its type (pin, line, area) or the name of its owner or a builder. */
 export function featureMatches(
-	f: Pick<FeatureData, "name" | "popup" | "type">,
+	f: Pick<FeatureData, "name" | "popup" | "type"> &
+		Partial<Pick<FeatureData, "owner" | "builders">>,
 	query: string,
 ): boolean {
 	const q = normalize(query);
 	if (!q) return true;
-	return [f.name, f.popup, TYPE_LABEL[f.type]].some((text) =>
-		text.toLowerCase().includes(q),
-	);
+	return [
+		f.name,
+		f.popup,
+		TYPE_LABEL[f.type],
+		...(f.owner ? [f.owner.name] : []),
+		...(f.builders ?? []).map((b) => b.name),
+	].some((text) => text.toLowerCase().includes(q));
 }
 
 export type LayerMatch = { layer: LayerData; features: FeatureData[] };

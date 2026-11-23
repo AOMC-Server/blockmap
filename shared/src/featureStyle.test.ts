@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	dashPattern,
-	emphasisedWidth,
-	hitTolerance,
-	resolveStyle,
-} from "./featureStyle";
+import { dashPattern, hitTolerance, resolveStyle } from "./featureStyle";
 
 describe("resolveStyle", () => {
 	test("no style is the look features had before styles", () => {
@@ -69,10 +64,7 @@ describe("a layer's default style", () => {
 	});
 });
 
-test("hover makes a line thicker, and a thick line is easier to hit", () => {
-	expect(emphasisedWidth(2)).toBe(5);
-	expect(emphasisedWidth(3)).toBe(5);
-	expect(emphasisedWidth(10)).toBe(12);
+test("a thick line is easier to hit", () => {
 	expect(hitTolerance(1)).toBe(7);
 	expect(hitTolerance(10)).toBe(9);
 });

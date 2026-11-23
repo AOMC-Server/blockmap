@@ -21,6 +21,17 @@ describe("featureMatches", () => {
 		expect(featureMatches(f, "nether")).toBe(false);
 	});
 
+	test("looks in the names of the owner and the builders", () => {
+		const f = {
+			...feature(1, "Farm"),
+			owner: { id: 1, uuid: "u1", name: "Notch" },
+			builders: [{ id: 2, uuid: "u2", name: "Jeb_" }],
+		} as FeatureData;
+		expect(featureMatches(f, "notch")).toBe(true);
+		expect(featureMatches(f, "JEB")).toBe(true);
+		expect(featureMatches(f, "dinnerbone")).toBe(false);
+	});
+
 	test("an empty query matches everything", () => {
 		expect(featureMatches(feature(1, "x"), "")).toBe(true);
 		expect(featureMatches(feature(1, "x"), "   ")).toBe(true);

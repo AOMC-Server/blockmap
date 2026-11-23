@@ -10,7 +10,7 @@ import {
 import { signal } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { showNotice } from "../api";
-import { mapView } from "../controller";
+import { goToFeature, mapView, revealLayer } from "../controller";
 import { featureTitle, pointsOf, TYPE_LABEL } from "../featureInfo";
 import { type LayerMatch, searchLayers } from "../layerSearch";
 import {
@@ -42,10 +42,10 @@ import {
 	toggleLayer,
 	user,
 } from "../state";
-import { openFeaturePopup } from "../tools/features";
 import { DyePicker } from "./DyePicker";
 import { Banner } from "./icons";
 import { layerSharingFor } from "./LayerSharing";
+import { PlayerHead } from "./PlayerHead";
 import { StyleControls } from "./StyleControls";
 
 /** Layers that are expanded in the list; kept when the panel is closed and reopened. */
@@ -57,29 +57,15 @@ function toggleOpen(id: number) {
 	openLayers.value = next;
 }
 
-/** A layer that is hidden would show nothing at the place we are taking the user to. */
-function reveal(layerId: number) {
-	const layer = layersData.value.find((l) => l.id === layerId);
-	if (layer && isLayerHidden(layer)) setLayersHidden([layer], false);
-}
-
 function zoomToLayer(l: LayerData) {
 	const mv = mapView.value;
 	if (!mv || l.features.length === 0) return;
-	reveal(l.id);
+	revealLayer(l.id);
 	mv.fitBounds(boundsOf(l.features.flatMap(pointsOf)), { padding: 100 });
 }
 
 const hoverFeature = (id: number | null) =>
 	mapView.value?.setHoveredFeature(id);
-
-function goTo(f: FeatureData) {
-	const mv = mapView.value;
-	if (!mv) return;
-	reveal(f.layerId);
-	mv.fitBounds(boundsOf(pointsOf(f)), { padding: 140 });
-	openFeaturePopup(f);
-}
 
 function LayerForm(props: {
 	initial?: LayerData;
@@ -498,13 +484,14 @@ function LayerRow(props: {
 									<button
 										type="button"
 										class="plain feature-link"
-										onClick={() => goTo(f)}
+										onClick={() => goToFeature(f)}
 									>
 										<Banner dye={f.color ?? l.color} />
 										<span class="type">{TYPE_LABEL[f.type]}</span>
 										<span class="feature-name">
 											{f.name || <em>unnamed</em>}
 										</span>
+										{f.owner && <PlayerHead player={f.owner} size={18} />}
 									</button>
 									{editable && (
 										<span class="feature-actions">

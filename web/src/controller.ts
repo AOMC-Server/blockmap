@@ -3,7 +3,9 @@ import { effect, signal } from "@preact/signals";
 import type { InferResponseType } from "hono/client";
 import { api, showNotice } from "./api";
 import { subscribe } from "./events";
+import { pointsOf } from "./featureInfo";
 import { loadLayers } from "./layers";
+import { boundsOf } from "./map/geometry";
 import { MapView } from "./map/MapView";
 import type { TileLookup } from "./map/tileLayer";
 import {
@@ -22,6 +24,7 @@ import {
 	editor,
 	effectiveRev,
 	embed,
+	type FeatureData,
 	interfaceHidden,
 	isLayerHidden,
 	isolatedUpload,
@@ -33,6 +36,7 @@ import {
 	preloadProgress,
 	type RevisionInfo,
 	rev,
+	setLayersHidden,
 	sharedLayers,
 	tilesPaused,
 	user,
@@ -41,6 +45,7 @@ import {
 } from "./state";
 import { initTools } from "./tools";
 import { stopDraw } from "./tools/draw";
+import { openFeaturePopup } from "./tools/features";
 import { formatUrl, parseUrl } from "./url";
 
 /** The response of the tile hash lookup, typed from the server's route (the query is not typed there). */
@@ -192,6 +197,21 @@ export async function refreshMap(): Promise<void> {
 /** How close to the middle of the map (css pixels) a tap hides the crosshair. */
 const CROSSHAIR_TAP_RADIUS = 24;
 
+/** A layer that is hidden would show nothing at the place we are taking the user to. */
+export function revealLayer(layerId: number) {
+	const layer = layersData.value.find((l) => l.id === layerId);
+	if (layer && isLayerHidden(layer)) setLayersHidden([layer], false);
+}
+
+/** Shows a feature: its layer switched on, the map fitted to it and its popup open. */
+export function goToFeature(f: FeatureData) {
+	const mv = mapView.value;
+	if (!mv) return;
+	revealLayer(f.layerId);
+	mv.fitBounds(boundsOf(pointsOf(f)), { padding: 140 });
+	openFeaturePopup(f);
+}
+
 /** Starts the app: loads the map, builds the canvas, and wires URL sync and head polling. */
 export async function boot(container: HTMLElement) {
 	const initial = parseUrl(location.search);
@@ -267,6 +287,7 @@ export async function boot(container: HTMLElement) {
 	);
 	effect(() => mv.setPinClusterDistance(settings.value.pinClusterDistance));
 	effect(() => mv.setBlockHighlight(settings.value.highlightBlock));
+	effect(() => mv.setHoverLook(settings.value.hoverLook));
 	effect(() =>
 		mv.setShapeCache(
 			shapeCacheEnabled(settings.value.shapeCache, navigator.userAgent),
@@ -353,6 +374,20 @@ export async function boot(container: HTMLElement) {
 		}
 		layersTimer = setTimeout(() => void loadLayers(), 120);
 	});
+
+	// A link to a feature goes to it once the layers it may be in have loaded.
+	if (initial.feature !== null && startDim === initial.dim) {
+		const target = initial.feature;
+		const stop = effect(() => {
+			const layers = layersData.value;
+			if (layers.length === 0) return;
+			const f = layers.flatMap((l) => l.features).find((f) => f.id === target);
+			queueMicrotask(() => {
+				stop();
+				if (f) goToFeature(f);
+			});
+		});
+	}
 
 	// Draw the layers the user has switched on.
 	effect(() => {

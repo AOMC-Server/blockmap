@@ -13,12 +13,15 @@ import { requireUser, userOf } from "../auth/session";
 import type { Db } from "../db/client";
 import { featureRevisions, features, layers, users } from "../db/schema";
 import {
+	attributionOf,
 	contentOf,
 	insertRevision,
 	latestRevision,
 	liveFeatureCount,
 	moveFeature,
-	toView,
+	playerIdsOf,
+	resolveContent,
+	viewOf,
 } from "../features";
 import { doc } from "../openapi";
 import {
@@ -27,6 +30,7 @@ import {
 	canModerate,
 	loadLayerAccess,
 } from "../permissions";
+import { playersById } from "../players";
 import type { AppEnv } from "../types";
 import { formatIssues, validate } from "../validate";
 import { parseId } from "./util";
@@ -77,7 +81,8 @@ export const featureRoutes = new Hono<AppEnv>()
 			tag: "Features",
 			summary: "Update a feature",
 			description:
-				"Send `baseRevisionId` (the `revisionId` you last saw) to avoid overwriting someone else's change: if the feature has a newer revision the answer is 409 with `{ error, feature }`, the current state. `layerId` moves the feature to another layer of the same dimension (you must be able to edit both; 409 `layer is full` if the target holds the most features it can).",
+				"Send `baseRevisionId` (the `revisionId` you last saw) to avoid overwriting someone else's change: if the feature has a newer revision, the answer is 409 with `{ error, feature }`, the current state. `layerId` moves the feature to another layer of the same dimension (you must be able to edit both; 409 `layer is full` if the target layer is full).",
+			params: { id: "Feature id" },
 			fails: [400, 403, 404, 409, 429],
 			login: true,
 		}),
@@ -127,9 +132,14 @@ export const featureRoutes = new Hono<AppEnv>()
 					color: patch.color === undefined ? current.color : patch.color,
 					style: patch.style === undefined ? current.style : patch.style,
 					geometry: patch.geometry ?? current.geometry,
+					owner: patch.owner === undefined ? current.ownerId : patch.owner,
+					builders: patch.builders ?? current.builderIds,
 				});
 				if (!merged.success)
 					return { status: 400, error: merged.error } as const;
+				const content = resolveContent(tx, merged.data, user.id);
+				if ("unknownPlayer" in content)
+					return { status: 404, player: content.unknownPlayer } as const;
 				if (moving) moveFeature(tx, found.feature.id, toLayerId);
 				return {
 					status: 200,
@@ -137,18 +147,21 @@ export const featureRoutes = new Hono<AppEnv>()
 						tx,
 						{ id: found.feature.id, layerId: toLayerId },
 						user.id,
-						merged.data,
+						content,
 					),
 				} as const;
 			});
 			switch (out.status) {
 				case 404:
-					return c.json({ error: "not found" }, 404);
+					return c.json(
+						{ error: "player" in out ? "player not found" : "not found" },
+						404,
+					);
 				case 409:
 					return c.json(
 						{
 							error: "the feature was changed since you loaded it",
-							feature: toView(found.feature, out.current),
+							feature: viewOf(db, found.feature, out.current),
 						},
 						409,
 					);
@@ -164,7 +177,7 @@ export const featureRoutes = new Hono<AppEnv>()
 					);
 				default:
 					announceLayers(c, found.layer.dimensionId);
-					return c.json({ feature: toView(found.feature, out.row) });
+					return c.json({ feature: viewOf(db, found.feature, out.row) });
 			}
 		},
 	)
@@ -173,7 +186,9 @@ export const featureRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Features",
 			summary: "Delete a feature",
-			description: "Recorded as a new revision, so it can be restored.",
+			description:
+				"Anyone who may edit the feature's layer. Recorded as a new revision, so it can be restored.",
+			params: { id: "Feature id" },
 			fails: [403, 404, 429],
 			login: true,
 		}),
@@ -205,7 +220,8 @@ export const featureRoutes = new Hono<AppEnv>()
 			tag: "Features",
 			summary: "Get a feature's edit history",
 			description:
-				"Newest first, `limit` (default 50) at a time. `nextBefore` is set when there are older entries: pass it as `before` to get the next page.",
+				"Anyone who may see the feature's layer. Newest first, `limit` (default 50) at a time. `nextBefore` is set when there are older entries: pass it as `before` to get the next page.",
+			params: { id: "Feature id" },
 			fails: [400, 404],
 		}),
 		// Optional so that clients written before paging need not send a query.
@@ -231,9 +247,14 @@ export const featureRoutes = new Hono<AppEnv>()
 				.orderBy(desc(featureRevisions.id))
 				.limit(limit + 1);
 			const page = rows.slice(0, limit);
+			const players = playersById(
+				db,
+				page.flatMap(({ revision }) => playerIdsOf(revision)),
+			);
 			return c.json({
 				history: page.map(({ revision: r, authorName }) => ({
 					...contentOf(r),
+					...attributionOf(r, players),
 					revisionId: r.id,
 					layerId: r.layerId,
 					authorId: r.authorId,
@@ -252,8 +273,16 @@ export const featureRoutes = new Hono<AppEnv>()
 			tag: "Features",
 			summary: "Restore an earlier version of a feature",
 			description:
-				"Moderators. Also brings back a deleted feature, and moves it back to the layer it was in then (if that layer still exists). Restoring the current version changes nothing (200).",
-			ok: { 201: "Restored" },
+				"Moderators. Also brings back a deleted feature, and moves it back to the layer it was in then (if that layer still exists). Restoring the current version changes nothing (200). 404 if the revision does not belong to this feature, 409 if the layer it returns to is full.",
+			params: {
+				id: "Feature id",
+				revisionId:
+					"Id of the revision to restore (`revisionId` in the history)",
+			},
+			ok: {
+				200: "Already the current version; nothing changed",
+				201: "Restored",
+			},
 			fails: [403, 404, 409, 429],
 			login: true,
 		}),
@@ -319,7 +348,7 @@ export const featureRoutes = new Hono<AppEnv>()
 					if (out.status === 201) announceLayers(c, found.layer.dimensionId);
 					return c.json(
 						{
-							feature: toView(found.feature, out.row),
+							feature: viewOf(db, found.feature, out.row),
 							deleted: out.old.deleted,
 						},
 						out.status,

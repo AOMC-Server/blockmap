@@ -18,6 +18,8 @@ import { App } from "./ui/App";
 import { FilesPage } from "./ui/FilesPage";
 import { InvitePage, inviteTokenFromPath } from "./ui/InvitePage";
 import { ManagePage } from "./ui/ManagePage";
+import { PlayerPage, playerKeyFromPath } from "./ui/PlayerPage";
+import { PlayersPage } from "./ui/PlayersPage";
 import { PrivacyPage } from "./ui/PrivacyPage";
 import { SettingsPage } from "./ui/SettingsPage";
 import { StatsPage } from "./ui/StatsPage";
@@ -29,6 +31,7 @@ installFontScale();
 
 const inviteToken = inviteTokenFromPath(location.pathname);
 const path = location.pathname.replace(/\/+$/, "");
+const playerKey = playerKeyFromPath(path);
 const onFiles = path === "/files" || path.startsWith("/files/");
 const onMap =
 	!inviteToken &&
@@ -36,6 +39,8 @@ const onMap =
 	path !== "/settings" &&
 	path !== "/manage" &&
 	path !== "/stats" &&
+	path !== "/players" &&
+	!playerKey &&
 	path !== "/privacy";
 
 effect(() => {
@@ -75,6 +80,10 @@ render(
 			<ManagePage />
 		) : path === "/stats" ? (
 			<StatsPage />
+		) : path === "/players" ? (
+			<PlayersPage />
+		) : playerKey ? (
+			<PlayerPage playerKey={decodeURIComponent(playerKey)} />
 		) : path === "/privacy" ? (
 			<PrivacyPage />
 		) : onFiles ? (

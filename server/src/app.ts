@@ -27,6 +27,7 @@ import { linkRoutes, shortLinkRedirect } from "./routes/links";
 import { mapRoutes } from "./routes/map";
 import { meRoutes } from "./routes/me";
 import { memberRoutes } from "./routes/members";
+import { playerRoutes } from "./routes/players";
 import { previewRoutes } from "./routes/preview";
 import { queueRoutes } from "./routes/queue";
 import { revisionRoutes } from "./routes/revisions";
@@ -128,6 +129,7 @@ export function createApp({ db, env, services, fetch: fetchFn }: AppDeps) {
 		.use("/api/layers/*", limitWrites)
 		.use("/api/features/*", limitWrites)
 		.use("/api/files/*", limitWrites)
+		.use("/api/players/*", limitWrites)
 		.route("/auth", authRoutes(fetchFn))
 		.route("/api/me", meRoutes)
 		.route("/api/tokens", tokenRoutes)
@@ -140,6 +142,7 @@ export function createApp({ db, env, services, fetch: fetchFn }: AppDeps) {
 		.route("/api/invites", inviteRoutes)
 		.route("/api/preview.png", previewRoutes)
 		.route("/api/features", featureRoutes)
+		.route("/api/players", playerRoutes(services.mojang))
 		.route("/api/files", fileRoutes)
 		.route("/api/stats", statsRoutes)
 		.route("/api/links", linkRoutes)

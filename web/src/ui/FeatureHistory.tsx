@@ -3,12 +3,14 @@ import { formatTime } from "@aomc-server/block-ui/format";
 import { signal } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { dyeLabel, pointsOf, TYPE_LABEL } from "../featureInfo";
+import { type AttributionChange, attributionChange } from "../players";
 import {
 	type FeatureHistoryEntry,
 	loadFeatureHistory,
 	restoreFeatureRevision,
 } from "../revisions";
 import { isModerator, layersData, popup, readOnly } from "../state";
+import { PlayerHead } from "./PlayerHead";
 
 /** The feature whose revision list is open. */
 export const featureHistoryFor = signal<{
@@ -37,6 +39,52 @@ function moved(e: FeatureHistoryEntry, older: FeatureHistoryEntry | undefined) {
 	// Names of layers the user cannot see are not known to the client.
 	const name = layersData.value.find((l) => l.id === e.layerId)?.name;
 	return name ? `Moved to ${name}` : "Moved to another layer";
+}
+
+function PlayerName(props: { player: { id: number; name: string } }) {
+	return (
+		<span class="fh-player">
+			<PlayerHead player={props.player} size={16} /> {props.player.name}
+		</span>
+	);
+}
+
+/** Who the feature is attributed to differently than in the version before. */
+function AttributionNote(props: { change: AttributionChange }) {
+	const { owner, added, removed } = props.change;
+	return (
+		<>
+			{owner && (
+				<div class="muted">
+					{owner.from && owner.to
+						? "Owner: "
+						: owner.to
+							? "Owner set: "
+							: "Owner removed: "}
+					{owner.from && <PlayerName player={owner.from} />}
+					{owner.from && owner.to && " → "}
+					{owner.to && <PlayerName player={owner.to} />}
+				</div>
+			)}
+			{(added.length > 0 || removed.length > 0) && (
+				<div class="muted">
+					Builders:{" "}
+					{[
+						...added.map((p) => (
+							<span key={`+${p.id}`} class="fh-added">
+								+<PlayerName player={p} />
+							</span>
+						)),
+						...removed.map((p) => (
+							<span key={`-${p.id}`} class="fh-removed">
+								−<PlayerName player={p} />
+							</span>
+						)),
+					].flatMap((el, i) => (i === 0 ? [el] : [", ", el]))}
+				</div>
+			)}
+		</>
+	);
 }
 
 /** Revision list of one feature. Moderators can make an old version current again. */
@@ -74,6 +122,16 @@ export function FeatureHistory() {
 		} finally {
 			setLoadingMore(false);
 		}
+	};
+
+	/** The change of attribution an entry made, once the version before it is known. */
+	const attributionNote = (i: number) => {
+		const e = entries?.[i];
+		if (!e || e.deleted) return null;
+		const older = entries?.[i + 1];
+		if (!older && nextBefore !== null) return null;
+		const change = attributionChange(older ?? null, e);
+		return change && <AttributionNote change={change} />;
 	};
 
 	const restore = async (e: FeatureHistoryEntry) => {
@@ -114,6 +172,7 @@ export function FeatureHistory() {
 								<div class="muted">{moved(e, entries[i + 1])}</div>
 							)}
 							<div class="muted">{summary(e)}</div>
+							{attributionNote(i)}
 							<div class="muted">
 								{e.authorName} · {formatTime(e.createdAt)}
 							</div>

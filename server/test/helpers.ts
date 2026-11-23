@@ -42,7 +42,7 @@ export function makeTestApp(
 		...envOverrides,
 	});
 	runSetup(db, env);
-	const services = createServices(db, env);
+	const services = createServices(db, env, fetchFn);
 	const app = createApp({ db, env, services, fetch: fetchFn });
 	return { app, db, env, services };
 }

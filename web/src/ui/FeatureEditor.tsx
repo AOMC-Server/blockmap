@@ -9,6 +9,7 @@ import {
 	MAX_NAME,
 	MAX_POPUP,
 } from "@blockmap/shared/features";
+import { MAX_BUILDERS, type Player } from "@blockmap/shared/players";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { showNotice } from "../api";
 import { pathsOf, TYPE_LABEL } from "../featureInfo";
@@ -40,6 +41,7 @@ import {
 import { DyePicker } from "./DyePicker";
 import { Banner } from "./icons";
 import { LayerSelect } from "./LayerSelect";
+import { BuildersPicker, OwnerPicker } from "./PlayerPicker";
 import { PointsList, ShapeStats } from "./PointsList";
 import { StyleControls } from "./StyleControls";
 
@@ -98,6 +100,8 @@ export function FeatureEditor() {
 	const [text, setText] = useState(existing?.popup ?? "");
 	const [color, setColor] = useState<Dye | null>(existing?.color ?? null);
 	const [style, setStyle] = useState<FeatureStyle>(existing?.style ?? {});
+	const [owner, setOwner] = useState<Player | null>(existing?.owner ?? null);
+	const [builders, setBuilders] = useState<Player[]>(existing?.builders ?? []);
 	const [saving, setSaving] = useState(false);
 	// The revision the edit is based on; moves forward only when a conflict is reported.
 	const [baseRevision, setBaseRevision] = useState<number | undefined>(
@@ -161,6 +165,8 @@ export function FeatureEditor() {
 			type,
 			style: type === "pin" ? null : cleanStyle(style),
 			geometry: drawnGeometry(d),
+			owner: owner?.id ?? null,
+			builders: builders.map((b) => b.id),
 		} as FeatureInput;
 		setSaving(true);
 		let saved = false;
@@ -385,6 +391,21 @@ export function FeatureEditor() {
 					}}
 					placeholder="Supports **bold** and [links](https://example.com)"
 				/>
+			</div>
+
+			<div class="field flow">
+				<span class="label">Owner</span>
+				<OwnerPicker value={owner} onChange={setOwner} />
+			</div>
+
+			<div class="field flow">
+				<span class="label">
+					Builders{" "}
+					<small>
+						({builders.length}/{MAX_BUILDERS})
+					</small>
+				</span>
+				<BuildersPicker value={builders} onChange={setBuilders} />
 			</div>
 
 			{type !== "pin" && (

@@ -4,6 +4,7 @@ import type {
 	FeatureType,
 	Point,
 } from "@blockmap/shared/features";
+import type { Player } from "@blockmap/shared/players";
 import { canEdit, canModerate, isReadOnly } from "@blockmap/shared/roles";
 import type { DimensionTheme } from "@blockmap/shared/schemas";
 import type { CurveKind } from "@blockmap/shared/spline";
@@ -33,6 +34,10 @@ export type FeatureData = {
 	geometry: Point | Point[] | Point[][];
 	authorId: string;
 	updatedAt: number;
+	ownerId: number | null;
+	builderIds: number[];
+	owner: Player | null;
+	builders: Player[];
 };
 
 export type LayerData = Omit<

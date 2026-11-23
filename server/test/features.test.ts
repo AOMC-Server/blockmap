@@ -362,6 +362,8 @@ describe("feature validation", () => {
 			geometry: [1, 2],
 			popup: "",
 			color: null,
+			owner: null,
+			builders: [],
 		});
 	});
 
@@ -793,6 +795,8 @@ describe("export and import", () => {
 				popup: "hello",
 				color: "lime",
 				geometry: [1, 2],
+				owner: null,
+				builders: [],
 			},
 			{
 				type: "line",
@@ -804,6 +808,8 @@ describe("export and import", () => {
 					[0, 0],
 					[100, 100],
 				],
+				owner: null,
+				builders: [],
 			},
 		]);
 

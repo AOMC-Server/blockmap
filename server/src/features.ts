@@ -3,10 +3,12 @@ import {
 	type FeatureInput,
 	type FeatureStyle,
 	type FeatureType,
+	type Player,
 } from "@blockmap/shared";
 import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "./db/client";
 import { featureRevisions, features, layers, revisions } from "./db/schema";
+import { playersById, resolvePlayerRefs, syncFeaturePlayers } from "./players";
 import { SEQS_PER_MS } from "./tiles/history";
 
 export type FeatureView = {
@@ -20,13 +22,37 @@ export type FeatureView = {
 	/** How a line or an area is drawn; null: the defaults. */
 	style: FeatureStyle | null;
 	geometry: unknown;
+	/** Id of the player who owns it; `owner` is that player. */
+	ownerId: number | null;
+	builderIds: number[];
+	owner: Player | null;
+	builders: Player[];
 	authorId: string;
 	updatedAt: number;
 };
 
 type RevisionRow = typeof featureRevisions.$inferSelect;
 
-export function toView(feature: { id: number }, r: RevisionRow): FeatureView {
+/** The players a revision mentions, for building its view. */
+export const playerIdsOf = (r: Pick<RevisionRow, "ownerId" | "builderIds">) =>
+	r.ownerId === null ? r.builderIds : [r.ownerId, ...r.builderIds];
+
+/** The owner and builders of a revision, as players; ids that are gone are left out. */
+export function attributionOf(
+	r: Pick<RevisionRow, "ownerId" | "builderIds">,
+	players: Map<number, Player>,
+) {
+	return {
+		owner: r.ownerId === null ? null : (players.get(r.ownerId) ?? null),
+		builders: r.builderIds.flatMap((id) => players.get(id) ?? []),
+	};
+}
+
+export function toView(
+	feature: { id: number },
+	r: RevisionRow,
+	players: Map<number, Player>,
+): FeatureView {
 	return {
 		id: feature.id,
 		layerId: r.layerId,
@@ -37,10 +63,20 @@ export function toView(feature: { id: number }, r: RevisionRow): FeatureView {
 		color: r.color,
 		style: r.style,
 		geometry: r.geometry,
+		ownerId: r.ownerId,
+		builderIds: r.builderIds,
+		...attributionOf(r, players),
 		authorId: r.authorId,
 		updatedAt: r.createdAt,
 	};
 }
+
+/** toView for a single revision, looking up its players. */
+export const viewOf = (
+	db: Pick<Db, "select">,
+	feature: { id: number },
+	r: RevisionRow,
+) => toView(feature, r, playersById(db, playerIdsOf(r)));
 
 /**
  * Current (or as-of `at`, a unix ms timestamp) non-deleted features of the given layers.
@@ -86,8 +122,12 @@ export function featuresOfLayers(
 		)
 		.orderBy(features.sortOrder, features.id)
 		.all();
+	const players = playersById(
+		db,
+		rows.flatMap(({ revision }) => playerIdsOf(revision)),
+	);
 	for (const { feature, revision } of rows)
-		byLayer.get(revision.layerId)?.push(toView(feature, revision));
+		byLayer.get(revision.layerId)?.push(toView(feature, revision, players));
 	return byLayer;
 }
 
@@ -120,15 +160,30 @@ export function liveFeatureCount(db: Pick<Db, "all">, layerId: number) {
 	return row?.n ?? 0;
 }
 
-export type RevisionContent = FeatureInput & { deleted?: boolean };
+/** What a revision holds, with the owner and builders as player ids. */
+type OmitEach<T, K extends PropertyKey> = T extends unknown
+	? Omit<T, K>
+	: never;
+export type RevisionContent = OmitEach<FeatureInput, "owner" | "builders"> & {
+	ownerId: number | null;
+	builderIds: number[];
+	deleted?: boolean;
+};
 
-/** The editable fields of a revision, as FeatureInput. */
-export const contentOf = (
-	r: Pick<
-		FeatureView,
-		"type" | "name" | "popup" | "color" | "style" | "geometry"
-	>,
-) =>
+type ContentFields = Pick<
+	FeatureView,
+	| "type"
+	| "name"
+	| "popup"
+	| "color"
+	| "style"
+	| "geometry"
+	| "ownerId"
+	| "builderIds"
+>;
+
+/** The editable fields of a revision, ready to be stored again. */
+export const contentOf = (r: ContentFields): RevisionContent =>
 	({
 		type: r.type,
 		name: r.name,
@@ -137,16 +192,57 @@ export const contentOf = (
 		// Only lines and areas have a style.
 		...(r.type === "pin" ? {} : { style: r.style }),
 		geometry: r.geometry,
-	}) as FeatureInput;
+		ownerId: r.ownerId,
+		builderIds: r.builderIds,
+	}) as RevisionContent;
+
+/**
+ * FeatureInput with its owner and builders turned into player ids (adding players given by
+ * `{uuid, name}` that the map does not know), or the first player id that does not exist.
+ */
+export function resolveContent(
+	db: Pick<Db, "select" | "insert">,
+	input: FeatureInput,
+	userId: string | null,
+): RevisionContent | { unknownPlayer: number } {
+	const { owner, builders, ...rest } = input;
+	const ownerIds = resolvePlayerRefs(db, owner === null ? [] : [owner], userId);
+	if ("unknown" in ownerIds) return { unknownPlayer: ownerIds.unknown };
+	const builderIds = resolvePlayerRefs(db, builders, userId);
+	if ("unknown" in builderIds) return { unknownPlayer: builderIds.unknown };
+	return {
+		...rest,
+		ownerId: ownerIds.ids[0] ?? null,
+		builderIds: builderIds.ids,
+	};
+}
+
+/** The editable fields of a revision as FeatureInput, with players as `{uuid, name}` so they can be imported elsewhere. */
+export function portableContentOf(
+	r: ContentFields,
+	players: Map<number, Player>,
+): FeatureInput {
+	const { ownerId, builderIds, ...rest } = contentOf(r);
+	const ref = (p: Player) => ({ uuid: p.uuid, name: p.name });
+	const owner = ownerId === null ? undefined : players.get(ownerId);
+	return {
+		...rest,
+		owner: owner ? ref(owner) : null,
+		builders: builderIds.flatMap((id) => {
+			const p = players.get(id);
+			return p ? [ref(p)] : [];
+		}),
+	} as FeatureInput;
+}
 
 /** Adds a revision; `feature.layerId` is the layer the feature is in as of it. */
 export function insertRevision(
-	db: Pick<Db, "insert">,
+	db: Pick<Db, "insert" | "delete">,
 	feature: { id: number; layerId: number },
 	authorId: string,
 	content: RevisionContent,
 ) {
-	return db
+	const row = db
 		.insert(featureRevisions)
 		.values({
 			featureId: feature.id,
@@ -163,14 +259,18 @@ export function insertRevision(
 					? null
 					: cleanStyle("style" in content ? content.style : null),
 			geometry: content.geometry,
+			ownerId: content.ownerId,
+			builderIds: content.builderIds,
 		})
 		.returning()
 		.get();
+	syncFeaturePlayers(db, feature.id, row);
+	return row;
 }
 
 /** Adds a feature at `sortOrder` with its first revision. */
 export function insertFeature(
-	db: Pick<Db, "insert">,
+	db: Pick<Db, "insert" | "delete" | "select">,
 	layerId: number,
 	sortOrder: number,
 	authorId: string,
@@ -181,7 +281,7 @@ export function insertFeature(
 		.values({ layerId, sortOrder })
 		.returning()
 		.get();
-	return toView(feature, insertRevision(db, feature, authorId, content));
+	return viewOf(db, feature, insertRevision(db, feature, authorId, content));
 }
 
 /** Puts a feature at the end of another layer. The caller adds the revision that records it. */

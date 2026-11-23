@@ -5,7 +5,9 @@ import type { Env } from "./env";
 import { createEventHub } from "./events";
 import { createFileStore } from "./files/store";
 import { createWorker } from "./jobs/worker";
+import { createMojang } from "./mojang";
 import { blobsDir, filesDir, previewCacheDir } from "./paths";
+import { createPlayerRefresher } from "./players";
 import { createPreviewService } from "./preview";
 import {
 	createRateLimiter,
@@ -18,7 +20,12 @@ import { createTraffic } from "./traffic";
 
 export type Services = ReturnType<typeof createServices>;
 
-export function createServices(db: Db, env: Env) {
+/** `fetchFn` is how the server reaches Mojang; tests pass a fake one. */
+export function createServices(
+	db: Db,
+	env: Env,
+	fetchFn: typeof fetch = fetch,
+) {
 	const blobs = createBlobStore(blobsDir(env.DATA_DIR), (hash, bytes) => {
 		db.insert(blobFiles).values({ hash, bytes }).onConflictDoNothing().run();
 	});
@@ -41,7 +48,11 @@ export function createServices(db: Db, env: Env) {
 	});
 	const traffic = createTraffic(db, env);
 	const files = createFileStore(filesDir(env.DATA_DIR));
+	const mojang = createMojang(fetchFn);
+	const playerRefresher = createPlayerRefresher(db, mojang);
 	return {
+		mojang,
+		playerRefresher,
 		blobs,
 		files,
 		events,

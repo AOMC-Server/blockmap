@@ -13,6 +13,7 @@ const ICONS = {
 	archive: "folder.png",
 	more: "more.png",
 	stats: "stats.png",
+	players: "players.png",
 	settings: "settings.png",
 	privacy: "privacy.png",
 	logout: "logout.png",

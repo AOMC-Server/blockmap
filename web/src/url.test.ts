@@ -9,6 +9,7 @@ describe("url state", () => {
 			rev: 7,
 			embed: true,
 			layers: null,
+			feature: null,
 		});
 	});
 
@@ -19,6 +20,7 @@ describe("url state", () => {
 			rev: null,
 			embed: false,
 			layers: null,
+			feature: null,
 		});
 	});
 
@@ -26,6 +28,12 @@ describe("url state", () => {
 		expect(parseUrl("?layers=3,1,x,-2,1.5,7").layers).toEqual([3, 1, 7]);
 		// Listed but empty: no layer is shown, which differs from not listed.
 		expect(parseUrl("?layers=").layers).toEqual([]);
+	});
+
+	test("parses the feature to go to", () => {
+		expect(parseUrl("?dim=overworld&feature=42").feature).toBe(42);
+		expect(parseUrl("?feature=x").feature).toBeNull();
+		expect(parseUrl("?feature=-3").feature).toBeNull();
 	});
 
 	test("ignores the old map parameter", () => {

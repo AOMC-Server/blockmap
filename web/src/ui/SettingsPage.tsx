@@ -7,6 +7,9 @@ import {
 import { useEffect, useState } from "preact/hooks";
 import { api, attempt, loginUrl } from "../api";
 import {
+	DEFAULT_HOVER_LOOK,
+	HOVER_PERCENT_MAX,
+	type HoverLook,
 	isMapOutlines,
 	isShapeCache,
 	MAP_OUTLINE_CHOICES,
@@ -38,6 +41,36 @@ function SettingToggle(props: {
 			label={props.label}
 			hint={props.hint}
 		/>
+	);
+}
+
+/** A slider for one part of how hovered lines and areas look, in percent of their normal look. */
+function HoverSlider(props: { part: keyof HoverLook; label: string }) {
+	const value = settings.value.hoverLook[props.part];
+	const set = (v: number, save = true) =>
+		updateSettings(
+			{ hoverLook: { ...settings.value.hoverLook, [props.part]: v } },
+			save,
+		);
+	return (
+		<label class="field flow">
+			<span class="label">
+				{props.label}: {value}%
+				{value === DEFAULT_HOVER_LOOK[props.part] && (
+					<span class="muted"> (default)</span>
+				)}
+			</span>
+			<input
+				type="range"
+				min={0}
+				max={HOVER_PERCENT_MAX}
+				step={5}
+				value={value}
+				onInput={(e) => set(Number(e.currentTarget.value), false)}
+				onChange={(e) => set(Number(e.currentTarget.value))}
+				onDblClick={() => set(DEFAULT_HOVER_LOOK[props.part])}
+			/>
+		</label>
 	);
 }
 
@@ -162,6 +195,14 @@ function Preferences() {
 					numbered cluster. Lower values show more individual pins.
 				</span>
 			</label>
+			<HoverSlider part="width" label="Line width on hover" />
+			<HoverSlider part="opacity" label="Line opacity on hover" />
+			<HoverSlider part="fill" label="Area fill opacity on hover" />
+			<p class="muted hint">
+				How lines and areas look when you point at them or open their popup,
+				compared to normal. 100% means no change. Double-click a slider to reset
+				it.
+			</p>
 			<SettingToggle
 				field="preloadSpawn"
 				label="Preload tiles around spawn"

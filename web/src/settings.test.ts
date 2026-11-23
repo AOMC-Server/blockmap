@@ -151,6 +151,28 @@ test("the pin cluster distance is kept within its range", () => {
 		expect(parse(bad)).toBe(DEFAULT_SETTINGS.pinClusterDistance);
 });
 
+test("the hover look is kept within 0 to 300%, each part on its own", () => {
+	const parse = (hoverLook: unknown) =>
+		parseSettings(JSON.stringify({ hoverLook })).hoverLook;
+	expect(DEFAULT_SETTINGS.hoverLook).toEqual({
+		width: 170,
+		opacity: 100,
+		fill: 165,
+	});
+	expect(parse({ width: 250.4, opacity: -5, fill: 999 })).toEqual({
+		width: 250,
+		opacity: 0,
+		fill: 300,
+	});
+	expect(parse({ width: "200", fill: 50 })).toEqual({
+		width: 170,
+		opacity: 100,
+		fill: 50,
+	});
+	for (const bad of [null, 3, "x"])
+		expect(parse(bad)).toEqual(DEFAULT_SETTINGS.hoverLook);
+});
+
 describe("shape cache", () => {
 	const firefox =
 		"Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0";

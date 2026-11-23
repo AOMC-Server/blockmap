@@ -23,10 +23,12 @@ recordStorage(db, "boot");
 await services.files.sweep(usedHashes(db));
 services.traffic.start();
 services.worker.start();
+services.playerRefresher.start();
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
 	process.on(signal, () => {
 		services.worker.stop();
 		services.traffic.stop();
+		services.playerRefresher.stop();
 		process.exit(0);
 	});
 }

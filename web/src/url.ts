@@ -7,6 +7,8 @@ export type UrlState = {
 	embed: boolean;
 	/** The layers a shared link shows, or null to show each layer's default. */
 	layers: number[] | null;
+	/** A feature to go to once the layers have loaded (links from a player's page). */
+	feature: number | null;
 };
 
 const num = (value: string | null): number | undefined => {
@@ -29,6 +31,7 @@ function parseLayers(value: string | null): number[] | null {
 export function parseUrl(search: string): UrlState {
 	const q = new URLSearchParams(search);
 	const rev = num(q.get("rev"));
+	const feature = num(q.get("feature"));
 	return {
 		dim: q.get("dim"),
 		view: {
@@ -39,6 +42,10 @@ export function parseUrl(search: string): UrlState {
 		rev: rev !== undefined && Number.isInteger(rev) && rev >= 0 ? rev : null,
 		embed: q.get("embed") === "1",
 		layers: parseLayers(q.get("layers")),
+		feature:
+			feature !== undefined && Number.isInteger(feature) && feature > 0
+				? feature
+				: null,
 	};
 }
 

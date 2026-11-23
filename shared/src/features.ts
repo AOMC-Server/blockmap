@@ -1,5 +1,6 @@
 import * as z from "zod/mini";
 import { DYES } from "./colors";
+import { MAX_BUILDERS, type PlayerRef, playerRefSchema } from "./players";
 import { blockCoord, MAX_NAME, nonEmpty } from "./schemas";
 
 export { MAX_NAME };
@@ -15,6 +16,7 @@ export const DEFAULT_HISTORY_LIMIT = 50;
 export const MAX_HISTORY_LIMIT = 200;
 
 export const FEATURE_TYPES = ["pin", "line", "polygon"] as const;
+type FeatureTypeName = (typeof FEATURE_TYPES)[number];
 
 export const dyeSchema = z.enum(DYES);
 
@@ -103,17 +105,67 @@ export const DEFAULT_FILL_OPACITY = 0.2;
  * area's outline), `fill` and `fillOpacity` about an area's inside.
  */
 export const styleSchema = z.strictObject({
-	dash: z.optional(z.enum(LINE_DASHES)),
-	width: z.optional(
-		z.int().check(z.minimum(MIN_LINE_WIDTH), z.maximum(MAX_LINE_WIDTH)),
+	dash: z.optional(
+		z
+			.enum(LINE_DASHES)
+			.check(
+				z.describe(
+					"Pattern of the line (or an area's outline), default `solid`",
+				),
+			),
 	),
-	opacity: z.optional(z.number().check(z.minimum(0.1), z.maximum(1))),
-	fill: z.optional(z.enum(AREA_FILLS)),
-	fillOpacity: z.optional(z.number().check(z.minimum(0), z.maximum(1))),
-	/** How the line (or outline) goes through its points; forks stay sharp corners. */
-	curve: z.optional(z.enum(LINE_CURVES)),
-	/** Before `curve`: true was what is now "curved". Read, and turned into `curve` by `cleanStyle`. */
-	smooth: z.optional(z.boolean()),
+	width: z.optional(
+		z
+			.int()
+			.check(
+				z.minimum(MIN_LINE_WIDTH),
+				z.maximum(MAX_LINE_WIDTH),
+				z.describe(
+					`Width of the line (or an area's outline) in screen pixels, default ${DEFAULT_LINE_WIDTH} (${DEFAULT_AREA_LINE_WIDTH} for an area)`,
+				),
+			),
+	),
+	opacity: z.optional(
+		z
+			.number()
+			.check(
+				z.minimum(0.1),
+				z.maximum(1),
+				z.describe("Opacity of the line (or an area's outline), default 1"),
+			),
+	),
+	fill: z.optional(
+		z.enum(AREA_FILLS).check(z.describe("Fill of an area, default `solid`")),
+	),
+	fillOpacity: z.optional(
+		z
+			.number()
+			.check(
+				z.minimum(0),
+				z.maximum(1),
+				z.describe(
+					`Opacity of an area's fill, default ${DEFAULT_FILL_OPACITY}`,
+				),
+			),
+	),
+	curve: z.optional(
+		z
+			.enum(LINE_CURVES)
+			.check(
+				z.describe(
+					"How the line (or an area's outline) passes through its points, default `straight`: `curved` keeps its direction (Catmull-Rom), `smooth` also keeps its curvature (a cubic spline, which is rounder); forks remain sharp corners",
+				),
+			),
+	),
+	smooth: z.optional(
+		z
+			.boolean()
+			.check(
+				z.describe(
+					"Legacy form of `curve`, where `true` is `curved` and `false` is `straight`; use `curve` instead",
+				),
+			),
+	),
 });
 export type FeatureStyle = z.infer<typeof styleSchema>;
 
@@ -142,24 +194,90 @@ export function mergeStyle(
 	return { ...cleanStyle(base), ...cleanStyle(over) };
 }
 
+const refKey = (r: PlayerRef) =>
+	typeof r === "number" ? `#${r}` : r.uuid.toLowerCase();
+
+function builderList() {
+	return z.array(playerRefSchema).check(
+		z.maxLength(MAX_BUILDERS),
+		z.refine(
+			(list) => new Set(list.map(refKey)).size === list.length,
+			"a builder is listed twice",
+		),
+	);
+}
+
 const common = {
-	name: z.string().check(z.trim(), z.maxLength(MAX_NAME)),
-	popup: z._default(z.string().check(z.maxLength(MAX_POPUP)), ""),
-	color: z._default(z.nullable(dyeSchema), null),
+	name: z
+		.string()
+		.check(
+			z.trim(),
+			z.maxLength(MAX_NAME),
+			z.describe(`Name, at most ${MAX_NAME} characters`),
+		),
+	popup: z
+		._default(z.string().check(z.maxLength(MAX_POPUP)), "")
+		.check(
+			z.describe(`Popup text, at most ${MAX_POPUP} characters, default empty`),
+		),
+	color: z
+		._default(z.nullable(dyeSchema), null)
+		.check(
+			z.describe("Dye colour; `null` (default) uses the colour of the layer"),
+		),
+	owner: z
+		._default(z.nullable(playerRefSchema), null)
+		.check(
+			z.describe(
+				"The player who owns it: a player id or `{uuid, name}`; `null` (default) for none",
+			),
+		),
+	builders: z
+		._default(builderList(), [])
+		.check(
+			z.describe(
+				`Players who helped build it, as player ids or \`{uuid, name}\`; at most ${MAX_BUILDERS}, default none`,
+			),
+		),
 };
 
+const featureStyle = z
+	._default(z.nullable(styleSchema), null)
+	.check(
+		z.describe(
+			"How the feature is drawn; omitted fields fall back to the layer's style, then to defaults",
+		),
+	);
+
+const featureType = <T extends FeatureTypeName>(type: T) =>
+	z
+		.literal(type)
+		.check(z.describe("Kind of feature: `pin`, `line` or `polygon`"));
+
 export const featureInputSchema = z.discriminatedUnion("type", [
-	z.object({ type: z.literal("pin"), geometry: pointSchema, ...common }),
 	z.object({
-		type: z.literal("line"),
-		geometry: lineGeometry,
-		style: z._default(z.nullable(styleSchema), null),
+		type: featureType("pin"),
+		geometry: pointSchema.check(z.describe("`[x, z]` in block coordinates")),
 		...common,
 	}),
 	z.object({
-		type: z.literal("polygon"),
-		geometry: polygonGeometry,
-		style: z._default(z.nullable(styleSchema), null),
+		type: featureType("line"),
+		geometry: lineGeometry.check(
+			z.describe(
+				`One path \`[[x, z], ...]\` or several \`[[[x, z], ...], ...]\` in block coordinates, with at least 2 different points and at most ${MAX_VERTICES} points in total`,
+			),
+		),
+		style: featureStyle,
+		...common,
+	}),
+	z.object({
+		type: featureType("polygon"),
+		geometry: polygonGeometry.check(
+			z.describe(
+				`Corners \`[[x, z], ...]\` in block coordinates, 3 to ${MAX_VERTICES} points that do not all lie on a single line`,
+			),
+		),
+		style: featureStyle,
 		...common,
 	}),
 ]);
@@ -168,16 +286,76 @@ export type FeatureType = FeatureInput["type"];
 
 /** Partial update; the merged result is validated with featureInputSchema. */
 export const featurePatchSchema = z.object({
-	/** The revision the edit is based on; if the feature has moved on since, the update answers 409. */
-	baseRevisionId: z.optional(z.int().check(z.positive())),
-	type: z.optional(z.enum(FEATURE_TYPES)),
-	name: z.optional(z.string()),
-	popup: z.optional(z.string()),
-	color: z.optional(z.nullable(dyeSchema)),
-	style: z.optional(z.nullable(styleSchema)),
-	geometry: z.optional(z.unknown()),
-	/** Moves the feature to another layer of the same dimension. */
-	layerId: z.optional(z.int().check(z.positive())),
+	baseRevisionId: z.optional(
+		z
+			.int()
+			.check(
+				z.positive(),
+				z.describe(
+					"The `revisionId` the edit is based on; if the feature has a newer revision, the update answers 409",
+				),
+			),
+	),
+	type: z.optional(
+		z
+			.enum(FEATURE_TYPES)
+			.check(z.describe("New kind of feature; send a matching `geometry`")),
+	),
+	name: z.optional(
+		z.string().check(z.describe(`New name, at most ${MAX_NAME} characters`)),
+	),
+	popup: z.optional(
+		z
+			.string()
+			.check(z.describe(`New popup text, at most ${MAX_POPUP} characters`)),
+	),
+	color: z.optional(
+		z
+			.nullable(dyeSchema)
+			.check(z.describe("New dye colour; `null` uses the colour of the layer")),
+	),
+	style: z.optional(
+		z
+			.nullable(styleSchema)
+			.check(
+				z.describe(
+					"New style, replacing the old one; `null` clears it so the layer's style applies",
+				),
+			),
+	),
+	geometry: z.optional(
+		z
+			.unknown()
+			.check(
+				z.describe(
+					"New geometry matching the feature's type; validated against it after the update",
+				),
+			),
+	),
+	owner: z.optional(
+		z
+			.nullable(playerRefSchema)
+			.check(
+				z.describe(
+					"New owner, a player id or `{uuid, name}`; `null` removes the owner",
+				),
+			),
+	),
+	builders: z.optional(
+		builderList().check(
+			z.describe("New list of builders, replacing the old one"),
+		),
+	),
+	layerId: z.optional(
+		z
+			.int()
+			.check(
+				z.positive(),
+				z.describe(
+					"Id of the layer to move the feature to, in the same dimension",
+				),
+			),
+	),
 });
 
 export const featureImportSchema = z
@@ -186,48 +364,101 @@ export const featureImportSchema = z
 
 /** New order of the layers of a dimension, or of the features of a layer, as ids. */
 export const reorderSchema = z.object({
-	ids: z.array(z.int().check(z.positive())).check(z.maxLength(10_000)),
+	ids: z
+		.array(z.int().check(z.positive()))
+		.check(
+			z.maxLength(10_000),
+			z.describe(
+				"Ids of all features in the layer, in the new order; the update answers 409 if the list is out of date",
+			),
+		),
 });
 export const reorderLayersSchema = z.extend(reorderSchema, {
-	dimension: z.string().check(z.minLength(1)),
+	ids: z
+		.array(z.int().check(z.positive()))
+		.check(
+			z.maxLength(10_000),
+			z.describe(
+				"Ids of all layers you can see in the dimension, in the new order; the update answers 409 if the list is out of date",
+			),
+		),
+	dimension: z
+		.string()
+		.check(z.minLength(1), z.describe("Slug of the dimension")),
 });
 
 export const featureHistoryQuerySchema = z.object({
-	limit: z._default(
-		z.pipe(
-			z.coerce.number(),
-			z.int().check(z.minimum(1), z.maximum(MAX_HISTORY_LIMIT)),
+	limit: z
+		._default(
+			z.pipe(
+				z.coerce.number(),
+				z.int().check(z.minimum(1), z.maximum(MAX_HISTORY_LIMIT)),
+			),
+			DEFAULT_HISTORY_LIMIT,
+		)
+		.check(
+			z.describe(
+				`Entries per page, at most ${MAX_HISTORY_LIMIT}, default ${DEFAULT_HISTORY_LIMIT}`,
+			),
 		),
-		DEFAULT_HISTORY_LIMIT,
+	before: z.optional(
+		z
+			.pipe(z.coerce.number(), z.int().check(z.positive()))
+			.check(
+				z.describe(
+					"Only entries older than this revision id; pass `nextBefore` from the previous page",
+				),
+			),
 	),
-	/** Only revisions older than this revision id. */
-	before: z.optional(z.pipe(z.coerce.number(), z.int().check(z.positive()))),
 });
 
-export const layerVisibilitySchema = z.enum(["public", "private"]);
+export const layerVisibilitySchema = z
+	.enum(["public", "private"])
+	.check(
+		z.describe(
+			"`public` layers are shown to everyone, `private` ones only to their creator, members and moderators",
+		),
+	);
 
 const layerName = z
 	.string()
 	.check(z.trim(), z.minLength(1), z.maxLength(MAX_NAME));
 
+const layerColor = dyeSchema.check(
+	z.describe(
+		"Dye colour of the layer's pins, lines and areas that do not set their own",
+	),
+);
+const layerHiddenByDefault = z
+	.boolean()
+	.check(z.describe("Whether the layer starts hidden on the map"));
+const layerStyle = z
+	.nullable(styleSchema)
+	.check(
+		z.describe(
+			"How the lines and areas of the layer are drawn unless they specify their own style; `null` clears it",
+		),
+	);
+
 export const createLayerSchema = z.object({
-	dimension: z.string().check(z.minLength(1)),
-	name: layerName,
-	color: z._default(dyeSchema, "white"),
-	hiddenByDefault: z._default(z.boolean(), false),
+	dimension: z
+		.string()
+		.check(z.minLength(1), z.describe("Slug of the dimension")),
+	name: layerName.check(z.describe("Layer name")),
+	color: z._default(layerColor, "white"),
+	hiddenByDefault: z._default(layerHiddenByDefault, false),
 	visibility: z._default(layerVisibilitySchema, "public"),
-	/** How the lines and areas of the layer are drawn unless they say otherwise. */
-	style: z._default(z.nullable(styleSchema), null),
+	style: z._default(layerStyle, null),
 });
 export type CreateLayer = z.infer<typeof createLayerSchema>;
 
 export const updateLayerSchema = z
 	.object({
-		name: z.optional(layerName),
-		color: z.optional(dyeSchema),
-		hiddenByDefault: z.optional(z.boolean()),
+		name: z.optional(layerName.check(z.describe("Layer name"))),
+		color: z.optional(layerColor),
+		hiddenByDefault: z.optional(layerHiddenByDefault),
 		visibility: z.optional(layerVisibilitySchema),
-		style: z.optional(z.nullable(styleSchema)),
+		style: z.optional(layerStyle),
 	})
 	.check(z.refine(nonEmpty, "nothing to update"));
 export type UpdateLayer = z.infer<typeof updateLayerSchema>;

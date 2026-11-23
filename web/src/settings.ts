@@ -72,6 +72,23 @@ export const PIN_CLUSTER_MIN = 8;
 export const PIN_CLUSTER_MAX = 120;
 export const PIN_CLUSTER_DEFAULT = 56;
 
+/** Hovered or selected lines and areas: their look relative to the normal one, in percent. */
+export const HOVER_PERCENT_MAX = 300;
+export type HoverLook = {
+	/** Width of the line, or an area's outline. */
+	width: number;
+	/** Opacity of the line, or an area's outline. */
+	opacity: number;
+	/** Opacity of an area's fill. */
+	fill: number;
+};
+/** About how hovering looked before it could be set: lines 3 px to 5, fills 20% to 33%. */
+export const DEFAULT_HOVER_LOOK: HoverLook = {
+	width: 170,
+	opacity: 100,
+	fill: 165,
+};
+
 /** Per-browser preferences, kept in localStorage. */
 export type Settings = {
 	showCoordinates: boolean;
@@ -94,6 +111,8 @@ export type Settings = {
 	historyMineOnly: boolean;
 	/** How close map pins must be to merge into one numbered marker (px, at the moment a level switches in). */
 	pinClusterDistance: number;
+	/** How a hovered or selected line or area is drawn, relative to how it normally is. */
+	hoverLook: HoverLook;
 	/** Load the dimension's low resolution tiles around spawn in the background. */
 	preloadSpawn: boolean;
 	/** Draw lines and areas from a cached image while moving the map; see SHAPE_CACHE_CHOICES. */
@@ -124,6 +143,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	historyInView: false,
 	historyMineOnly: false,
 	pinClusterDistance: PIN_CLUSTER_DEFAULT,
+	hoverLook: DEFAULT_HOVER_LOOK,
 	preloadSpawn: true,
 	shapeCache: "auto",
 	debugRender: false,
@@ -182,6 +202,18 @@ export function parseSettings(raw: string | null): Settings {
 				PIN_CLUSTER_MAX,
 			),
 		);
+	}
+	if (typeof stored.hoverLook === "object" && stored.hoverLook !== null) {
+		const look = stored.hoverLook as Record<string, unknown>;
+		const percent = (v: unknown, fallback: number) =>
+			typeof v === "number" && Number.isFinite(v)
+				? Math.round(Math.min(Math.max(v, 0), HOVER_PERCENT_MAX))
+				: fallback;
+		result.hoverLook = {
+			width: percent(look.width, DEFAULT_HOVER_LOOK.width),
+			opacity: percent(look.opacity, DEFAULT_HOVER_LOOK.opacity),
+			fill: percent(look.fill, DEFAULT_HOVER_LOOK.fill),
+		};
 	}
 	if (isModeChoice(stored.mode)) result.mode = stored.mode;
 	if (isStyle(stored.style)) result.style = stored.style;

@@ -41,6 +41,13 @@ export function LoginButton() {
 				<a class="btn" href="/stats" title="Statistics and leaderboard">
 					Stats
 				</a>
+				<a
+					class="btn"
+					href="/players"
+					title="Players and what they own and built"
+				>
+					Players
+				</a>
 				<a class="btn" href="/privacy" title="Privacy policy">
 					Privacy
 				</a>
@@ -73,6 +80,14 @@ export function LoginButton() {
 				aria-label="Stats"
 			>
 				<ActionContent icon="stats" label="Stats" />
+			</a>
+			<a
+				class="btn account-action"
+				href="/players"
+				title="Players and what they own and built"
+				aria-label="Players"
+			>
+				<ActionContent icon="players" label="Players" />
 			</a>
 			<a
 				class="btn account-action"
