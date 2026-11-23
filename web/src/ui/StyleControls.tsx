@@ -175,8 +175,8 @@ export function StyleControls(props: {
 					disabled={cleanStyle(style) === null}
 					title={
 						kind === "layer"
-							? "Back to the built-in look"
-							: "Follow the layer's default style"
+							? "Reset to built-in defaults"
+							: "Reset to the layer's default style"
 					}
 					onClick={() => onChange({})}
 				>

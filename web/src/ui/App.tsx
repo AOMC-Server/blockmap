@@ -52,7 +52,7 @@ export function App() {
 	useEffect(() => {
 		if (host.current)
 			boot(host.current).catch(() => {
-				loadError.value = "The map could not be started.";
+				loadError.value = "Failed to initialize the map.";
 			});
 	}, []);
 

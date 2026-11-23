@@ -25,8 +25,8 @@ export function LayerSharing() {
 	return (
 		<Modal title={`Sharing “${target.name}”`} onClose={close}>
 			<p class="muted">
-				Map moderators always see private layers. Everyone else needs to be a
-				member here.
+				Map moderators can always view private layers. Other users must be added
+				below.
 			</p>
 			<MembersSection scope={scope} creatorId={creatorId} />
 			<InviteLinks scope={scope} />

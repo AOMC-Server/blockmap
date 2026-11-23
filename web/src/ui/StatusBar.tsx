@@ -95,7 +95,10 @@ export function StatusBar() {
 				</span>
 			)}
 			{equivalent && (
-				<span class="line equivalent" title="The same place in the overworld">
+				<span
+					class="line equivalent"
+					title="Corresponding Overworld coordinates"
+				>
 					Overworld: {equivalent.x}, {equivalent.z}
 				</span>
 			)}
@@ -107,7 +110,7 @@ export function StatusBar() {
 					type="button"
 					class={`btn small tile-pause ${tilesPaused.value ? "active" : ""}`}
 					aria-pressed={tilesPaused.value}
-					title="Freeze the tiles: only what is on screen now stays drawn and nothing new loads in. Panning and zooming keep working."
+					title="Stop loading new tiles while keeping currently loaded tiles visible"
 					onClick={() => {
 						tilesPaused.value = !tilesPaused.value;
 					}}

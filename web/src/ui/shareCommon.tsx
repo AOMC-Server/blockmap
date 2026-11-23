@@ -16,6 +16,6 @@ export function copyWaypoint(w: {
 	if (!dim) return;
 	void copyText(
 		xaeroWaypoint({ ...w, dimension: dim.xaeroDimension }),
-		"Waypoint copied. Paste it in Minecraft chat to share it.",
+		"Waypoint copied. Paste in Minecraft chat to share.",
 	);
 }

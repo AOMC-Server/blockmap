@@ -64,7 +64,7 @@ export function Hotbar() {
 			key: "1",
 			icon: "layers",
 			label: "Layers",
-			hint: "Markers, lines and areas",
+			hint: "Pins, lines, and areas",
 			active: sidePanel.value === "layers",
 			run: () => toggle("layers"),
 		},
@@ -73,7 +73,7 @@ export function Hotbar() {
 			secondary: true,
 			icon: "history",
 			label: "History",
-			hint: "Earlier versions of the map",
+			hint: "Browse past map revisions",
 			active: sidePanel.value === "history" || rev.value !== null,
 			// Looking at an old version with the history closed: remind that it is not the latest.
 			warn: sidePanel.value !== "history" && rev.value !== null,
@@ -83,7 +83,7 @@ export function Hotbar() {
 			key: "3",
 			icon: "measure",
 			label: "Measure",
-			hint: "Click points to measure a path (Esc stops, then clears)",
+			hint: "Measure distances and areas",
 			active: activeTool.value === "measure",
 			run: () => {
 				activeTool.value = activeTool.value === "measure" ? "none" : "measure";
@@ -94,7 +94,7 @@ export function Hotbar() {
 			secondary: true,
 			icon: "upload",
 			label: busy ? "Uploading…" : "Upload",
-			hint: "Add Xaero's World Map exports",
+			hint: "Upload Xaero's World Map exports",
 			active: uploadOpen.value,
 			run: () => {
 				uploadOpen.value = true;
@@ -106,7 +106,7 @@ export function Hotbar() {
 			secondary: true,
 			icon: "share",
 			label: "Share",
-			hint: "A short link to this place, zoom and layers",
+			hint: "Create a short link to the current view",
 			active: shareOpen.value,
 			run: () => {
 				shareOpen.value = true;
@@ -117,7 +117,7 @@ export function Hotbar() {
 			secondary: true,
 			icon: "files",
 			label: "Files",
-			hint: "Downloads such as Voxy data and Xaero presets",
+			hint: "Shared downloads and presets",
 			active: false,
 			href: "/files/",
 		},
@@ -128,7 +128,7 @@ export function Hotbar() {
 			secondary: true,
 			icon: "manage",
 			label: "Manage",
-			hint: "Settings, dimensions, members and invites",
+			hint: "Map settings, dimensions, members, and stats",
 			active: false,
 			href: "/manage",
 		});

@@ -111,7 +111,7 @@ export function putFile(
 				conflict: xhr.status === 409 ? (body?.conflict ?? null) : null,
 				error:
 					xhr.status === 413
-						? "The file is larger than the server allows."
+						? "File exceeds the server's size limit."
 						: xhr.status === 507
 							? "The file library is full."
 							: failureMessage(xhr.status, body),

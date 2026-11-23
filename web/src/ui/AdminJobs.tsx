@@ -71,7 +71,7 @@ function JobTable(props: { jobs: AdminJob[]; open: boolean }) {
 						<th class="num">#</th>
 						<th>Job</th>
 						<th>Status</th>
-						<th class="num" title="Times it was started">
+						<th class="num" title="Number of attempts">
 							Tries
 						</th>
 						<th>Queued</th>
@@ -92,24 +92,22 @@ function JobTable(props: { jobs: AdminJob[]; open: boolean }) {
 export function AdminJobs() {
 	const { data, failed } = useJobList(fetchAdminJobs);
 	if (!data)
-		return (
-			<p class="muted">{failed ? "Could not load the jobs." : "Loading…"}</p>
-		);
+		return <p class="muted">{failed ? "Failed to load jobs." : "Loading…"}</p>;
 	return (
 		<>
 			<h2>Queue</h2>
 			<p class="muted">
-				Uploads, deletions, history rebuilds, image cleanups and dimension
-				deletions run one at a time, in this order. This updates by itself.
+				Background jobs run one at a time in the order listed below. Updates
+				automatically.
 			</p>
 			{data.open.length === 0 ? (
-				<p class="muted">Nothing is queued.</p>
+				<p class="muted">Queue is empty.</p>
 			) : (
 				<JobTable jobs={data.open} open />
 			)}
 			<h2>Recently finished</h2>
 			{data.recent.length === 0 ? (
-				<p class="muted">No job has run yet.</p>
+				<p class="muted">No recent jobs.</p>
 			) : (
 				<JobTable jobs={data.recent} open={false} />
 			)}

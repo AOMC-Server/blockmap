@@ -3,7 +3,7 @@ import { currentMap, user } from "../state";
 import { Page, usePageLoad } from "./Page";
 
 /** When the statement last changed in substance; update it with the text. */
-const UPDATED = "20 November 2026";
+const UPDATED = "23 November 2026";
 
 /** A contact that looks like an e-mail address or a web address becomes a link. */
 function Contact(props: { value: string }) {
@@ -39,150 +39,143 @@ export function PrivacyPage() {
 
 	return (
 		<Page title="Privacy">
-			<Section title="In short">
+			<Section title="Summary">
 				<p>
-					{site} is a shared Minecraft map. It keeps what it needs to run the
-					map and to show who contributed what, and nothing more: no ads, no
-					analytics, no tracking cookies, and nothing is sold or shared for
-					marketing. Looking at the map without logging in leaves no personal
-					data behind.
+					{site} is a community Minecraft map. We only store the data needed to
+					operate the map and credit contributions. There are no ads, analytics,
+					or tracking cookies, and no data is sold or shared for marketing.
+					Browsing the map without logging in leaves no personal data on the
+					server.
 				</p>
 				<p class="muted">Last updated {UPDATED}.</p>
 			</Section>
 
-			<Section title="Who is responsible">
+			<Section title="Data controller">
 				{status === "loading" ? (
 					<p class="muted">Loading…</p>
 				) : controller || contact ? (
 					<p>
-						The personal data on this site is the responsibility of{" "}
-						<b>{controller || "the operator of this site"}</b> (the controller
-						under the EU General Data Protection Regulation, GDPR).
+						The data controller responsible for personal data on this site under
+						the EU General Data Protection Regulation (GDPR) is{" "}
+						<b>{controller || "the site operator"}</b>.
 						{contact && (
 							<>
 								{" "}
-								For questions, a copy of your data or anything else about
-								privacy, contact <Contact value={contact} />.
+								For privacy inquiries or data requests, contact{" "}
+								<Contact value={contact} />.
 							</>
 						)}
 					</p>
 				) : (
 					<p>
-						The operator of this site has not filled in their contact details
-						yet. Until they do, ask a moderator of the map.
+						Contact details have not been configured yet. Please reach out to a
+						map moderator with any privacy questions.
 					</p>
 				)}
 			</Section>
 
-			<Section title="When you only look at the map">
+			<Section title="Browsing without logging in">
 				<ul>
 					<li>
-						Your <b>IP address</b> is used for a moment, in memory, to limit how
-						many short links and preview images one visitor can make per minute.
-						It is never written to disk, and the site keeps no access logs with
-						IP addresses.
+						Your <b>IP address</b> is held briefly in memory for rate limiting
+						(such as generating short links and preview images). It is never
+						written to disk, and the server does not keep IP access logs.
 					</li>
 					<li>
-						The server counts its traffic in total (how many requests and bytes,
-						per hour and kind of request), with nothing that tells visitors
-						apart.
+						The server records aggregate traffic metrics (request counts and
+						bandwidth by category and hour) without any visitor identifiers.
 					</li>
 					<li>
-						Your settings (appearance, preferences), which layers you chose to
-						show or hide, and where you last were on the map are saved in{" "}
-						<b>your own browser</b> (local storage). They are never sent to the
-						server; clearing your browser's site data removes them.
+						Your display preferences, layer visibility choices, and last map
+						position are stored locally in <b>your browser</b> (localStorage).
+						They are never sent to the server and can be cleared through your
+						browser settings.
 					</li>
 				</ul>
 			</Section>
 
-			<Section title="When you log in with Discord">
+			<Section title="Logging in with Discord">
 				<p>
-					Logging in goes through Discord. The site asks Discord only for your
-					basic profile (the <code>identify</code> permission), so it never sees
-					your e-mail address, your servers or your messages. It keeps:
+					Authentication is handled via Discord OAuth using only the{" "}
+					<code>identify</code> scope. The site never receives your email
+					address, Discord servers, or messages. When you log in, we store:
 				</p>
 				<ul>
 					<li>
-						your Discord <b>user id</b>, <b>display name</b> and a link to your{" "}
-						<b>avatar</b>, refreshed each time you log in;
+						your Discord <b>user ID</b>, <b>display name</b>, and <b>avatar</b>{" "}
+						URL (updated on each login);
 					</li>
-					<li>when your account was created and when you last logged in;</li>
+					<li>your account creation and last login timestamps;</li>
 					<li>
-						your <b>role</b> on the map, if you have been made a moderator or
-						owner, which private layers you have been invited to, and which
-						folders of the file library you may change.
+						your map <b>role</b> (if granted moderator or owner access), private
+						layer memberships, and file library folder permissions.
 					</li>
 				</ul>
 				<p>
-					Two cookies are used, both only to keep you logged in safely: a{" "}
-					<b>session cookie</b> that lasts 30 days and is renewed while you use
-					the site (the server keeps only a hash of it), and a short-lived
-					cookie during login that protects against forged logins. They are
-					strictly necessary for logging in, so they need no consent under the
-					Swedish Electronic Communications Act (lagen om elektronisk
-					kommunikation). There are no other cookies.
+					Two strictly necessary cookies are used for authentication: a 30-day{" "}
+					<b>session cookie</b> renewed as you use the site (stored only as a
+					hash on the server), and a short-lived OAuth state cookie used during
+					login to prevent cross-site request forgery. Because both are strictly
+					necessary to provide login functionality, they do not require consent
+					under the Swedish Electronic Communications Act (lagen om elektronisk
+					kommunikation). No other cookies are used.
 				</p>
 			</Section>
 
-			<Section title="What you add to the map">
+			<Section title="Your contributions">
 				<p>
-					Everything you contribute is stored together with your account, and
-					your name is shown next to it:
+					Content you contribute is associated with your account and displays
+					your username:
 				</p>
 				<ul>
 					<li>
-						<b>Uploads</b>: the map images, where they are, how many files, when
-						the export was made, and whether it came from the in-game mod.
+						<b>Uploads</b>: map tiles, coordinates, file counts, export
+						timestamps, and whether the upload was sent via the in-game mod.
 					</li>
 					<li>
-						<b>Layers and features</b> (pins, lines and areas) with their names,
-						texts and positions, including every earlier version and deleted
-						ones, so changes can be followed and undone.
+						<b>Layers and features</b> (pins, lines, and areas), including full
+						revision history and deleted versions so edits can be reviewed or
+						restored.
 					</li>
 					<li>
-						<b>Files</b> you upload to the file library and folders you make
-						there: their names, sizes and when they were added. They are shown
-						with your name to everyone who is logged in.
+						<b>File library items</b>: files and folders you upload or create,
+						along with their names, sizes, timestamps, and your username
+						(visible to logged-in users).
 					</li>
 					<li>
-						<b>Invites</b> and <b>short links</b> you make, and{" "}
-						<b>API tokens</b> (their names, permissions and when they were used;
-						only a hash of the secret is kept).
+						<b>Invites</b>, <b>short links</b>, and <b>API tokens</b> (name,
+						scopes, and last-used timestamp; token secrets are stored only as
+						hashes).
 					</li>
 				</ul>
 				<p>
-					Anyone can see the map, so your name is public next to your uploads,
-					in the history of features, and on the statistics page with its
-					leaderboard. Private layers are only shown to the people invited to
-					them and to the map's moderators.
+					Because the map is public, your username appears publicly alongside
+					your uploads, feature edit history, and leaderboard statistics.
+					Private layers are only visible to invited members and map moderators.
 				</p>
 			</Section>
 
-			<Section title="Why, and on what legal basis">
+			<Section title="Purpose and legal basis">
 				<ul>
 					<li>
-						Your account and your contributions are needed to give you what you
-						sign up for: logging in, and adding to and editing the shared map
-						(GDPR article 6(1)(b), performance of a contract).
+						Account and contribution data are processed to provide the service,
+						allowing you to log in, upload map exports, and edit shared layers
+						(GDPR Article 6(1)(b), performance of a contract).
 					</li>
 					<li>
-						Showing who contributed what, keeping the history of changes,
-						limiting requests per visitor and counting traffic keep the map
-						trustworthy, safe from abuse and running (article 6(1)(f),
-						legitimate interests). You can object to this; see below.
+						Attribution, revision history, rate limiting, and aggregate traffic
+						statistics are maintained to prevent abuse and keep the map reliable
+						(GDPR Article 6(1)(f), legitimate interests). You have the right to
+						object to this processing; see below.
 					</li>
 				</ul>
-				<p>
-					No decisions about you are made automatically, and nothing is used for
-					profiling.
-				</p>
+				<p>We do not use automated decision-making or user profiling.</p>
 			</Section>
 
-			<Section title="Who else is involved">
+			<Section title="Third parties and hosting">
 				<ul>
 					<li>
-						<b>Discord</b> handles the login, under its own{" "}
+						<b>Discord</b> handles sign-in under its own{" "}
 						<a
 							href="https://discord.com/privacy"
 							target="_blank"
@@ -190,63 +183,62 @@ export function PrivacyPage() {
 						>
 							privacy policy
 						</a>
-						. Avatars are shown straight from Discord's servers, so Discord sees
-						the IP address of anyone whose browser shows an avatar. Discord is
-						based in the United States.
+						. User avatars are loaded directly from Discord's CDN, which means
+						Discord receives your IP address when avatars are displayed. Discord
+						is based in the United States.
 					</li>
 					<li>
-						The site is <b>hosted in the EU/EEA</b>. The hosting provider stores
-						the data on the operator's behalf and may not use it for anything
-						else.
+						This site is <b>hosted in the EU/EEA</b>. The hosting provider
+						processes data solely on behalf of the operator.
 					</li>
 				</ul>
-				<p>Nothing is shared with anyone else.</p>
+				<p>No personal data is shared with any other third parties.</p>
 			</Section>
 
-			<Section title="How long it is kept">
+			<Section title="Data retention">
 				<ul>
 					<li>
-						Your account: until you delete it. A session ends 30 days after you
-						last used the site, or when you log out.
+						<b>Account data</b> is kept until you delete your account. Browser
+						sessions expire after 30 days of inactivity or when you log out.
 					</li>
 					<li>
-						Your contributions: as long as the map exists, since others build on
-						them. When you delete your account they stay, but under the name
-						“Deleted user”, with nothing left that leads back to you. You can
-						delete your own features at any time, and your own uploads for a
-						while after making them; ask a moderator or the contact above to
-						remove anything else.
+						<b>Contributions</b> remain part of the shared map even if you
+						delete your account, reassigned to an anonymised “Deleted user”
+						entry with no link back to your Discord identity. You can delete
+						your own features at any time and your own map uploads within the
+						self-delete window; contact a moderator or the controller above to
+						request removal of older contributions.
 					</li>
 					<li>
-						Backups of the site may hold deleted data until they are replaced by
-						newer ones.
+						<b>Backups</b> may retain deleted records briefly until rotated out
+						by newer snapshots.
 					</li>
 				</ul>
 			</Section>
 
 			<Section title="Your rights">
 				<p>
-					Under the GDPR you may ask for a copy of your data, have it corrected
-					or deleted, restrict or object to how it is used, and get it in a form
-					you can take elsewhere.{" "}
+					Under the GDPR, you have the right to access, rectify, erase, or
+					export your personal data, as well as the right to restrict or object
+					to its processing.{" "}
 					{loggedIn ? (
 						<>
-							Most of this you can do yourself in{" "}
-							<a href="/settings#your-data">Settings</a>: download your data as
-							a JSON file, or delete your account.
+							You can download a JSON archive of your data or delete your
+							account directly in <a href="/settings#your-data">Settings</a>.
 						</>
 					) : (
 						<>
 							Once logged in, you can download your data or delete your account
-							yourself under Settings.
+							directly from Settings.
 						</>
 					)}{" "}
-					Your name and avatar follow your Discord profile and update when you
-					log in again. For anything else, use the contact above.
+					Your display name and avatar sync automatically from Discord whenever
+					you log in. For any other requests, use the contact details above.
 				</p>
 				<p>
-					If you think your data is handled wrongly, you can complain to the
-					Swedish Authority for Privacy Protection,{" "}
+					If you believe your personal data has been handled improperly, you
+					have the right to lodge a complaint with the Swedish Authority for
+					Privacy Protection,{" "}
 					<a
 						href="https://www.imy.se/"
 						target="_blank"
@@ -254,7 +246,7 @@ export function PrivacyPage() {
 					>
 						Integritetsskyddsmyndigheten (IMY)
 					</a>
-					, or to the authority where you live.
+					, or your local supervisory authority.
 				</p>
 			</Section>
 		</Page>

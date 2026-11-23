@@ -55,23 +55,23 @@ function drawHint(d: DrawState | null, type: FeatureType): string {
 	const count = d?.points.length ?? 0;
 	if (type === "pin")
 		return mode === "placed"
-			? "Drag the marker to move it, or type its coordinates."
+			? "Drag the marker to move it, or enter coordinates below."
 			: "Click the map to place the pin.";
 	if (type === "line") {
 		if (mode === "placed")
-			return "Drag a point to move it (onto another point to join them), or a + to add one. Click a point to draw on from it, which branches the line from the middle. Right-click a point to remove it.";
+			return "Drag a point to move it (drop onto another point to merge), or drag a + handle to insert a point. Click a point to continue drawing or branch from it. Right-click a point to delete it.";
 		if (count === 0)
-			return "Click the map to start the line. Hold Shift to snap to straight lines.";
+			return "Click the map to start drawing. Hold Shift to snap to 45° angles.";
 		if (d?.selected === null)
-			return "Click a point to draw on from it, or the map to start a separate part.";
-		return "Click to add points. Click another point to join it, which closes a loop, or the selected point (or press Enter or Esc) to stop, then click any point to branch from it. Hold Shift to snap to straight lines.";
+			return "Click an existing point to continue from it, or click the map to start a separate segment.";
+		return "Click to add points. Click another point to connect to it, or click the selected point (or press Enter/Esc) to finish. Hold Shift to snap to 45° angles.";
 	}
 	if (mode === "placed")
-		return "Drag a point to move it, or drag a + on a segment to add one. Right-click a point to remove it.";
+		return "Drag a point to move it, or drag a + handle on an edge to insert a point. Right-click a point to delete it.";
 	const need = minPoints(type);
 	if (count < need)
-		return `Click the map to add points (${count}/${need} minimum). Hold Shift to snap to straight lines.`;
-	return "Click to add more points. Click the first point or press Enter or Esc to close the area.";
+		return `Click the map to add points (${count}/${need} minimum). Hold Shift to snap to 45° angles.`;
+	return "Click to add more points. Click the first point or press Enter/Esc to close the shape.";
 }
 
 /** Side panel for creating or editing one feature. Geometry is placed on the map with the draw tool. */
@@ -363,7 +363,7 @@ export function FeatureEditor() {
 					<button
 						type="button"
 						class="btn small"
-						title="Link: select the text first, then put the address in the brackets"
+						title="Insert link"
 						onClick={() => wrapSelection("[", "](https://)", "link text")}
 					>
 						Link
@@ -382,7 +382,7 @@ export function FeatureEditor() {
 							wrapSelection("**", "**", "bold text");
 						}
 					}}
-					placeholder="**bold**, [links](https://example.com) and line breaks"
+					placeholder="Supports **bold** and [links](https://example.com)"
 				/>
 			</div>
 

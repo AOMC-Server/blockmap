@@ -95,7 +95,8 @@ function NewLayerForm(props: { x: number; z: number; onBack: () => void }) {
 				onChange={(d) => d && setColor(d)}
 			/>
 			<p class="hint">
-				Public and shown by default; change that in its settings.
+				Public and visible by default. You can change this later in layer
+				settings.
 			</p>
 			<div class="group">
 				<button
@@ -179,7 +180,7 @@ export function ContextMenu() {
 	const measuring = activeTool.value === "measure";
 	const layers = layersData.value.filter((l) => l.canEdit);
 	const busyTitle = editing
-		? "Save or cancel the feature you are editing first"
+		? "Finish or cancel editing the current feature first"
 		: undefined;
 
 	return (
@@ -223,7 +224,7 @@ export function ContextMenu() {
 						type="button"
 						role="menuitem"
 						class="plain menu-item"
-						title="Copy a waypoint for Xaero's Minimap; paste it in Minecraft chat to share it"
+						title="Copy as a Xaero's Minimap waypoint to paste in Minecraft chat"
 						onClick={() => {
 							close();
 							copyWaypoint({ name: "Waypoint", x, z, color: "white" });
@@ -309,7 +310,9 @@ export function ContextMenu() {
 							);
 						})}
 						{layers.length === 0 && (
-							<p class="muted menu-note">No layers you can add to here.</p>
+							<p class="muted menu-note">
+								No editable layers in this dimension.
+							</p>
 						)}
 					</div>
 					<button
@@ -319,7 +322,7 @@ export function ContextMenu() {
 						disabled={layerLimitReached.value}
 						title={
 							layerLimitReached.value
-								? "You already have as many layers as one person may create"
+								? "You've reached the maximum number of layers"
 								: undefined
 						}
 						onClick={() => setPage("new")}

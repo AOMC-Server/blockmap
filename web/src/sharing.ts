@@ -62,11 +62,12 @@ export const mapScope: Scope<MemberRole> = {
 	defaultRole: "moderator",
 	defaultInviteRole: "moderator",
 	roleHelp: {
-		moderator: "can delete uploads, restore features and manage dimensions",
-		owner: "can also manage members, invites and settings",
+		moderator: "Can delete uploads, restore features, and manage dimensions",
+		owner: "Full access, including members, invites, and map settings",
 	},
 	inviteRoles: [],
-	inviteHelp: "Anyone who accepts the invite becomes a moderator.",
+	inviteHelp:
+		"Anyone who accepts this invite will be granted the moderator role.",
 	async load() {
 		const out = await run(() => api.api.members.$get());
 		return out?.members ?? null;
@@ -103,8 +104,8 @@ export function layerScope(layerId: number): Scope<LayerRole> {
 		defaultRole: "viewer",
 		defaultInviteRole: "editor",
 		roleHelp: {
-			viewer: "can see the layer",
-			editor: "can also edit its features",
+			viewer: "Can view this layer",
+			editor: "Can view and edit features in this layer",
 		},
 		inviteRoles: layerRoleSchema.options,
 		inviteHelp: "",

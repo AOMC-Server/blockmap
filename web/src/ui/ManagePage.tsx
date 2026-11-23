@@ -116,7 +116,7 @@ function MaintenanceToggle() {
 				}
 			}}
 			label="Maintenance mode"
-			hint="Makes the map read only for everyone but owners: no uploads, drawing, layer or dimension changes, deletions or invites. Everyone sees a banner saying the map is in maintenance."
+			hint="Makes the map read-only for everyone except owners (pausing uploads, edits, deletions, and invites) and displays a maintenance banner."
 		/>
 	);
 }
@@ -128,8 +128,7 @@ function FailedUploads() {
 		void failedUploadCount().then(setCount);
 	}, []);
 	const purge = async () => {
-		if (!confirm("Delete all failed uploads of everyone from the upload log?"))
-			return;
+		if (!confirm("Remove all failed uploads from the upload log?")) return;
 		setBusy(true);
 		try {
 			if ((await purgeFailedUploads()) !== null) setCount(0);
@@ -141,8 +140,8 @@ function FailedUploads() {
 		<div class="field flow">
 			<span class="label">Failed uploads</span>
 			<p class="muted hint">
-				Only their author and moderators see failed uploads in the history.
-				Purging removes them for good; the files can be uploaded again.
+				Failed uploads are only visible to their uploader and moderators.
+				Purging permanently clears them from the log.
 			</p>
 			<button
 				type="button"
@@ -274,7 +273,7 @@ function PreloadEditor(props: {
 				Preload around spawn:{" "}
 				{rings.length === 0
 					? "off"
-					: `${tiles} tile${tiles === 1 ? "" : "s"}${tiles >= MAX_PRELOAD_TILES ? " (the most allowed; lower a radius or resolution)" : ""}`}
+					: `${tiles} tile${tiles === 1 ? "" : "s"}${tiles >= MAX_PRELOAD_TILES ? " (limit reached; reduce a radius or resolution)" : ""}`}
 			</span>
 			<div>
 				{rings.map((ring, i) => (
@@ -413,14 +412,14 @@ function DimensionRow(props: {
 				</div>
 				<label
 					class="dim-scale"
-					title="How Xaero's Minimap names this dimension in shared waypoints: dim%0 overworld, dim%-1 Nether, dim%1 End"
+					title="Dimension ID used in Xaero's Minimap waypoints (e.g. dim%0 Overworld, dim%-1 Nether, dim%1 End)"
 				>
-					<span class="muted">Xaero id</span>
+					<span class="muted">Xaero ID</span>
 					<input
 						type="text"
 						class="xaero-input"
 						value={xaero}
-						aria-label={`Xaero dimension id of ${d.slug}`}
+						aria-label={`Xaero dimension ID of ${d.slug}`}
 						onInput={(e) => setXaero(e.currentTarget.value)}
 						onBlur={() => {
 							const parsed = xaeroDimensionSchema.safeParse(xaero);
@@ -475,18 +474,18 @@ function DimensionRow(props: {
 						disabled={props.busy}
 						onClick={() => {
 							const typed = prompt(
-								`This permanently deletes ${d.name} with its uploads, tile history, layers and features, and cannot be undone. Type its name to confirm.`,
+								`Permanently delete “${d.name}” along with all of its uploads, tiles, layers, and features? This cannot be undone.\n\nType the dimension name to confirm:`,
 							);
 							if (typed?.trim() !== d.name) {
 								if (typed !== null)
-									showNotice("The name did not match.", "error");
+									showNotice("Dimension name did not match.", "error");
 								return;
 							}
 							props.run(async () => {
 								const ok = await deleteDimension(d.slug);
 								if (ok)
 									showNotice(
-										`Deleting ${d.name}; it disappears when the server is done.`,
+										`Queued deletion of ${d.name}. It will be removed once background processing finishes.`,
 									);
 								return ok;
 							});
@@ -527,11 +526,11 @@ function DimensionsTab() {
 	const problem = !newName.trim()
 		? null
 		: !newSlug
-			? "The slug is empty: type one using letters, digits, - or _."
+			? "Slug is required (use lowercase letters, numbers, - or _)."
 			: !slugSchema.safeParse(newSlug).success
-				? "The slug may only have lowercase letters, digits, - and _, and must start with a letter or digit."
+				? "Slug may only contain lowercase letters, numbers, - and _, and must start with a letter or number."
 				: scale === undefined
-					? "The scale must be a positive number, or empty."
+					? "Scale must be a positive number or left blank."
 					: null;
 
 	const add = async (e: Event) => {
@@ -560,32 +559,29 @@ function DimensionsTab() {
 	return (
 		<div>
 			<p class="muted">
-				Archived dimensions disappear from the dimension picker but keep their
-				tiles and history. Owners can delete an archived dimension for good.
+				Archived dimensions are hidden from the dimension switcher while keeping
+				their tiles and history. Owners can permanently delete archived
+				dimensions.
 			</p>
 			<p class="muted">
-				<b>Scale</b> relates a dimension's coordinates to the overworld: 1 for
-				the overworld, 8 for the Nether (one Nether block is 8 overworld
-				blocks). Switching between dimensions with a scale keeps showing the
-				same place. Leave it empty for a dimension like the End, whose
-				coordinates don't correspond to anything.
+				<b>Scale</b> maps a dimension's coordinates to the Overworld (e.g. 1 for
+				Overworld, 8 for Nether) so switching dimensions preserves your
+				location. Leave blank for dimensions with independent coordinates, like
+				The End.
 			</p>
 			<p class="muted">
-				<b>Theme</b> picks the dimension's icon and the colours of the interface
-				while it is shown.
+				<b>Theme</b> sets the dimension's icon and UI colour palette.
 			</p>
 			<p class="muted">
-				<b>Xaero id</b> is how Xaero's Minimap names the dimension, used in the
-				waypoints people copy from the map: <code>dim%0</code> for the
-				overworld, <code>dim%-1</code> for the Nether and <code>dim%1</code> for
-				the End.
+				<b>Xaero ID</b> is the identifier used when copying waypoints for
+				Xaero's Minimap: <code>dim%0</code> (Overworld), <code>dim%-1</code>{" "}
+				(Nether), or <code>dim%1</code> (The End).
 			</p>
 			<p class="muted">
-				<b>Preload around spawn</b> loads low resolution images of the area
-				around 0, 0 in the background, so there is always something to show
-				there while the detailed images load. Each ring keeps one resolution
-				loaded out to a distance; a coarser ring can reach further for the same
-				number of tiles. Viewers can turn preloading off in their settings.
+				<b>Preload around spawn</b> fetches low-resolution tiles near 0, 0 in
+				the background so the map stays visible while zooming or panning.
+				Coarser rings cover wider areas using fewer tiles. Users can disable
+				preloading in their browser settings.
 			</p>
 			<ul class="dimension-list">
 				{dims.map((d, i) => (
@@ -673,7 +669,7 @@ export function ManagePage() {
 	} else if (status === "failed") {
 		body = <LoadFailed retry={retry} />;
 	} else if (!detail) {
-		body = <p class="error-text">The map could not be loaded.</p>;
+		body = <p class="error-text">Failed to load map details.</p>;
 	} else if (!user.value) {
 		body = (
 			<>

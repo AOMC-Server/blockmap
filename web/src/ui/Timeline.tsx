@@ -287,7 +287,7 @@ export function Timeline(props: {
 				ref={track}
 				tabIndex={0}
 				role="slider"
-				aria-label="Time line of uploads"
+				aria-label="Upload timeline"
 				aria-valuemin={0}
 				aria-valuemax={stops.length - 1}
 				aria-valuenow={position}
@@ -312,7 +312,7 @@ export function Timeline(props: {
 						key={b.x0}
 						class="timeline-break"
 						style={{ left: `${b.x0}px`, width: `${b.x1 - b.x0}px` }}
-						title="A long quiet stretch, squeezed"
+						title="Inactive period (compressed)"
 					/>
 				))}
 				{latest || current || events.length === 0 ? null : (
@@ -369,7 +369,7 @@ export function Timeline(props: {
 						</span>
 						{hover.items.length > 1 && (
 							<span class="muted">
-								and {hover.items.length - 1} more close by
+								and {hover.items.length - 1} more nearby
 							</span>
 						)}
 					</span>
@@ -422,7 +422,7 @@ export function Timeline(props: {
 					class="btn small"
 					disabled={latest}
 					onClick={() => setRev(null)}
-					title="Back to the latest map (End)"
+					title="Jump to latest map (End)"
 				>
 					Latest
 				</button>
@@ -431,7 +431,7 @@ export function Timeline(props: {
 					type="button"
 					class="btn small"
 					onClick={() => zoomAround(playheadX, 0.5)}
-					title="Zoom in on the time line (+)"
+					title="Zoom in timeline (+)"
 					aria-label="Zoom in"
 				>
 					+
@@ -441,7 +441,7 @@ export function Timeline(props: {
 					class="btn small"
 					disabled={range === null}
 					onClick={() => zoomAround(playheadX, 2)}
-					title="Zoom out (−)"
+					title="Zoom out timeline (−)"
 					aria-label="Zoom out"
 				>
 					−
@@ -451,7 +451,7 @@ export function Timeline(props: {
 					class="btn small"
 					disabled={range === null}
 					onClick={() => setRange(null)}
-					title="Show the whole time line"
+					title="Fit entire timeline"
 				>
 					Fit
 				</button>

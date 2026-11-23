@@ -41,11 +41,7 @@ export function LoginButton() {
 				<a class="btn" href="/stats" title="Statistics and leaderboard">
 					Stats
 				</a>
-				<a
-					class="btn"
-					href="/privacy"
-					title="What the site keeps about you, and why"
-				>
+				<a class="btn" href="/privacy" title="Privacy policy">
 					Privacy
 				</a>
 				<a class="btn primary" href={loginUrl()}>
@@ -73,7 +69,7 @@ export function LoginButton() {
 			<a
 				class="btn account-action"
 				href="/stats"
-				title="Your stats and the leaderboard"
+				title="Statistics and leaderboard"
 				aria-label="Stats"
 			>
 				<ActionContent icon="stats" label="Stats" />
@@ -81,7 +77,7 @@ export function LoginButton() {
 			<a
 				class="btn account-action"
 				href="/settings"
-				title="Your settings and API tokens"
+				title="Preferences, API tokens, and account data"
 				aria-label="Settings"
 			>
 				<ActionContent icon="settings" label="Settings" />
@@ -89,7 +85,7 @@ export function LoginButton() {
 			<a
 				class="btn account-action"
 				href="/privacy"
-				title="What the site keeps about you, and why"
+				title="Privacy policy"
 				aria-label="Privacy"
 			>
 				<ActionContent icon="privacy" label="Privacy" />

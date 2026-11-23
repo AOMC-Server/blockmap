@@ -89,14 +89,16 @@ export function MeasureCard() {
 				{!stats ? (
 					<p class="muted">
 						{touch
-							? "Move the map to put the crosshair on a spot, then tap Add point. Keep adding points to measure a path."
+							? "Pan the map to aim the crosshair, then tap Add point to measure a path."
 							: "Click the map to place a point, then keep clicking to measure a path."}
 					</p>
 				) : (
 					<>
 						<div class="measure-total">
 							{formatBlocks(stats.total)}{" "}
-							<small>{stats.area !== null ? "blocks around" : "blocks"}</small>
+							<small>
+								{stats.area !== null ? "blocks (perimeter)" : "blocks"}
+							</small>
 						</div>
 						{stats.segments.length === 0 && (
 							<p class="muted">
@@ -193,7 +195,7 @@ export function MeasureCard() {
 						type="button"
 						class="btn small"
 						disabled={placed === 0}
-						title={finished ? "Go back to adding points" : undefined}
+						title={finished ? "Continue adding points" : undefined}
 						onClick={finished ? measureShape.resume : measureShape.undoPoint}
 					>
 						{finished ? "Resume" : "Undo"}
@@ -223,8 +225,8 @@ export function MeasureCard() {
 							disabled={!canSave}
 							title={
 								canSave
-									? "Keep this as a line in a layer"
-									: "Needs a layer you can add to, and no feature being edited"
+									? "Create a line feature from this measurement"
+									: "Requires an editable, non-full layer and no open feature editor"
 							}
 							onClick={() => featureFromMeasure("line")}
 						>
@@ -237,8 +239,8 @@ export function MeasureCard() {
 								disabled={!canSave}
 								title={
 									canSave
-										? "Keep this as an area in a layer"
-										: "Needs a layer you can add to, and no feature being edited"
+										? "Create an area feature from this measurement"
+										: "Requires an editable, non-full layer and no open feature editor"
 								}
 								onClick={() => featureFromMeasure("polygon")}
 							>
@@ -249,10 +251,10 @@ export function MeasureCard() {
 				)}
 				<p class="hint">
 					{finished
-						? "Drag a point to move it, or click one to draw on from it (from the middle, that branches). Right-click a point to remove it. Clear starts over."
+						? "Drag points to adjust, click a point to continue or branch from it, or right-click a point to delete it."
 						: touch
-							? "Tap a point to join the path to it (the first closes a shape), or the last to finish. Drag a point to move it."
-							: "Click another point to join it (the first closes a shape), or the last point (Enter or Esc) to finish. Hold Shift to snap to straight lines. Drag a point to move it, right-click one to remove it."}
+							? "Tap an existing point to connect (tap the first point to close a loop), or tap Done to finish. Drag points to adjust."
+							: "Click another point to connect (click the first to close a loop), or press Enter/Esc to finish. Hold Shift to snap to 45° angles. Drag points to move, right-click to delete."}
 				</p>
 			</div>
 		</aside>

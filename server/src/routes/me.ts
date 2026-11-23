@@ -57,7 +57,7 @@ export const meRoutes = new Hono<AppEnv>()
 				return c.json(
 					{
 						error:
-							"you are the map's last owner: make someone else an owner first",
+							"You are the map's last owner. Assign another owner before deleting your account.",
 					},
 					409,
 				);

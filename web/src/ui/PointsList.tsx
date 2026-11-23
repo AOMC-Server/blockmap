@@ -88,7 +88,7 @@ export function PointsList() {
 							aria-pressed={i === d.selected}
 							title={
 								d.type === "line"
-									? "Select this point, to remove it or draw on from it"
+									? "Select point to remove or continue drawing from it"
 									: "Select this point"
 							}
 							onClick={() => selectPoint(i === d.selected ? null : i)}

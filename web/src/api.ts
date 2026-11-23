@@ -88,9 +88,7 @@ export async function run<R extends Res>(
 		await after?.();
 	} catch (err) {
 		showNotice(
-			err instanceof Error
-				? err.message
-				: "Could not refresh after the change.",
+			err instanceof Error ? err.message : "Saved, but failed to refresh data.",
 			"error",
 		);
 	}

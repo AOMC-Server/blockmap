@@ -54,13 +54,13 @@ export function validateFiles(
 			pngCount++;
 			if (!parseXaeroCoords(f.name)) {
 				errors.push(
-					`${f.name}: no coordinates in the name (expected _x<X>_z<Z>)`,
+					`${f.name}: missing coordinates in filename (expected _x<X>_z<Z>)`,
 				);
 			}
 		} else if (e === ".zip") {
 			zipCount++;
 		} else {
-			errors.push(`${f.name}: only .png and .zip files can be uploaded`);
+			errors.push(`${f.name}: only .png and .zip files are supported`);
 		}
 	}
 	if (files.length > limits.maxFilesPerUpload) {

@@ -28,7 +28,7 @@ export async function loadLayers(): Promise<void> {
 	if (seq !== loadSeq) return;
 	if (result.ok)
 		layersData.value = result.body.layers as typeof layersData.value;
-	else showNotice(`Could not load the layers: ${result.error}`, "error");
+	else showNotice(`Failed to load layers: ${result.error}`, "error");
 }
 
 export const mutate = <R extends Res>(call: () => Promise<R>) =>
@@ -98,7 +98,7 @@ export async function updateFeature(
 		const current = (res.detail as { feature?: { revisionId?: number } } | null)
 			?.feature?.revisionId;
 		showNotice(
-			"Someone else changed this feature while you were editing. Their version is on the map now; save again to replace it with yours.",
+			"Someone else edited this feature while you were working. The map has been updated; click Save again to overwrite with your changes.",
 			"error",
 		);
 		return {

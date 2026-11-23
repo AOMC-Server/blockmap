@@ -100,7 +100,7 @@ const folderJson = (f: FolderRow, chain: readonly FolderRow[]) => ({
 	url: urlOf(chain),
 });
 
-const TAKEN = "something with that name is already there";
+const TAKEN = "An item with that name already exists";
 
 /** Removes contents no file uses any more, taking turns with uploads. */
 const dropUnused = (c: Ctx, hashes: string[]) =>
@@ -223,8 +223,8 @@ export const fileRoutes = new Hono<AppEnv>()
 					{
 						error:
 							existing.kind === "folder"
-								? "a folder with that name is already there"
-								: "a file with that name is already there",
+								? "A folder with that name already exists"
+								: "A file with that name already exists",
 						conflict: existing.kind,
 					},
 					409,
@@ -245,10 +245,7 @@ export const fileRoutes = new Hono<AppEnv>()
 				env.FILES_QUOTA_BYTES,
 			);
 			if (!release)
-				return c.json(
-					{ error: "the file library is full: there is no room for this file" },
-					507,
-				);
+				return c.json({ error: "File library storage quota exceeded" }, 507);
 
 			let received: Received | null = null;
 			try {

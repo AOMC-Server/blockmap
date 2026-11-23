@@ -43,8 +43,8 @@ function MaintenanceNotice() {
 		<div class="maintenance-notice" role="status">
 			<p>
 				{owner
-					? "Maintenance mode is on: the map is read only for everyone but owners."
-					: "The map is in maintenance: you can look around, but nothing can be changed until it is over."}
+					? "Maintenance mode is active. The map is read-only for everyone except owners."
+					: "Maintenance mode is active. The map is temporarily read-only."}
 			</p>
 			{owner && (
 				<button

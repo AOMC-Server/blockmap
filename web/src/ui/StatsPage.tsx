@@ -41,32 +41,32 @@ type Column = {
 };
 
 const COLUMNS: Column[] = [
-	{ key: "uploads", label: "Uploads", hint: "Finished uploads" },
+	{ key: "uploads", label: "Uploads", hint: "Completed uploads" },
 	{
 		key: "tiles",
 		label: "Tiles",
-		hint: "Map tiles uploaded, counting repeats",
+		hint: "Total map tiles uploaded, including updates",
 	},
-	{ key: "areaTiles", label: "Area", hint: "Distinct ground uploaded" },
+	{ key: "areaTiles", label: "Area", hint: "Unique area mapped" },
 	{
 		key: "modUploads",
 		label: "Webmapper uploads",
-		hint: "Uploads sent by the AOMC Webmapper mod (also counted in Uploads)",
+		hint: "Uploads sent via AOMC Webmapper (included in Uploads)",
 	},
 	{
 		key: "modAreaTiles",
 		label: "Webmapper area",
-		hint: "Distinct ground the AOMC Webmapper mod mapped (also counted in Area)",
+		hint: "Unique area mapped via AOMC Webmapper (included in Area)",
 	},
 	{
 		key: "featuresCreated",
 		label: "Features",
-		hint: "Pins, lines and areas created",
+		hint: "Pins, lines, and areas created",
 	},
 	{
 		key: "featureEdits",
 		label: "Edits",
-		hint: "Changes to features after they were made",
+		hint: "Subsequent edits to existing features",
 	},
 	{ key: "layersCreated", label: "Layers", hint: "Layers created" },
 ];
@@ -113,12 +113,12 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 					{
 						label: "Area uploaded",
 						value: formatArea(s.uploadedBlocks),
-						hint: "Total volume, counting ground that was uploaded again",
+						hint: "Total area across all uploads, including re-uploaded regions",
 					},
 					{
 						label: "Area mapped",
 						value: formatArea(s.areaBlocks),
-						hint: `${formatNumber(s.areaTiles)} distinct tiles`,
+						hint: `${formatNumber(s.areaTiles)} unique tiles`,
 					},
 					{
 						label: "Features created",
@@ -132,7 +132,7 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 			<p class="muted hint">{props.note}</p>
 			<h3 class="stats-group">AOMC Webmapper</h3>
 			<p class="muted hint">
-				The part of the above that was sent by the in-game mod.
+				Subset of the stats above uploaded via the in-game mod.
 			</p>
 			<TileGrid
 				plain
@@ -144,12 +144,12 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 					{
 						label: "Area uploaded by AOMC Webmapper",
 						value: formatArea(s.modUploadedBlocks),
-						hint: "Total volume, counting ground that was uploaded again",
+						hint: "Total area across all uploads, including re-uploaded regions",
 					},
 					{
 						label: "Area mapped by AOMC Webmapper",
 						value: formatArea(s.modAreaBlocks),
-						hint: `${formatNumber(s.modAreaTiles)} distinct tiles`,
+						hint: `${formatNumber(s.modAreaTiles)} unique tiles`,
 					},
 				]}
 			/>
@@ -219,7 +219,7 @@ function Leaderboard(props: { rows: Row[]; me: string | null }) {
 			a.username.localeCompare(b.username),
 	);
 	if (rows.length === 0)
-		return <p class="muted">Nobody has contributed in this period.</p>;
+		return <p class="muted">No contributions in this time range.</p>;
 	return (
 		<div class="table-wrap flush">
 			<table class="table plain compact nowrap">
@@ -307,7 +307,7 @@ export function StatsPage() {
 				names={RANGE_NAMES}
 				onChange={setRange}
 			/>
-			{error && <p class="muted">Could not load the statistics: {error}</p>}
+			{error && <p class="muted">Failed to load statistics: {error}</p>}
 
 			<Tabs center tabs={STAT_TABS} value={tab} onChange={setPicked} />
 
@@ -318,7 +318,7 @@ export function StatsPage() {
 				) : tab === "global" ? (
 					<StatTiles
 						stats={data.totals}
-						note="Everyone's contributions combined. Private layers are not counted."
+						note="Combined contributions from all users. Excludes private layers."
 					/>
 				) : data.me && u ? (
 					<>
@@ -338,7 +338,7 @@ export function StatsPage() {
 					</>
 				) : (
 					<>
-						<p class="muted">Log in to see your own contributions.</p>
+						<p class="muted">Log in to view your personal stats.</p>
 						<a class="btn primary" href={loginUrl()}>
 							Log in with Discord
 						</a>
@@ -349,9 +349,8 @@ export function StatsPage() {
 			<section class="page-section">
 				<h2>Mapped area</h2>
 				<p class="muted">
-					Distinct ground uploaded, dated by when the uploaded data was exported
-					(or by the upload, when that isn't known). Deleted uploads are not
-					included.
+					Cumulative unique area mapped over time, ordered by export date (or
+					upload date when undated). Excludes deleted uploads.
 				</p>
 				{data ? (
 					<AreaChart data={data} signedIn={u !== null} />

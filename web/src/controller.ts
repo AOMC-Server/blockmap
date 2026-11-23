@@ -138,7 +138,7 @@ export function isolateUpload(r: RevisionInfo, fit = true) {
 		(d) => d.id === r.dimensionId,
 	)?.slug;
 	if (!slug || !visibleDimensions.value.some((d) => d.slug === slug)) {
-		showNotice("That upload's dimension is archived.", "error");
+		showNotice("This upload belongs to an archived dimension.", "error");
 		return;
 	}
 	selectDimension(slug);
@@ -199,7 +199,7 @@ export async function boot(container: HTMLElement) {
 	const [detail] = await Promise.all([fetchMap(), loadUser()]);
 	if (!detail) {
 		loadError.value =
-			"The map could not be loaded. Check your connection and try again.";
+			"Failed to load the map. Check your connection and try again.";
 		return;
 	}
 	currentMap.value = detail;

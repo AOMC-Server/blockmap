@@ -80,7 +80,7 @@ function RevisionRow(props: { r: RevisionInfo; now: number }) {
 		(r.deleting
 			? {
 					label: "deleting…",
-					detail: "Queued for deletion, one job at a time",
+					detail: "Queued for deletion",
 				}
 			: undefined);
 	const busy = inFlight(r) || removing !== undefined;
@@ -110,7 +110,7 @@ function RevisionRow(props: { r: RevisionInfo; now: number }) {
 				class="plain revision-main"
 				disabled={!canView}
 				onClick={() => showRevision(r)}
-				title={canView ? "Look at the map as of this upload" : undefined}
+				title={canView ? "View map at this revision" : undefined}
 			>
 				<span class="rev-no">{r.rev !== null ? `#${r.rev}` : "…"}</span>
 				<span class="rev-what">
@@ -130,8 +130,8 @@ function RevisionRow(props: { r: RevisionInfo; now: number }) {
 						title={
 							removing?.detail ??
 							(r.status === "pending"
-								? "Queued: uploads, deletions and history rebuilds run one at a time"
-								: "Being added to the map")
+								? "Waiting in the background job queue"
+								: "Processing upload…")
 						}
 					>
 						{removing?.label ??
@@ -154,7 +154,7 @@ function RevisionRow(props: { r: RevisionInfo; now: number }) {
 					type="button"
 					class={`btn small ${isolated ? "active" : ""}`}
 					aria-pressed={isolated}
-					title="View only what this upload added, without the rest of the map"
+					title="Show only tiles from this upload"
 					onClick={() => {
 						if (isolated) isolatedUpload.value = null;
 						else isolateUpload(r, !settings.value.historyInView);
@@ -169,8 +169,8 @@ function RevisionRow(props: { r: RevisionInfo; now: number }) {
 					class="btn small danger"
 					title={
 						r.deletableUntil !== null
-							? `You can delete your upload for another ${formatDuration(Math.ceil((r.deletableUntil - props.now) / 60_000) * 60)}`
-							: "Remove this upload from the map and its history"
+							? `You can delete your own upload for another ${formatDuration(Math.ceil((r.deletableUntil - props.now) / 60_000) * 60)}`
+							: "Permanently delete this upload from the map and history"
 					}
 					onClick={() => {
 						deleteUploadFor.value = r;
@@ -296,22 +296,22 @@ export function HistoryPanel() {
 				<div class="history-head">
 					<div class="history-filters">
 						<fieldset class="history-scope">
-							<legend class="visually-hidden">Which uploads</legend>
+							<legend class="visually-hidden">Upload filter</legend>
 							<div class="segmented">
 								<button
 									type="button"
 									class={`btn small ${inView ? "" : "active"}`}
 									aria-pressed={!inView}
-									title="Every upload in this dimension"
+									title="Show all uploads in this dimension"
 									onClick={() => updateSettings({ historyInView: false })}
 								>
-									Everything
+									All
 								</button>
 								<button
 									type="button"
 									class={`btn small ${inView ? "active" : ""}`}
 									aria-pressed={inView}
-									title="Only uploads whose area is in view of the camera"
+									title="Only uploads within the current map view"
 									onClick={() => updateSettings({ historyInView: true })}
 								>
 									In view
@@ -333,17 +333,17 @@ export function HistoryPanel() {
 
 					<div class="muted slider-info" aria-live="polite">
 						{head === 0 ? (
-							"Nothing has been uploaded yet."
+							"No uploads yet."
 						) : rev.value === null ? (
 							<>
-								Showing the <b>latest</b> map
+								Viewing <b>latest</b> map
 								{filtered
 									? ` · ${shown.length} of ${all.length} uploads listed`
 									: ` · ${uploads} upload${uploads === 1 ? "" : "s"}`}
 							</>
 						) : current ? (
 							<>
-								As of <b>{formatEventTime(current)}</b> · #{current.rev} by{" "}
+								Viewing <b>{formatEventTime(current)}</b> · #{current.rev} by{" "}
 								{current.authorName}
 							</>
 						) : (
@@ -375,12 +375,12 @@ export function HistoryPanel() {
 			{shown.length === 0 && (
 				<p class="muted">
 					{all.length === 0
-						? "Nothing has been uploaded to this dimension yet."
+						? "No uploads in this dimension yet."
 						: inView && mine
-							? "None of your uploads are in view. Zoom out, or switch to Everything."
+							? "None of your uploads are in the current view. Zoom out or switch to All."
 							: inView
-								? "No uploads in view. Zoom out, or switch to Everything."
-								: "You haven't uploaded anything to this dimension."}
+								? "No uploads in the current view. Zoom out or switch to All."
+								: "You haven't uploaded anything to this dimension yet."}
 				</p>
 			)}
 		</Panel>

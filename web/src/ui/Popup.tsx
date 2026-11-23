@@ -64,7 +64,7 @@ export function Popup() {
 					<button
 						type="button"
 						class="plain popup-coords"
-						title="Copy the coordinates (x, z)"
+						title="Copy coordinates (x, z)"
 						onClick={() =>
 							void copyText(
 								`${spot.x}, ${spot.z}`,
@@ -94,7 +94,7 @@ export function Popup() {
 						<button
 							type="button"
 							class="btn small"
-							title="Copy a waypoint for Xaero's Minimap; paste it in Minecraft chat to share it"
+							title="Copy as a Xaero's Minimap waypoint to paste in Minecraft chat"
 							onClick={() =>
 								copyWaypoint({ name: feature.name, ...spot, color: dye })
 							}

@@ -49,11 +49,11 @@ function MaintenanceBar() {
 			title={
 				owner ? (
 					<>
-						<b>Maintenance</b> · only owners can make changes
+						<b>Maintenance mode</b> · only owners can make changes
 					</>
 				) : (
 					<>
-						<b>Maintenance</b> · the map is read only for now
+						<b>Maintenance mode</b> · the map is currently read-only
 					</>
 				)
 			}
@@ -91,7 +91,7 @@ function HistoryBanner() {
 				fill={1}
 				title={
 					<>
-						Only the upload by <b>{only.authorName}</b> ·{" "}
+						Viewing isolated upload by <b>{only.authorName}</b> ·{" "}
 						{formatEventTime(only)}
 					</>
 				}
@@ -113,12 +113,12 @@ function HistoryBanner() {
 			title={
 				r ? (
 					<>
-						As of <b>{formatEventTime(r)}</b> · #{current} by {r.authorName} ·
-						editing is off
+						Viewing <b>{formatEventTime(r)}</b> · #{current} by {r.authorName}{" "}
+						(read-only)
 					</>
 				) : (
 					<>
-						Revision <b>{current}</b> of {head} · editing is off
+						Revision <b>{current}</b> of {head} (read-only)
 					</>
 				)
 			}

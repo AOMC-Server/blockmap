@@ -28,7 +28,7 @@ function JobItem(props: { job: QueuedJob; position: number }) {
 			<div class="muted queue-job-meta">
 				{running
 					? (progress ?? "Running…")
-					: `#${props.position} in line · queued ${formatRelative(job.createdAt)}`}
+					: `#${props.position} in queue · added ${formatRelative(job.createdAt)}`}
 			</div>
 		</li>
 	);
@@ -43,13 +43,12 @@ export function QueueDialog() {
 	return (
 		<Modal title="Queued jobs" onClose={close}>
 			<p class="muted hint">
-				Uploads, deletions, history rebuilds, image cleanups and dimension
-				deletions run one at a time, in this order.
+				Background jobs run one at a time in the order listed below.
 			</p>
 			{data === null ? (
-				<p class="muted">{failed ? "Could not load the queue." : "Loading…"}</p>
+				<p class="muted">{failed ? "Failed to load job queue." : "Loading…"}</p>
 			) : data.length === 0 ? (
-				<p class="muted">Nothing is queued.</p>
+				<p class="muted">Queue is empty.</p>
 			) : (
 				<ol class="queue-jobs">
 					{data.map((job, i) => (
@@ -63,7 +62,7 @@ export function QueueDialog() {
 			)}
 			{isModerator.value && (
 				<p class="hint">
-					<a href="/manage?tab=jobs">All jobs, with the ones that ran</a>
+					<a href="/manage?tab=jobs">View full job history</a>
 				</p>
 			)}
 		</Modal>
@@ -80,7 +79,7 @@ export function QueueButton() {
 			<button
 				type="button"
 				class={`btn queue-button ${queueOpen.value ? "active" : ""}`}
-				title="Jobs the server is working through"
+				title="Background job queue"
 				onClick={() => {
 					queueOpen.value = true;
 				}}

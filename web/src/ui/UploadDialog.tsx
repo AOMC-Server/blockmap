@@ -97,15 +97,16 @@ export function UploadDialog() {
 							<b>Turn off resource packs</b> if you have any enabled.
 						</li>
 						<li>
-							In Xaero's World Map, drag with the right mouse button over the
-							area and choose to export it as PNG.
+							In Xaero's World Map, right-click and drag to select an area, then
+							choose Export PNG.
 						</li>
 						<li>
 							Set <b>Multiple Unscaled Images</b> to ON, then confirm.
 						</li>
 						<li>
-							Select the exported images (or a ZIP of them). They are usually
-							saved in <code>.minecraft/your_instance_folder/map exports/</code>
+							Select the exported PNGs, folder, or ZIP archive. Exports are
+							usually saved in{" "}
+							<code>.minecraft/your_instance_folder/map exports/</code>
 						</li>
 					</ol>
 
@@ -118,12 +119,11 @@ export function UploadDialog() {
 						</p>
 					) : readOnly.value ? (
 						<p class="muted">
-							The map is in maintenance, so uploads are paused. Try again once
-							it is over.
+							Uploads are paused while the map is in maintenance mode.
 						</p>
 					) : !canUpload ? (
 						<p class="muted">
-							You have view-only access to this map, so you can't upload to it.
+							You have view-only access and cannot upload to this map.
 						</p>
 					) : (
 						<>
@@ -168,8 +168,8 @@ export function UploadDialog() {
 									}}
 								/>
 								<span>
-									Drop PNG or ZIP files, or whole export folders, here, or click
-									to choose files
+									Drop PNGs, ZIP archives, or export folders here, or click to
+									browse
 								</span>
 							</label>
 							<label class="btn folder-pick">
@@ -188,9 +188,9 @@ export function UploadDialog() {
 								Choose a folder…
 							</label>
 							<p class="muted hint">
-								Exports are layered by the date in their file or folder name
-								(like <code>2026-02-10_15.06.41</code>), newest on top, so
-								importing old exports never covers newer data.
+								Exports are ordered by the timestamp in their file or folder
+								name (e.g. <code>2026-02-10_15.06.41</code>) with newest data on
+								top, so older exports won't overwrite newer areas.
 							</p>
 
 							{files.length > 0 && (
@@ -209,17 +209,17 @@ export function UploadDialog() {
 									{dates.dates.length > 0 && (
 										<div class="muted">
 											{dates.dates.length} export
-											{dates.dates.length === 1 ? "" : "s"} made{" "}
+											{dates.dates.length === 1 ? "" : "s"} dated{" "}
 											{formatDay(dates.dates[0] as number)}
 											{dates.dates.length > 1 &&
-												` to ${formatDay(dates.dates.at(-1) as number)}`}
+												` – ${formatDay(dates.dates.at(-1) as number)}`}
 										</div>
 									)}
 									{dates.undated > 0 && (
 										<div class="muted">
 											{dates.undated} file
-											{dates.undated === 1 ? " has" : "s have"} no date in the
-											name or folder and will count as made now.
+											{dates.undated === 1 ? " has" : "s have"} no export
+											timestamp and will use the current time.
 										</div>
 									)}
 									<ul class="file-list">
@@ -236,9 +236,7 @@ export function UploadDialog() {
 												<li key={e}>{e}</li>
 											))}
 											{validation.errors.length > 5 && (
-												<li>
-													…and {validation.errors.length - 5} more problems
-												</li>
+												<li>…and {validation.errors.length - 5} more issues</li>
 											)}
 										</ul>
 									)}
@@ -280,7 +278,8 @@ export function UploadDialog() {
 						label={formatProgress(state.message, state.done, state.total)}
 					/>
 					<p class="muted">
-						You can close this window; processing continues in the background.
+						You can safely close this dialog. Processing will continue in the
+						background.
 					</p>
 				</>
 			)}
@@ -290,7 +289,7 @@ export function UploadDialog() {
 					<p class="success">
 						{state.exports > 1
 							? `${state.exports} exports added`
-							: "Upload finished"}
+							: "Upload complete"}
 						{state.rev !== null && state.exports === 1
 							? ` as revision ${state.rev}`
 							: ""}
@@ -298,8 +297,8 @@ export function UploadDialog() {
 					</p>
 					{state.failed > 0 && (
 						<p class="error-text">
-							{state.failed} export{state.failed === 1 ? "" : "s"} failed; see
-							the history panel.
+							{state.failed} export{state.failed === 1 ? "" : "s"} failed; check
+							the History panel for details.
 						</p>
 					)}
 					{state.skipped.length > 0 && (

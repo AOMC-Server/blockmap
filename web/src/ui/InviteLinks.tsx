@@ -109,7 +109,7 @@ export function InviteLinks<R extends string>(props: { scope: Scope<R> }) {
 					<input
 						type="text"
 						inputMode="numeric"
-						placeholder="unlimited"
+						placeholder="Unlimited"
 						maxLength={String(MAX_INVITE_USES).length}
 						value={maxUses}
 						onInput={(e) =>
@@ -124,7 +124,7 @@ export function InviteLinks<R extends string>(props: { scope: Scope<R> }) {
 
 			{created && (
 				<ShownOnce
-					intro="Copy it now: for safety the link is only shown once."
+					intro="Copy this link now. It won't be shown again."
 					value={created.url}
 					label="Invite link"
 					copied="Link copied."

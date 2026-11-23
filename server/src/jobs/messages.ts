@@ -2,24 +2,24 @@
 export const messages = {
 	starting: "Starting",
 	upload: {
-		reading: "Reading the uploaded images",
-		tiles: "Combining the images into map tiles",
+		reading: "Reading uploaded images",
+		tiles: "Building map tiles",
 		zoom: (level: number) => `Updating zoomed-out tiles (zoom level ${level})`,
-		publishing: "Publishing to the map",
+		publishing: "Publishing to map",
 	},
 	failed: {
 		unreadableImage: (x: number, z: number) =>
-			`An image could not be read (at x ${x}, z ${z}). Export it again and upload it again.`,
+			`Could not read image at x ${x}, z ${z}. Try exporting and uploading it again.`,
 		interrupted:
-			"The server restarted while processing this upload. Upload it again.",
+			"Server restarted while processing this upload. Please upload it again.",
 		internal:
-			"Something went wrong on the server. Try again, and tell a moderator if it keeps happening.",
+			"Internal server error while processing. Please try again, or contact a moderator if the issue persists.",
 	},
 	erase: {
-		tiles: "Removing the upload from the history of its tiles",
+		tiles: "Removing upload from tile history",
 		zoom: (level: number) =>
 			`Rebuilding zoomed-out tiles (zoom level ${level})`,
-		publishing: "Publishing the changes",
+		publishing: "Saving changes",
 	},
 };
 
@@ -38,8 +38,8 @@ export function waitingMessage(
 	if (running?.type === "rebuild_history")
 		return "Waiting for the history rebuild to finish";
 	if (running?.type === "gc_blobs")
-		return "Waiting for the image cleanup to finish";
+		return "Waiting for image cleanup to finish";
 	if (running?.type === "delete_dimension")
-		return "Waiting for a dimension to be deleted";
-	return `Waiting for ${plural(ahead.length, "job", "jobs")} ahead of it (uploads, deletions, history rebuilds, image cleanups and dimension deletions run one at a time)`;
+		return "Waiting for dimension deletion to finish";
+	return `Waiting for ${plural(ahead.length, "job", "jobs")} ahead of it`;
 }

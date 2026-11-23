@@ -36,23 +36,23 @@ const EXPIRIES: ExpiryOption[] = [
 const SCOPE_INFO: Record<TokenScope, { label: string; hint: string }> = {
 	read: {
 		label: "Read",
-		hint: "See what you can see, such as private layers. Without it, reads are anonymous.",
+		hint: "Read everything your account can access, including private layers. Without this, requests are anonymous.",
 	},
 	upload: {
 		label: "Upload",
-		hint: "Upload Xaero exports and delete your own uploads.",
+		hint: "Upload Xaero exports, delete your own uploads, and manage files where permitted.",
 	},
 	features: {
 		label: "Layers and features",
-		hint: "Create and edit layers, pins, lines and areas, and share layers.",
+		hint: "Create and edit layers, pins, lines, and areas, and manage layer sharing.",
 	},
 	moderate: {
 		label: "Moderate",
-		hint: "Use moderator powers: delete any upload, restore features, edit dimensions.",
+		hint: "Moderator permissions: delete any upload, restore features, and manage dimensions.",
 	},
 	manage: {
 		label: "Manage",
-		hint: "Use owner powers: members, map invites and map settings. Includes Moderate.",
+		hint: "Owner permissions: manage members, map invites, and map settings. Implies Moderate.",
 	},
 };
 
@@ -145,22 +145,22 @@ export function ApiTokens() {
 		<section class="page-section">
 			<h2>API tokens</h2>
 			<p class="muted">
-				Tokens let scripts act as you. Send one as{" "}
-				<code>Authorization: Bearer &lt;token&gt;</code>. A token can do what
-				its scopes allow, and never more than your account can, so give it only
-				the scopes it needs and keep it secret. See the{" "}
+				API tokens let scripts access the map on your behalf via{" "}
+				<code>Authorization: Bearer &lt;token&gt;</code>. Tokens are limited to
+				the scopes selected below and can never exceed your account's own
+				permissions. Keep them secret. See the{" "}
 				<a href="/scalar" target="_blank" rel="noopener">
 					API documentation
 				</a>{" "}
-				for the endpoints.
+				for available endpoints.
 			</p>
 
 			{created && (
 				<ShownOnce
 					intro={
 						<>
-							<b>{created.name}</b> was created. Copy it now: it won't be shown
-							again.
+							<b>{created.name}</b> created. Copy this token now; it won't be
+							shown again.
 						</>
 					}
 					value={created.token}
@@ -209,15 +209,15 @@ export function ApiTokens() {
 			</form>
 			{full && (
 				<p class="hint">
-					You have {MAX_TOKENS_PER_USER} tokens, the maximum. Revoke one to make
-					a new one.
+					You've reached the maximum of {MAX_TOKENS_PER_USER} tokens. Revoke an
+					existing token to generate a new one.
 				</p>
 			)}
 
 			{tokens === null ? (
 				<p class="muted">Loading…</p>
 			) : tokens.length === 0 ? (
-				<p class="muted">You have no API tokens.</p>
+				<p class="muted">No API tokens yet.</p>
 			) : (
 				<ul class="invite-list">
 					{tokens.map((t) => (

@@ -104,15 +104,15 @@ export function startUpload(dimSlug: string, items: UploadItem[]) {
 		}
 		const reason =
 			xhr.status === 401
-				? "You need to log in to upload."
+				? "Log in to upload map data."
 				: xhr.status === 429
 					? "Too many uploads. Wait a moment and try again."
 					: xhr.status === 413
-						? "The upload is too large for the server. Send fewer or smaller files."
+						? "Upload exceeds the server size limit. Try uploading fewer files at once."
 						: xhr.status === 409 && body?.skipped
 							? body.skipped.length === 1
-								? "This file was already uploaded, so there is nothing new to add."
-								: "All of these files were already uploaded, so there is nothing new to add."
+								? "This file has already been uploaded."
+								: "All selected files have already been uploaded."
 							: (body?.error ?? `Upload failed (${xhr.status}).`);
 		uploadState.value = {
 			phase: "failed",
@@ -200,7 +200,7 @@ async function follow(revisionIds: number[], skipped: SkippedFile[]) {
 	if (firstError) {
 		showNotice(`Some exports failed: ${firstError}${skippedNote}`, "error");
 	} else {
-		showNotice(`Upload finished. The map has been updated.${skippedNote}`);
+		showNotice(`Upload complete. Map updated.${skippedNote}`);
 	}
 	await refreshMap();
 	void loadRevisions();

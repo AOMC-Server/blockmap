@@ -88,22 +88,20 @@ export function ShareDialog() {
 					<>
 						<dt>Revision</dt>
 						<dd>
-							{view.rev} <span class="muted">(an earlier version)</span>
+							{view.rev} <span class="muted">(historical)</span>
 						</dd>
 					</>
 				)}
 				<dt>Layers</dt>
 				<dd>
-					{includeLayers
-						? `${shown} of ${total} shown`
-						: "Each layer's default"}
+					{includeLayers ? `${shown} of ${total} shown` : "Default visibility"}
 				</dd>
 			</dl>
 			<Toggle
 				inline
 				checked={includeLayers}
 				onChange={setIncludeLayers}
-				label="Show the same layers I have on"
+				label="Include my current layer visibility"
 			/>
 			<div class="copy-row share-link">
 				<input
@@ -111,7 +109,7 @@ export function ShareDialog() {
 					readOnly
 					aria-label="Short link"
 					value={link.phase === "ready" ? link.url : ""}
-					placeholder={link.phase === "making" ? "Making a link…" : ""}
+					placeholder={link.phase === "making" ? "Creating link…" : ""}
 					onFocus={(e) => e.currentTarget.select()}
 				/>
 				<button
@@ -126,7 +124,7 @@ export function ShareDialog() {
 				</button>
 			</div>
 			{link.phase === "failed" && (
-				<p class="error-text">Could not make a link: {link.error}</p>
+				<p class="error-text">Failed to create link: {link.error}</p>
 			)}
 		</Modal>
 	);

@@ -77,7 +77,7 @@ export function FeatureHistory() {
 	};
 
 	const restore = async (e: FeatureHistoryEntry) => {
-		const what = e.deleted ? "deleted state" : "this version";
+		const what = e.deleted ? "the deleted state" : "this version";
 		if (!confirm(`Restore ${what} from ${formatTime(e.createdAt)}?`)) return;
 		setBusy(true);
 		let ok = false;
@@ -93,9 +93,9 @@ export function FeatureHistory() {
 	};
 
 	return (
-		<Modal title={`History of “${target.title}”`} onClose={close}>
+		<Modal title={`History: ${target.title}`} onClose={close}>
 			{entries === null && !failed && <p class="muted">Loading…</p>}
-			{failed && <p class="error-text">Could not load the history.</p>}
+			{failed && <p class="error-text">Failed to load history.</p>}
 			<ul class="feature-history">
 				{entries?.map((e, i) => (
 					<li key={e.revisionId} class={e.deleted ? "deleted" : ""}>
@@ -146,8 +146,8 @@ export function FeatureHistory() {
 			)}
 			{isModerator.value && readOnly.value && entries && (
 				<p class="muted">
-					The map is in maintenance, so earlier versions can't be restored for
-					now.
+					Earlier versions cannot be restored while the map is in maintenance
+					mode.
 				</p>
 			)}
 		</Modal>

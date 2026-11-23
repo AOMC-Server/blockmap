@@ -54,8 +54,8 @@ export function DeleteUploadDialog() {
 			</dl>
 			<p class={failed ? "muted" : "warn-text"}>
 				{failed
-					? "It only failed to process, so there is nothing to undo on the map."
-					: "It is removed from the map and from every past revision, and cannot be restored. To bring it back, upload the files again."}
+					? "This upload failed to process, so it hasn't affected the map. Deleting it removes it from the log."
+					: "This will permanently remove the upload from the map and all past revisions. To restore it later, you'll need to upload the files again."}
 			</p>
 			<div class="modal-actions">
 				<button

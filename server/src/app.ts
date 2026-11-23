@@ -118,7 +118,7 @@ export function createApp({ db, env, services, fetch: fetchFn }: AppDeps) {
 				return c.json(
 					{
 						error:
-							"The map is in maintenance: it is read only until an owner turns maintenance off.",
+							"Maintenance mode is active. The map is temporarily read-only.",
 						reason: "maintenance",
 					},
 					503,

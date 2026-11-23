@@ -49,7 +49,9 @@ export function MembersSection<R extends string>(props: {
 
 	const remove = (m: Member<R>) => {
 		const self = m.userId === user.value?.id;
-		const ask = self ? "Leave? You may lose access." : `Remove ${m.username}?`;
+		const ask = self
+			? "Remove yourself? You may lose access."
+			: `Remove ${m.username}?`;
 		if (confirm(ask)) void act(() => scope.remove(m.userId));
 	};
 
@@ -137,8 +139,8 @@ export function MembersSection<R extends string>(props: {
 				<input
 					type="text"
 					inputMode="numeric"
-					placeholder="Discord user id"
-					aria-label="Discord user id"
+					placeholder="Discord user ID"
+					aria-label="Discord user ID"
 					value={newId}
 					onInput={(e) => setNewId(e.currentTarget.value)}
 				/>
@@ -156,8 +158,8 @@ export function MembersSection<R extends string>(props: {
 				</button>
 			</form>
 			<p class="muted hint">
-				They must have logged in once. Enable Developer Mode in Discord and use
-				“Copy User ID”, or just send an invite link.
+				The user must have logged in at least once. Enable Developer Mode in
+				Discord to use “Copy User ID”, or share an invite link instead.
 			</p>
 		</section>
 	);

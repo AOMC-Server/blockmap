@@ -74,8 +74,8 @@ export function FilesPage() {
 				<section class="page-section">
 					<h2>Files</h2>
 					<p class="muted">
-						Downloads such as Voxy data and Xaero presets. Log in to browse and
-						download them.
+						Shared downloads such as Voxy data and Xaero presets. Log in to
+						browse and download files.
 					</p>
 					<a class="btn primary" href={loginUrl()}>
 						Log in with Discord
@@ -271,7 +271,7 @@ function Library(props: { names: string[]; go: Go }) {
 				meter: createSpeedMeter(),
 				state: tooBig ? "failed" : "waiting",
 				error: tooBig
-					? `Larger than the ${formatBytes(max)} a file may be.`
+					? `Exceeds the ${formatBytes(max)} file size limit.`
 					: undefined,
 			});
 		}
@@ -298,7 +298,7 @@ function Library(props: { names: string[]; go: Go }) {
 			i.webkitGetAsEntry?.()?.isDirectory === true;
 		if (items.some(isFolder))
 			showNotice(
-				"Folders can't be uploaded. Put them in a ZIP file and upload that.",
+				"Folders can't be uploaded directly. Compress them into a ZIP file first.",
 				"error",
 			);
 		const files = items
@@ -338,15 +338,15 @@ function Library(props: { names: string[]; go: Go }) {
 		return (
 			<section class="page-section">
 				<h2>Not found</h2>
-				<p class="muted">There is no folder at {path}.</p>
+				<p class="muted">Folder not found: {path}</p>
 				<FolderLink class="btn" href="/files/" go={go}>
-					Go to the top
+					Back to Files
 				</FolderLink>
 			</section>
 		);
 	if (!tree)
 		return error ? (
-			<p class="error-text">Could not load the folder: {error}</p>
+			<p class="error-text">Failed to load folder: {error}</p>
 		) : (
 			<p class="muted">Loading…</p>
 		);
@@ -380,7 +380,7 @@ function Library(props: { names: string[]; go: Go }) {
 				) : (
 					!tree.folder && (
 						<p class="muted">
-							Downloads for players, such as Voxy data and Xaero presets.
+							Shared downloads for players, such as Voxy data and Xaero presets.
 						</p>
 					)
 				)}
@@ -426,9 +426,9 @@ function Library(props: { names: string[]; go: Go }) {
 				)}
 				{write && (
 					<p class="muted hint">
-						Upload folders as a ZIP. Files up to{" "}
-						{formatBytes(tree.limits.maxFileBytes)}; the library uses{" "}
-						{formatBytes(tree.limits.usedBytes)} of{" "}
+						Upload folders as ZIP archives. Max file size:{" "}
+						{formatBytes(tree.limits.maxFileBytes)} · Storage used:{" "}
+						{formatBytes(tree.limits.usedBytes)} /{" "}
 						{formatBytes(tree.limits.quotaBytes)}.
 					</p>
 				)}
@@ -576,7 +576,7 @@ function Library(props: { names: string[]; go: Go }) {
 													...(write
 														? ([
 																[
-																	"Upload a new version",
+																	"Upload new version",
 																	() => {
 																		replacing.current = f;
 																		replacePick.current?.click();
@@ -613,9 +613,7 @@ function Library(props: { names: string[]; go: Go }) {
 						</table>
 					</div>
 				)}
-				{dragging && (
-					<div class="file-drop">Drop files to upload them here</div>
-				)}
+				{dragging && <div class="file-drop">Drop files here to upload</div>}
 			</section>
 
 			{dialog?.kind === "newFolder" && (
@@ -639,7 +637,7 @@ function Library(props: { names: string[]; go: Go }) {
 			{dialog?.kind === "describe" && tree.folder && (
 				<TextDialog
 					title="Folder description"
-					label="Shown above what the folder holds. **bold** and [links](https://…) work."
+					label="Displayed above the folder contents. Supports **bold** and [links](https://…)."
 					initial={tree.folder.description}
 					multiline
 					submit="Save"
@@ -669,7 +667,7 @@ function Library(props: { names: string[]; go: Go }) {
 			{dialog?.kind === "move" && (
 				<TextDialog
 					title={`Move “${dialog.target.item.name}”`}
-					label="To the folder (a path such as /voxy/worlds; / is the top)"
+					label="Destination folder path (e.g. /voxy/worlds, or / for root)"
 					initial={path}
 					submit="Move"
 					onClose={() => setDialog(null)}
@@ -699,7 +697,7 @@ async function copyLink(url: string) {
 		await navigator.clipboard.writeText(new URL(url, location.origin).href);
 		showNotice("Link copied. Only logged-in users can download it.");
 	} catch {
-		showNotice("Could not copy the link.", "error");
+		showNotice("Failed to copy link.", "error");
 	}
 }
 
@@ -707,7 +705,7 @@ async function deleteFolder(f: FolderItem, after: () => Promise<void>) {
 	const ask =
 		f.items > 0
 			? `Delete “${f.name}” and everything in it? This cannot be undone.`
-			: `Delete the empty folder “${f.name}”?`;
+			: `Delete folder “${f.name}”?`;
 	if (!confirm(ask)) return;
 	await ok(
 		() =>
@@ -759,7 +757,7 @@ async function move(target: Target, to: string, after: () => Promise<void>) {
 	);
 	if (!r.ok) {
 		showNotice(
-			r.status === 404 ? `There is no folder at ${to}.` : r.error,
+			r.status === 404 ? `Folder “${to}” does not exist.` : r.error,
 			"error",
 		);
 		return false;
@@ -850,7 +848,7 @@ function UploadList(props: {
 				{allLeft !== null && (
 					<span class="muted upload-eta">
 						{" "}
-						· about {formatElapsed(Math.ceil(allLeft))} left for all
+						· ~{formatElapsed(Math.ceil(allLeft))} remaining
 					</span>
 				)}
 			</h2>
@@ -973,18 +971,18 @@ function ConflictDialog(props: {
 		<Modal title="Name already taken" onClose={() => pick("skip")}>
 			<p>
 				{props.folder
-					? `There is a folder called “${props.name}” here already.`
-					: `There is a file called “${props.name}” here already.`}
+					? `A folder named “${props.name}” already exists in this location.`
+					: `A file named “${props.name}” already exists in this location.`}
 			</p>
 			<p class="muted">
-				Replacing keeps the existing link and download count. Keeping both
-				uploads this one with a number added to its name.
+				Replacing updates the file while keeping its link and download count.
+				Keeping both saves the new file with a number appended.
 			</p>
 			<Toggle
 				inline
 				checked={forAll}
 				onChange={setForAll}
-				label="Do the same for the rest of these uploads"
+				label="Apply to remaining uploads"
 			/>
 			<div class="modal-actions">
 				{!props.folder && (
@@ -1064,12 +1062,12 @@ function AccessDialog(props: {
 	return (
 		<Modal title={`Access to “${props.folderName}”`} onClose={props.onClose}>
 			<p class="muted">
-				These people may upload, rename, move and delete files and folders in
-				this folder and below it. Moderators always can.
+				These users can upload, rename, move, and delete items in this folder
+				and its subfolders. Moderators always have access.
 			</p>
 			{grants === null && <p class="muted">Loading…</p>}
 			{grants?.length === 0 && inherited.length === 0 && (
-				<p class="muted">Nobody else yet.</p>
+				<p class="muted">No additional users granted access.</p>
 			)}
 			<ul class="member-list">
 				{grants?.map((g) => (
@@ -1098,7 +1096,7 @@ function AccessDialog(props: {
 				{inherited.map((g) => (
 					<li key={`${g.path}:${g.userId}`}>
 						{person(g)}
-						<span class="muted" title="Given a folder above this one">
+						<span class="muted" title="Inherited from a parent folder">
 							from {g.path}
 						</span>
 					</li>
@@ -1126,8 +1124,8 @@ function AccessDialog(props: {
 				<input
 					type="text"
 					inputMode="numeric"
-					placeholder="Discord user id"
-					aria-label="Discord user id"
+					placeholder="Discord user ID"
+					aria-label="Discord user ID"
 					value={newId}
 					onInput={(e) => setNewId(e.currentTarget.value)}
 				/>
@@ -1136,8 +1134,8 @@ function AccessDialog(props: {
 				</button>
 			</form>
 			<p class="muted hint">
-				They must have logged in once. Enable Developer Mode in Discord and use
-				“Copy User ID”.
+				The user must have logged in at least once. Enable Developer Mode in
+				Discord to use “Copy User ID”.
 			</p>
 		</Modal>
 	);

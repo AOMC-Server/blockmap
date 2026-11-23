@@ -59,7 +59,7 @@ function Appearance() {
 			<SettingToggle
 				field="dimensionColours"
 				label="Colour the map by dimension"
-				hint="Use the viewed dimension's colours, like the Nether's reds or the End's purples. Otherwise the overworld's are used everywhere."
+				hint="Match the UI colour palette to the active dimension (such as red in the Nether or purple in The End) instead of always using Overworld colours."
 			/>
 		</section>
 	);
@@ -72,7 +72,7 @@ function TransitionPicker() {
 			value={settings.value.transitionSpeed}
 			options={TRANSITION_SPEEDS}
 			onChange={(transitionSpeed) => updateSettings({ transitionSpeed })}
-			hint="How quickly the map moves and zooms to a place, for example when you open an upload. Instant skips the animation."
+			hint="Animation speed when panning or zooming automatically (such as jumping to a feature or upload). Instant disables animations."
 		/>
 	);
 }
@@ -86,14 +86,14 @@ function Preferences() {
 			<p class="muted">Saved in this browser only.</p>
 
 			<label class="field flow">
-				<span class="label">Open the map in</span>
+				<span class="label">Default dimension</span>
 				<select
 					value={current ?? ""}
 					onChange={(e) =>
 						updateSettings({ defaultDimension: e.currentTarget.value || null })
 					}
 				>
-					<option value="">The first dimension</option>
+					<option value="">First dimension</option>
 					{dims.map((d) => (
 						<option key={d.slug} value={d.slug}>
 							{d.name}
@@ -104,7 +104,7 @@ function Preferences() {
 					)}
 				</select>
 				<span class="muted hint">
-					Used when the link doesn't name a dimension.
+					Used when opening the map without a dimension in the URL.
 				</span>
 			</label>
 
@@ -112,23 +112,23 @@ function Preferences() {
 
 			<SettingToggle
 				field="rememberPosition"
-				label="Remember where I was"
-				hint="Reopen the map at your last position and dimension when the link doesn't name one."
+				label="Remember last position"
+				hint="Restore your last viewed dimension, coordinates, and zoom level when opening the map."
 			/>
 			<SettingToggle
 				field="showCoordinates"
 				label="Show cursor coordinates"
-				hint="In the bottom left corner of the map."
+				hint="Display block coordinates in the bottom-left corner."
 			/>
 			<SettingToggle
 				field="showOverworldEquivalent"
 				label="Show overworld coordinates in other dimensions"
-				hint="In the Nether, also show the matching overworld position."
+				hint="Show corresponding Overworld coordinates when viewing scaled dimensions like the Nether."
 			/>
 			<SettingToggle
 				field="showScale"
-				label="Show the zoom scale"
-				hint="For example “1 px = 4 blocks”."
+				label="Show zoom scale"
+				hint="Display the current pixel-to-block ratio (e.g. “1 px = 4 blocks”)."
 			/>
 			<label class="field flow">
 				<span class="label">
@@ -153,17 +153,17 @@ function Preferences() {
 					}
 				/>
 				<span class="muted hint">
-					How close pins must be on the map to merge into one numbered marker.
-					Lower shows more individual pins; higher groups them sooner.
+					Screen distance (in pixels) within which nearby pins merge into a
+					numbered cluster. Lower values show more individual pins.
 				</span>
 			</label>
 			<SettingToggle
 				field="preloadSpawn"
-				label="Preload the area around spawn"
-				hint="Load low resolution images of the area around spawn in the background, so there is always something to show there while the detailed ones load. Turn off to save data on a slow or metered connection."
+				label="Preload tiles around spawn"
+				hint="Keep low-resolution tiles around 0, 0 loaded in the background to prevent blank areas while panning or zooming. Turn off to save bandwidth on metered connections."
 			/>
 			<label class="field flow">
-				<span class="label">Cache lines and areas while moving</span>
+				<span class="label">Cache vector shapes while moving</span>
 				<select
 					value={settings.value.shapeCache}
 					onChange={(e) => {
@@ -178,11 +178,9 @@ function Preferences() {
 					))}
 				</select>
 				<span class="muted hint">
-					Draw lines and areas once and move that picture while panning and
-					zooming, instead of drawing them again every frame. Smoother where
-					drawing them is slow, such as in Firefox; while zooming they look
-					slightly thicker or thinner until it settles. Automatic turns it on in
-					Firefox only.
+					Rasterize lines and areas while panning and zooming instead of
+					redrawing them every frame. Improves performance in browsers with
+					slower canvas rendering (enabled automatically in Firefox).
 				</span>
 			</label>
 		</section>
@@ -197,22 +195,22 @@ function Debugging() {
 			<SettingToggle
 				field="debugRender"
 				label="Debug render mode"
-				hint="Colour each map tile by how it was drawn (loaded, stale, stand-in, missing), label it, and show renderer statistics on the map."
+				hint="Tint and label tiles by load state (loaded, stale, fallback, missing) and display renderer diagnostics."
 			/>
 			<SettingToggle
 				field="tileOutlines"
 				label="Show tile outlines"
-				hint="Draw the edges of the map tiles at the current zoom level."
+				hint="Show map tile boundaries at the current zoom level."
 			/>
 			<SettingToggle
 				field="chunkOutlines"
 				label="Show chunk outlines"
-				hint="Draw the 16×16 block chunk grid from 1:1 zoom inwards. Zoom in further for chunk coordinates, then the block grid, then each block's coordinates."
+				hint="Show the 16×16 chunk grid at 1:1 zoom and closer. Zooming in further reveals chunk coordinates, the block grid, and individual block coordinates."
 			/>
 			<SettingToggle
 				field="regionOutlines"
 				label="Show region outlines"
-				hint="Draw the 512×512 block region grid, labelled with each region's file name (r.X.Z)."
+				hint="Show the 512×512 region grid labelled with region filenames (r.X.Z)."
 			/>
 			<label class="toggle toggle-select">
 				<select
@@ -231,9 +229,9 @@ function Debugging() {
 				<span class="toggle-text">
 					Show in-game map outlines
 					<span class="muted hint">
-						Draw the areas in-game maps of that size cover. Zoom in for each
-						map's centre. All scales draws them nested, each in its own colour:
-						1:1 yellow, 1:2 orange, 1:4 red, 1:8 purple, 1:16 green.
+						Show vanilla Minecraft map boundaries and centres. “All scales”
+						draws nested grids by scale: 1:1 yellow, 1:2 orange, 1:4 red, 1:8
+						purple, 1:16 green.
 					</span>
 				</span>
 			</label>
@@ -266,8 +264,8 @@ function YourData() {
 		<section class="page-section" id="your-data">
 			<h2>Your data</h2>
 			<p class="muted">
-				What the site keeps about you and why is described in the{" "}
-				<a href="/privacy">privacy statement</a>.
+				See the <a href="/privacy">privacy policy</a> for details on how your
+				data is stored and used.
 			</p>
 			<div class="group">
 				<a class="btn" href="/api/me/export" download="my-map-data.json">
@@ -286,14 +284,14 @@ function YourData() {
 			{confirming && (
 				<div class="delete-account">
 					<p>
-						This logs you out everywhere and deletes your account, your API
-						tokens, your roles and the invites you made. It cannot be undone.
+						This logs you out everywhere and permanently deletes your account,
+						API tokens, roles, and invite links. This cannot be undone.
 					</p>
 					<p>
-						Your uploads, layers and features stay on the map under the name
-						“Deleted user”, with nothing left that leads back to you. Delete any
-						of them first if you want them gone. Logging in again later starts a
-						new, empty account.
+						Your map uploads, layers, features, and uploaded files will remain
+						under the name “Deleted user” with no link back to your Discord
+						account. Delete any items you want removed before proceeding.
+						Logging in again later will create a new account.
 					</p>
 					<div class="group">
 						<button

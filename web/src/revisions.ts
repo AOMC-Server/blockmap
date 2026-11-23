@@ -173,7 +173,7 @@ function followRevision(
 			if (found.kind === "gone") return settle({ status: "gone", error: null });
 			if (found.kind === "error") {
 				if (++failures >= MAX_POLL_FAILURES)
-					settle(fail("Lost contact with the server."));
+					settle(fail("Lost connection to the server."));
 				return;
 			}
 			failures = 0;
@@ -239,7 +239,8 @@ export async function watchRevision(
 	const out = await followRevision(revisionId, {
 		onProgress,
 		signal,
-		timeoutError: "Still processing; check the history panel later.",
+		timeoutError:
+			"Still processing in the background. Check the History panel for progress.",
 	});
 	return out.status === "gone"
 		? { status: "failed", error: "The upload was deleted." }
@@ -293,7 +294,7 @@ export async function deleteUpload(id: number): Promise<boolean> {
 	// Marked busy before the request, so the row cannot be deleted twice meanwhile.
 	setDeleting(id, {
 		label: "deleting…",
-		detail: "Waiting for the server to start deleting it",
+		detail: "Waiting for deletion to start",
 	});
 	const out = await run(() =>
 		api.api.revisions[":id"].$delete({ param: { id: String(id) } }),
@@ -311,7 +312,8 @@ export async function deleteUpload(id: number): Promise<boolean> {
 
 	const result = await followRevision(id, {
 		erase: true,
-		timeoutError: "Still deleting; check the history panel later.",
+		timeoutError:
+			"Still deleting in the background. Check the History panel for progress.",
 		onProgress: (p) =>
 			setDeleting(id, {
 				label: p.total

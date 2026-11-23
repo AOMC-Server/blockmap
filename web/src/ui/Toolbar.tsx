@@ -41,9 +41,7 @@ export function Toolbar() {
 								role="tab"
 								aria-selected={active}
 								title={
-									active
-										? `${d.name} (double-click to go back to 0, 0)`
-										: d.name
+									active ? `${d.name} (double-click to return to 0, 0)` : d.name
 								}
 								class={`btn dim ${active ? "active" : ""}`}
 								onClick={() => selectDimension(d.slug)}

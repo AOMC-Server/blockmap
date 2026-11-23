@@ -141,9 +141,10 @@ function LayerForm(props: {
 				onChange={(d) => d && setColor(d)}
 			/>
 			<details class="layer-style">
-				<summary>Default style of lines and areas</summary>
+				<summary>Default line and area style</summary>
 				<p class="hint">
-					Used by every line and area in this layer that does not set its own.
+					Applies to lines and areas in this layer unless overridden per
+					feature.
 				</p>
 				<StyleControls
 					kind="layer"
@@ -196,8 +197,8 @@ function ImportButton(props: { layer: LayerData; replace: boolean }) {
 			class="btn small"
 			title={
 				replace
-					? "Delete every feature in this layer and use the ones in a JSON file"
-					: "Add the features from a JSON file to this layer"
+					? "Replace all features in this layer with a JSON file"
+					: "Append features from a JSON file to this layer"
 			}
 		>
 			{replace ? "Import (replace)" : "Import"}
@@ -221,7 +222,7 @@ function ImportButton(props: { layer: LayerData; replace: boolean }) {
 					try {
 						data = JSON.parse(await file.text());
 					} catch {
-						showNotice("That file is not valid JSON.", "error");
+						showNotice("Invalid JSON file.", "error");
 						return;
 					}
 					const out = await importFeatures(props.layer.id, data, replace);
@@ -258,7 +259,7 @@ function LayerSettings(props: {
 			{editable && l.visibility === "private" && l.canManage && (
 				<section>
 					<h4 class="section-title">Access</h4>
-					<p class="hint">Who can see and edit this layer.</p>
+					<p class="hint">Manage who can view and edit this private layer.</p>
 					<button
 						type="button"
 						class="btn small"
@@ -274,7 +275,7 @@ function LayerSettings(props: {
 			<section>
 				<h4 class="section-title">Data</h4>
 				<p class="hint">
-					Features are exchanged as JSON files, the same format Export writes.
+					Export features to JSON or import from an exported file.
 				</p>
 				<div class="settings-actions">
 					<a
@@ -289,8 +290,8 @@ function LayerSettings(props: {
 				</div>
 				{editable && (
 					<p class="hint">
-						Import adds the file's features. Import (replace) deletes everything
-						in this layer first.
+						Import appends to existing features. Import (replace) overwrites all
+						features in this layer.
 					</p>
 				)}
 			</section>
@@ -443,7 +444,7 @@ function LayerRow(props: {
 								<button
 									type="button"
 									class="btn small"
-									title="Move the map to show everything in this layer"
+									title="Fit map view to this layer's features"
 									onClick={() => zoomToLayer(l)}
 								>
 									Zoom to
@@ -453,7 +454,7 @@ function LayerRow(props: {
 								<button
 									type="button"
 									class="btn small"
-									title="Hide all the other layers"
+									title="Hide all other layers"
 									onClick={() => showOnlyLayer(l)}
 								>
 									Only this
@@ -462,7 +463,7 @@ function LayerRow(props: {
 							<button
 								type="button"
 								class="btn small"
-								title="Layer details, sharing, import and export"
+								title="Layer settings, sharing, and import/export"
 								onClick={() => setSettingsOpen(true)}
 							>
 								Settings
@@ -574,7 +575,7 @@ export function LayerPanel() {
 							disabled={layersFull}
 							title={
 								layersFull
-									? `You already have ${maxLayers} layers, the most one person may create`
+									? `You've reached the limit of ${maxLayers} layers`
 									: undefined
 							}
 							onClick={() => setCreating(true)}
@@ -619,10 +620,10 @@ export function LayerPanel() {
 							<button
 								type="button"
 								class="plain link"
-								title="Each layer shown or hidden as its settings say"
+								title="Reset layers to their default visibility"
 								onClick={() => resetLayers(layers)}
 							>
-								Show default
+								Reset defaults
 							</button>
 						</div>
 					)}
@@ -653,7 +654,7 @@ export function LayerPanel() {
 				<p class="muted">No layers in this dimension yet.</p>
 			)}
 			{layers.length > 0 && matches.length === 0 && (
-				<p class="muted">Nothing matches “{query.trim()}”.</p>
+				<p class="muted">No matches for “{query.trim()}”.</p>
 			)}
 		</Panel>
 	);

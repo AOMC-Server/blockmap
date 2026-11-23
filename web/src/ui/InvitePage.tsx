@@ -81,7 +81,7 @@ export function InvitePage(props: { token: string }) {
 						<>
 							<p class="error-text">{state.message}</p>
 							<a class="btn" href="/">
-								Open the map
+								Go to map
 							</a>
 						</>
 					)}

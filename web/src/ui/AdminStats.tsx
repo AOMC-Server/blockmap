@@ -45,10 +45,10 @@ const CATEGORIES: { key: Category; label: string; color: string }[] = [
 ];
 
 const STORAGE_NOTES: Record<string, string> = {
-	upload: "After an upload",
-	erase: "After an upload was deleted",
-	gc: "After removing unused images",
-	rebuild: "After the history was rebuilt",
+	upload: "After upload",
+	erase: "After upload deletion",
+	gc: "After image cleanup",
+	rebuild: "After history rebuild",
 	boot: "Server started",
 };
 
@@ -85,8 +85,7 @@ function CleanupButton(props: { onDone: () => void }) {
 		[props.onDone],
 	);
 	const start = async () => {
-		if (!confirm("Delete the images that nothing uses? This cannot be undone."))
-			return;
+		if (!confirm("Delete unused tile images? This cannot be undone.")) return;
 		setQueued(true);
 		const res = await attempt(() => api.api.admin.storage.cleanup.$post());
 		if (!res.ok) {
@@ -123,7 +122,7 @@ function Storage(props: { data: Body; onCleaned: () => void }) {
 		},
 		{
 			key: "used",
-			label: "Used by the map",
+			label: "In use",
 			color: "var(--chart-2)",
 			values: readings.map((r) => r.referencedBytes),
 		},
@@ -146,8 +145,8 @@ function Storage(props: { data: Body; onCleaned: () => void }) {
 		<>
 			<h2>Storage</h2>
 			<p class="muted">
-				Summed from the recorded size of every image, not measured on disk. A
-				point is added after each upload, deletion and cleanup.
+				Calculated from recorded image sizes rather than actual disk usage.
+				Updated after each upload, deletion, and cleanup.
 			</p>
 			<TileGrid
 				plain
@@ -155,17 +154,17 @@ function Storage(props: { data: Body; onCleaned: () => void }) {
 					{
 						label: "Tile images",
 						value: formatBytes(cur.blobBytes),
-						hint: `${formatNumber(cur.blobCount)} images, ${formatBytes(overview.tiles.averageImageBytes)} each on average`,
+						hint: `${formatNumber(cur.blobCount)} images, avg ${formatBytes(overview.tiles.averageImageBytes)}`,
 					},
 					{
-						label: "Used by the map",
+						label: "In use",
 						value: formatBytes(cur.referencedBytes),
-						hint: `${formatNumber(cur.referencedBlobs)} images, each used ${overview.tiles.reuse}× on average`,
+						hint: `${formatNumber(cur.referencedBlobs)} images, avg ${overview.tiles.reuse}× reuse`,
 					},
 					{
-						label: "Waiting for cleanup",
+						label: "Unused images",
 						value: formatBytes(reclaimable),
-						hint: "Unused images that the cleanup removes",
+						hint: "Can be freed by running cleanup",
 					},
 					{ label: "Database", value: formatBytes(cur.dbBytes) },
 				]}
@@ -238,21 +237,21 @@ function Traffic(props: { data: Body }) {
 				/>
 			</div>
 			<p class="muted">
-				What this server sent, counted as it happens. Redirects and errors carry
-				almost no data.
+				Outgoing traffic from this server. Redirects and error responses
+				transfer minimal data.
 			</p>
 			<TileGrid
 				plain
 				tiles={[
 					{
-						label: "Sent in this period",
+						label: "Data sent",
 						value: formatBytes(periodBytes),
-						hint: `${formatBytes(totalBytes)} in total`,
+						hint: `${formatBytes(totalBytes)} all time`,
 					},
 					{
-						label: "Requests in this period",
+						label: "Requests",
 						value: formatNumber(periodRequests),
-						hint: `${formatNumber(totalRequests)} in total`,
+						hint: `${formatNumber(totalRequests)} all time`,
 					},
 					{
 						label: "Failed requests",
@@ -284,12 +283,12 @@ function Traffic(props: { data: Body }) {
 				<table class="table plain compact nowrap">
 					<thead>
 						<tr>
-							<th>Kind</th>
+							<th>Category</th>
 							<th class="num">Requests</th>
 							<th class="num">Sent</th>
 							<th class="num">Redirects</th>
 							<th class="num">Errors</th>
-							<th class="num">Sent, all time</th>
+							<th class="num">All-time sent</th>
 							<th class="num">Chart</th>
 						</tr>
 					</thead>
@@ -355,10 +354,10 @@ function Domains(props: { data: Body }) {
 	const total = rows.reduce((n, d) => n + d.bytes, 0);
 	return (
 		<>
-			<h2>Where tiles are requested from</h2>
+			<h2>Tile traffic by domain</h2>
 			<p class="muted">
-				The site named in the Origin or Referer of each request. “No referrer”
-				is scripts and direct downloads, which send neither.
+				Grouped by the request's Origin or Referer header. “No referrer”
+				includes scripts and direct downloads.
 			</p>
 			{rows.length === 0 ? (
 				<p class="muted">No tile requests in this period.</p>
@@ -380,7 +379,7 @@ function Domains(props: { data: Body }) {
 										hint={c.hint}
 									/>
 								))}
-								<th>Share of data</th>
+								<th>Share</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -428,7 +427,7 @@ function Overview(props: { data: Body }) {
 					{
 						label: "Users",
 						value: formatNumber(o.users.total),
-						hint: `${formatNumber(o.users.active7d)} logged in this week, ${formatNumber(o.users.active30d)} this month`,
+						hint: `${formatNumber(o.users.active7d)} active (7d), ${formatNumber(o.users.active30d)} (30d)`,
 					},
 					{
 						label: "Sessions / API tokens",
@@ -438,17 +437,17 @@ function Overview(props: { data: Body }) {
 					{
 						label: "Uploads",
 						value: formatNumber(o.map.uploadsDone),
-						hint: `${formatNumber(o.map.uploadsViaMod)} via the mod, ${formatNumber(o.map.uploadsFailed)} failed`,
+						hint: `${formatNumber(o.map.uploadsViaMod)} via mod, ${formatNumber(o.map.uploadsFailed)} failed`,
 					},
 					{
 						label: "Layers",
 						value: formatNumber(o.map.publicLayers + o.map.privateLayers),
-						hint: `${formatNumber(o.map.privateLayers)} private, in ${formatNumber(o.map.dimensions)} dimensions`,
+						hint: `${formatNumber(o.map.privateLayers)} private across ${formatNumber(o.map.dimensions)} dimensions`,
 					},
 					{
 						label: "Features",
 						value: formatNumber(o.map.features),
-						hint: `${formatNumber(o.map.featureRevisions)} versions kept`,
+						hint: `${formatNumber(o.map.featureRevisions)} revisions`,
 					},
 					{
 						label: "Tile versions",
@@ -457,7 +456,7 @@ function Overview(props: { data: Body }) {
 					},
 					{
 						label: "Job queue",
-						value: `${formatNumber(o.jobs.pending + o.jobs.processing)} waiting`,
+						value: `${formatNumber(o.jobs.pending + o.jobs.processing)} active`,
 						hint: `${formatNumber(o.jobs.failed)} failed`,
 					},
 					{
@@ -488,9 +487,7 @@ export function AdminStats() {
 				names={RANGE_NAMES}
 				onChange={setRange}
 			/>
-			{error && (
-				<p class="error-text">Could not load the statistics: {error}</p>
-			)}
+			{error && <p class="error-text">Failed to load statistics: {error}</p>}
 			{!data ? (
 				!error && <p class="muted">Loading…</p>
 			) : (
