@@ -1,15 +1,15 @@
+import { scaleRatio } from "@blockmap/shared/view";
 import { showNotice } from "../api";
 import {
 	activeTool,
 	canEditMap,
 	centerBlock,
 	currentScale,
-	dimSlug,
 	editor,
 	isLayerFull,
 	layersData,
 	noHover,
-	visibleDimensions,
+	scaledDimensions,
 } from "../state";
 import {
 	clearMeasure,
@@ -53,13 +53,7 @@ export function MeasureCard() {
 	if (activeTool.value !== "measure") return null;
 	const stats = measureStats.value;
 	const scale = currentScale.value;
-	const others =
-		stats && scale !== null
-			? visibleDimensions.value.filter(
-					(d) =>
-						d.slug !== dimSlug.value && d.scale !== null && d.scale !== scale,
-				)
-			: [];
+	const others = stats ? scaledDimensions.value : [];
 	const shape = measureShape.state.value;
 	const placed = shape?.points.length ?? 0;
 	const touch = noHover.value;
@@ -137,7 +131,7 @@ export function MeasureCard() {
 									<Row
 										key={d.slug}
 										label={d.name}
-										value={`${formatBlocks((stats.total * (scale as number)) / (d.scale as number))} blocks`}
+										value={`${formatBlocks(stats.total * (scaleRatio(scale, d.scale) ?? 1))} blocks`}
 									/>
 								))}
 							</>

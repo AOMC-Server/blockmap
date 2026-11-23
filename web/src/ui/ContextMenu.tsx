@@ -1,5 +1,6 @@
 import type { Dye } from "@blockmap/shared/colors";
 import { MAX_NAME } from "@blockmap/shared/features";
+import { convertBlock } from "@blockmap/shared/view";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { copyText } from "../clipboard";
 import { mapView } from "../controller";
@@ -8,12 +9,16 @@ import {
 	activeTool,
 	canEditMap,
 	contextMenu,
+	currentMap,
+	currentScale,
+	dimSlug,
 	editor,
 	isLayerFull,
 	isLayerHidden,
 	layerLimitReached,
 	layersData,
 	popup,
+	scaledDimensions,
 	setLayersHidden,
 	view,
 } from "../state";
@@ -42,7 +47,9 @@ function addPin(layerId: number, x: number, z: number) {
 /** Up and Down move between the items of the menu, like a native one. */
 function moveFocus(menu: HTMLElement, step: 1 | -1) {
 	const items = [
-		...menu.querySelectorAll<HTMLButtonElement>("button.menu-item:enabled"),
+		...menu.querySelectorAll<HTMLButtonElement>(
+			"button.menu-item:enabled, button.menu-coord:enabled",
+		),
 	];
 	if (items.length === 0) return;
 	const at = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -182,6 +189,17 @@ export function ContextMenu() {
 	const busyTitle = editing
 		? "Finish or cancel editing the current feature first"
 		: undefined;
+	// The clicked block first, then the same spot in the related dimensions.
+	const here = currentMap.value?.dimensions.find(
+		(d) => d.slug === dimSlug.value,
+	);
+	const spots = [
+		{ slug: here?.slug ?? "", name: here?.name ?? "", x, z },
+		...scaledDimensions.value.flatMap((d) => {
+			const at = convertBlock(x, z, currentScale.value, d.scale ?? null);
+			return at ? [{ slug: d.slug, name: d.name, ...at }] : [];
+		}),
+	];
 
 	return (
 		<div
@@ -193,9 +211,28 @@ export function ContextMenu() {
 		>
 			<div class="menu-head">
 				{page === "main" ? (
-					<span class="menu-coords">
-						{x}, {z}
-					</span>
+					<div class="menu-coords">
+						{spots.map((d) => (
+							<button
+								key={d.slug}
+								type="button"
+								role="menuitem"
+								class="plain menu-coord"
+								title={`Copy ${d.name ? `the ${d.name}` : "these"} coordinates`}
+								onClick={() => {
+									close();
+									void copyText(`${d.x}, ${d.z}`, `Copied ${d.x}, ${d.z}`);
+								}}
+							>
+								{spots.length > 1 && (
+									<span class="menu-coord-name">{d.name}</span>
+								)}
+								<span class="menu-coord-value">
+									{d.x}, {d.z}
+								</span>
+							</button>
+						))}
+					</div>
 				) : (
 					<button
 						type="button"
@@ -209,17 +246,6 @@ export function ContextMenu() {
 
 			{page === "main" && (
 				<>
-					<button
-						type="button"
-						role="menuitem"
-						class="plain menu-item"
-						onClick={() => {
-							close();
-							void copyText(`${x}, ${z}`, `Copied ${x}, ${z}`);
-						}}
-					>
-						Copy coordinates
-					</button>
 					<button
 						type="button"
 						role="menuitem"

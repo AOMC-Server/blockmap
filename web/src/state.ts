@@ -288,3 +288,12 @@ export const currentDimensionTheme = computed<DimensionTheme>(
 export const visibleDimensions = computed(
 	() => currentMap.value?.dimensions.filter((d) => !d.archived) ?? [],
 );
+
+/** Dimensions whose coordinates and distances relate to this one's at a different scale (the Nether from the overworld). */
+export const scaledDimensions = computed(() => {
+	const scale = currentScale.value;
+	if (scale === null) return [];
+	return visibleDimensions.value.filter(
+		(d) => d.slug !== dimSlug.value && d.scale !== null && d.scale !== scale,
+	);
+});

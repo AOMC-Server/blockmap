@@ -1,3 +1,4 @@
+import { convertBlock } from "@blockmap/shared/view";
 import { settings } from "../settings";
 import {
 	activeTool,
@@ -75,7 +76,7 @@ export function StatusBar() {
 	const prefs = settings.value;
 	const equivalent =
 		prefs.showOverworldEquivalent && c && scale !== null && scale !== 1
-			? { x: Math.round(c.x * scale), z: Math.round(c.z * scale) }
+			? convertBlock(c.x, c.z, scale, 1)
 			: null;
 	if (
 		!prefs.showCoordinates &&

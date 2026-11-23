@@ -1744,9 +1744,12 @@ img.banner,
 	border-bottom: var(--bw) solid var(--line);
 }
 
+/* The clicked block and its twin in other dimensions: each is a button that copies it. */
 .menu-coords {
-	font-weight: 700;
-	font-variant-numeric: tabular-nums;
+	display: flex;
+	flex: 1;
+	justify-content: space-between;
+	gap: 12px;
 }
 
 .menu-back {
@@ -1765,6 +1768,38 @@ img.banner,
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.menu-coord {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: flex-start;
+	min-width: 0;
+	padding: 0 2px;
+	font-size: 13px;
+	line-height: 1.2;
+	color: var(--head-fg);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.menu-coord:last-child:not(:first-child) {
+	align-items: flex-end;
+}
+
+.menu-coord-name {
+	font-size: 12px;
+	opacity: 0.8;
+}
+
+.menu-coord-value {
+	font-weight: 700;
+}
+
+.menu-coord:hover .menu-coord-value,
+.menu-coord:focus-visible .menu-coord-value {
+	text-decoration: underline;
 }
 
 .menu-more {

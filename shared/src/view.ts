@@ -14,9 +14,21 @@ export function clampZoom(zoom: number, maxZoom: number): number {
 }
 
 /**
- * The same place in another dimension. `scale` is overworld blocks per block of the dimension
- * (1 for the overworld, 8 for the Nether), or null when its coordinates can't be related to
- * others (the End), in which case there is no equivalent and this returns null.
+ * How many blocks of the target dimension one block of the source covers. A dimension's `scale` is
+ * overworld blocks per block of it (1 for the overworld, 8 for the Nether), or null when its
+ * coordinates can't be related to others (the End), in which case this returns null.
+ * Overworld to Nether is 1/8; multiply coordinates and lengths by it to convert them.
+ */
+export function scaleRatio(
+	fromScale: number | null,
+	toScale: number | null,
+): number | null {
+	if (fromScale === null || toScale === null) return null;
+	return fromScale / toScale;
+}
+
+/**
+ * The same place in another dimension, or null when there is no equivalent.
  *
  * The view keeps showing the same area: one Nether block covers 8 overworld blocks, so going to
  * the Nether divides the coordinates by 8 and zooms in by 3 levels (log2 8).
@@ -27,13 +39,28 @@ export function convertView(
 	toScale: number | null,
 	maxZoom: number,
 ): View | null {
-	if (fromScale === null || toScale === null) return null;
-	const ratio = fromScale / toScale;
+	const ratio = scaleRatio(fromScale, toScale);
+	if (ratio === null) return null;
 	return {
 		centerX: view.centerX * ratio,
 		centerZ: view.centerZ * ratio,
 		zoom: clampZoom(view.zoom + Math.log2(ratio), maxZoom),
 	};
+}
+
+/**
+ * The block in another dimension matching a block of this one (scales as for `convertView`), or
+ * null when they can't be related. Going to a larger scale floors, so overworld -1 is Nether -1.
+ */
+export function convertBlock(
+	x: number,
+	z: number,
+	fromScale: number | null,
+	toScale: number | null,
+): { x: number; z: number } | null {
+	const ratio = scaleRatio(fromScale, toScale);
+	if (ratio === null) return null;
+	return { x: Math.floor(x * ratio), z: Math.floor(z * ratio) };
 }
 
 export function screenToBlock(view: View, size: Size, sx: number, sy: number) {
