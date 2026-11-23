@@ -181,6 +181,7 @@ export class Input {
 		this.pointers.set(e.pointerId, p);
 		if (this.session) {
 			this.session.move(p.x, p.y);
+			if (e.pointerType === "mouse") this.map.trackPointer(p.x, p.y);
 			return;
 		}
 

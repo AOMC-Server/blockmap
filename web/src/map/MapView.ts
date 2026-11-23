@@ -11,6 +11,7 @@ import {
 	type View,
 	zoomAt,
 } from "@blockmap/shared/view";
+import { drawBlockHighlight } from "./blockHighlight";
 import {
 	type DebugOptions,
 	drawChunkGrid,
@@ -114,6 +115,12 @@ export class MapView {
 		null;
 	/** Something is being dragged: the map, or a point of a tool. */
 	private grabbing = false;
+	/** Outline the block under the mouse; see setBlockHighlight. */
+	private blockHighlight = false;
+	/** The block outlined last, so moving within it does not redraw. */
+	private highlightedBlock: string | null = null;
+	/** Where the mouse is over the map, for the block highlight. */
+	private highlightAt: ScreenPoint | null = null;
 	/** How long animations take relative to the default; 0 skips them. */
 	private motion = 1;
 	private tileSize: number;
@@ -264,6 +271,7 @@ export class MapView {
 		if (this.grabbing === grabbing) return;
 		this.grabbing = grabbing;
 		this.refreshCursor();
+		if (this.blockHighlight) this.renderer.invalidate();
 	}
 
 	/** Replaces the features drawn on the map (only the layers that should be visible). */
@@ -274,6 +282,13 @@ export class MapView {
 	/** Sets how close (in px) pins must be to merge into a cluster. */
 	setPinClusterDistance(px: number) {
 		this.features.setClusterDistance(px);
+	}
+
+	/** Outlines the block under the mouse when zoomed in far enough to see single blocks. */
+	setBlockHighlight(enabled: boolean) {
+		if (this.blockHighlight === enabled) return;
+		this.blockHighlight = enabled;
+		this.renderer.invalidate();
 	}
 
 	/** Draws lines and areas from a cached image while panning and zooming; see FeatureLayer. */
@@ -352,6 +367,21 @@ export class MapView {
 			this.updateHover(hit, sx, sy);
 			this.lastPointer = { sx, sy, hit };
 			this.refreshCursor();
+			this.trackPointer(sx, sy);
+		}
+	}
+
+	/**
+	 * Follows the mouse for the block highlight, also while a tool drags a point (which reports
+	 * no moves to `pointer`).
+	 */
+	trackPointer(sx: number, sy: number) {
+		this.highlightAt = { x: sx, y: sy };
+		const b = this.screenToBlock(sx, sy);
+		const block = `${Math.floor(b.x)},${Math.floor(b.z)}`;
+		if (this.blockHighlight && block !== this.highlightedBlock) {
+			this.highlightedBlock = block;
+			this.renderer.invalidate();
 		}
 	}
 
@@ -368,6 +398,11 @@ export class MapView {
 		this.lastPointer = null;
 		this.emit("move", null);
 		this.updateHover(null, 0, 0);
+		this.highlightAt = null;
+		if (this.highlightedBlock !== null) {
+			this.highlightedBlock = null;
+			this.renderer.invalidate();
+		}
 	}
 
 	cancelAnimation(why = "cancelled") {
@@ -554,6 +589,15 @@ export class MapView {
 		this.emit("hover", { hit, sx, sy });
 	}
 
+	/**
+	 * The block highlight gives way to a feature under the mouse (which a click would open), but
+	 * not while dragging or while a tool (such as drawing) decides what a click does.
+	 */
+	private highlightShown(at: ScreenPoint): boolean {
+		if (this.grabbing || !this.lastPointer?.hit) return true;
+		return this.cursorHandler?.(at.x, at.y) != null;
+	}
+
 	/** Zooming the page or moving to another screen changes the pixel ratio without resizing. */
 	private watchPixelRatio() {
 		if (typeof matchMedia !== "function") return;
@@ -614,6 +658,9 @@ export class MapView {
 			);
 		}
 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		const at = this.highlightAt;
+		if (this.blockHighlight && at && this.highlightShown(at))
+			drawBlockHighlight(ctx, view, size, at.x, at.y);
 		this.features.draw(ctx, view, size);
 		for (const overlay of this.overlays) overlay(ctx, this);
 		this.rehover();

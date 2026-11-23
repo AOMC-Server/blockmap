@@ -266,6 +266,7 @@ export async function boot(container: HTMLElement) {
 		mv.setMotionScale(transitionFactor(settings.value.transitionSpeed)),
 	);
 	effect(() => mv.setPinClusterDistance(settings.value.pinClusterDistance));
+	effect(() => mv.setBlockHighlight(settings.value.highlightBlock));
 	effect(() =>
 		mv.setShapeCache(
 			shapeCacheEnabled(settings.value.shapeCache, navigator.userAgent),

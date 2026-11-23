@@ -130,6 +130,11 @@ function Preferences() {
 				label="Show zoom scale"
 				hint="Display the current pixel-to-block ratio (e.g. “1 px = 4 blocks”)."
 			/>
+			<SettingToggle
+				field="highlightBlock"
+				label="Highlight block under cursor"
+				hint="Outline the block under the mouse when zoomed in far enough to see individual blocks."
+			/>
 			<label class="field flow">
 				<span class="label">
 					Pin clustering distance: {settings.value.pinClusterDistance}

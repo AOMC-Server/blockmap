@@ -77,6 +77,8 @@ export type Settings = {
 	showCoordinates: boolean;
 	showOverworldEquivalent: boolean;
 	showScale: boolean;
+	/** Outline the block under the mouse when zoomed in far enough to see it. */
+	highlightBlock: boolean;
 	rememberPosition: boolean;
 	/** Dimension slug to open when the URL names none; null = the first one. */
 	defaultDimension: string | null;
@@ -112,6 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	showCoordinates: true,
 	showOverworldEquivalent: true,
 	showScale: true,
+	highlightBlock: true,
 	rememberPosition: false,
 	defaultDimension: null,
 	mode: "dark",
@@ -150,6 +153,7 @@ export function parseSettings(raw: string | null): Settings {
 		"showCoordinates",
 		"showOverworldEquivalent",
 		"showScale",
+		"highlightBlock",
 		"rememberPosition",
 		"dimensionColours",
 		"historyInView",
