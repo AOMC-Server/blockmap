@@ -16,7 +16,13 @@ import { removeUploads } from "../jobs/target";
 import { doc } from "../openapi";
 import { canManage, canModerate } from "../permissions";
 import { measureStorage } from "../storage";
-import { TRAFFIC_CATEGORIES, type TrafficCategory } from "../traffic";
+import {
+	NO_REFERRER,
+	OTHER_DOMAIN,
+	SELF_DOMAIN,
+	TRAFFIC_CATEGORIES,
+	type TrafficCategory,
+} from "../traffic";
 import type { AppEnv } from "../types";
 import { validate } from "../validate";
 
@@ -29,6 +35,7 @@ const RANGE_MS: Record<AdminStatsRange, number | null> = {
 	"90d": 90 * DAY,
 	all: null,
 };
+const PSEUDO_DOMAINS = [SELF_DOMAIN, NO_REFERRER, OTHER_DOMAIN];
 const MAX_STORAGE_POINTS = 300;
 const RECENT_JOBS = 50;
 
@@ -351,6 +358,29 @@ export const adminRoutes = new Hono<AppEnv>()
 			for (const dimensionId of new Set(failed.map((r) => r.dimensionId)))
 				if (dimensionId !== null) svc.events.emit("revisions", dimensionId, {});
 			return c.json({ removed: failed.length });
+		},
+	)
+	.delete(
+		"/traffic/domains/:domain{.+}",
+		doc({
+			tag: "Admin",
+			summary: "Remove a domain from the traffic breakdown",
+			description:
+				'Owners. Moves everything counted for the domain, all time, to `Other`, so it leaves the breakdown by domain while the totals stay the same. `This site` (and its browsers), `No referrer` and `Other` cannot be removed. A domain that requests again shows up again. Domains with a "/" are not hosts: `App/version` is a tool that sent no Origin or Referer, named by its User-Agent, and `This site/<browser>` this site\'s traffic from one browser, version and platform.',
+			fails: [400, 403, 404],
+			login: true,
+		}),
+		(c) => {
+			if (!canManage(c.var.role)) return c.json({ error: "forbidden" }, 403);
+			const domain = c.req.param("domain");
+			if (
+				PSEUDO_DOMAINS.includes(domain) ||
+				domain.startsWith(`${SELF_DOMAIN}/`)
+			)
+				return c.json({ error: `“${domain}” cannot be removed` }, 400);
+			if (!c.var.svc.traffic.mergeDomain(domain))
+				return c.json({ error: "no traffic from that domain" }, 404);
+			return c.json({ ok: true });
 		},
 	)
 	.post(

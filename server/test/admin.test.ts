@@ -11,6 +11,8 @@ import {
 } from "../src/db/schema";
 import { recordMissingBlobSizes } from "../src/storage";
 import {
+	appOf,
+	browserOf,
 	categoryOf,
 	createTraffic,
 	domainOf,
@@ -139,6 +141,63 @@ describe("traffic classification", () => {
 		expect(domainOf("https://map.example", undefined, self)).toBe(SELF_DOMAIN);
 		expect(domainOf("null", "not a url", self)).toBe(NO_REFERRER);
 		expect(domainOf(undefined, undefined, self)).toBe(NO_REFERRER);
+	});
+
+	test("this site's requests are told apart by browser, version and platform", () => {
+		const ua = {
+			firefoxLinux:
+				"Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0",
+			chromeWindows:
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+			edge: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+			safariMac:
+				"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+			safariIphone:
+				"Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1",
+			chromeIphone:
+				"Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.6778.73 Mobile/15E148 Safari/604.1",
+			chromeAndroid:
+				"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+			samsung:
+				"Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36",
+		};
+		expect(browserOf(ua.firefoxLinux)).toBe("Firefox 133 · Linux");
+		expect(browserOf(ua.chromeWindows)).toBe("Chrome 131 · Windows");
+		expect(browserOf(ua.edge)).toBe("Edge 131 · Windows");
+		expect(browserOf(ua.safariMac)).toBe("Safari 18 · macOS");
+		expect(browserOf(ua.safariIphone)).toBe("Safari 18 · iOS");
+		expect(browserOf(ua.chromeIphone)).toBe("Chrome 131 · iOS");
+		expect(browserOf(ua.chromeAndroid)).toBe("Chrome 131 · Android");
+		expect(browserOf(ua.samsung)).toBe("Samsung Internet 26 · Android");
+		expect(browserOf("Mozilla/5.0 (compatible; Bot)")).toBe("Other · Other");
+		expect(browserOf("AOMCGuessr/1.4")).toBeNull();
+		expect(browserOf(undefined)).toBeNull();
+
+		const self = "map.example";
+		expect(domainOf("https://map.example", undefined, self, ua.edge)).toBe(
+			`${SELF_DOMAIN}/Edge 131 · Windows`,
+		);
+		expect(domainOf("https://other.site", undefined, self, ua.edge)).toBe(
+			"other.site",
+		);
+	});
+
+	test("without Origin or Referer, the app and version from the User-Agent", () => {
+		const self = "map.example";
+		expect(
+			domainOf(undefined, undefined, self, "AOMCGuessr/1.4.2 (Windows)"),
+		).toBe("AOMCGuessr/1.4.2");
+		expect(domainOf(undefined, undefined, self, "curl/8.4.0")).toBe(
+			"curl/8.4.0",
+		);
+		expect(domainOf("https://a.b", undefined, self, "AOMCGuessr/1.4")).toBe(
+			"a.b",
+		);
+		expect(appOf("Mozilla/5.0 (X11; Linux x86_64) Firefox/120.0")).toBeNull();
+		expect(appOf("AOMCGuessr")).toBeNull();
+		expect(appOf("")).toBeNull();
+		expect(appOf(undefined)).toBeNull();
+		expect(appOf(`${"x".repeat(60)}/1`)).toBeNull();
 	});
 });
 
@@ -313,6 +372,19 @@ describe("GET /api/admin/stats", () => {
 		expect(overview.process.uptimeSeconds).toBeGreaterThanOrEqual(0);
 	});
 
+	test("tools without a Referer are listed by the app and version in their User-Agent", async () => {
+		const t = await boot();
+		await t.app.request("/api/dimensions/overworld/tiles/0/0/0", {
+			headers: { "User-Agent": "AOMCGuessr/1.4 (Windows)" },
+		});
+		const res = await call(t, t.owner, "GET", "/api/admin/stats?range=24h");
+		expect(
+			res.body.traffic.domains.find(
+				(d: { domain: string }) => d.domain === "AOMCGuessr/1.4",
+			)?.tileRequests,
+		).toBe(1);
+	});
+
 	test("server errors are counted apart from client errors", async () => {
 		const t = await boot();
 		const now = Date.now();
@@ -334,5 +406,75 @@ describe("GET /api/admin/stats", () => {
 		expect(res.body.since).toBeNull();
 		expect(res.body.traffic.bucketMs).toBe(DAY);
 		expect(res.body.traffic.points.length).toBeLessThan(5);
+	});
+});
+
+describe("DELETE /api/admin/traffic/domains/:domain", () => {
+	test("moves the domain's traffic to 'Other', keeping the totals", async () => {
+		const t = await boot();
+		const now = Date.now();
+		const { traffic } = t.services;
+		traffic.record("tiles", "spam.example", 0, 302, now - 2 * DAY);
+		traffic.record("blobs", "spam.example", 500, 200, now);
+		traffic.record("blobs", "kept.example", 100, 200, now);
+		traffic.record("blobs", OTHER_DOMAIN, 50, 200, now);
+		const before = await call(t, t.owner, "GET", "/api/admin/stats?range=all");
+
+		const path = `/api/admin/traffic/domains/${encodeURIComponent("spam.example")}`;
+		expect((await call(t, t.mod, "DELETE", path)).status).toBe(403);
+		expect((await call(t, t.owner, "DELETE", path)).status).toBe(200);
+		expect((await call(t, t.owner, "DELETE", path)).status).toBe(404);
+
+		const after = await call(t, t.owner, "GET", "/api/admin/stats?range=all");
+		const domains = after.body.traffic.domains as {
+			domain: string;
+			tileRequests: number;
+			bytes: number;
+		}[];
+		expect(domains.map((d) => d.domain).sort()).toEqual([
+			"Other",
+			"kept.example",
+		]);
+		expect(domains.find((d) => d.domain === OTHER_DOMAIN)).toMatchObject({
+			tileRequests: 1,
+			bytes: 550,
+		});
+		// The test's own API requests are counted too, so only tiles and images are compared.
+		for (const category of ["tiles", "blobs"])
+			expect(after.body.traffic.allTime.byCategory[category]).toEqual(
+				before.body.traffic.allTime.byCategory[category],
+			);
+	});
+
+	test("an app version can be removed", async () => {
+		const t = await boot();
+		t.services.traffic.record("tiles", "AOMCGuessr/1.4", 0, 302);
+		const res = await call(
+			t,
+			t.owner,
+			"DELETE",
+			`/api/admin/traffic/domains/${"AOMCGuessr/1.4"}`,
+		);
+		expect(res.status).toBe(200);
+		const rows = await t.db.select().from(trafficHourly);
+		expect(rows.map((r) => r.domain)).not.toContain("AOMCGuessr/1.4");
+	});
+
+	test("the grouped rows and this site's browsers cannot be removed", async () => {
+		const t = await boot();
+		for (const name of [
+			SELF_DOMAIN,
+			`${SELF_DOMAIN}/Firefox 133 · Linux`,
+			NO_REFERRER,
+			OTHER_DOMAIN,
+		]) {
+			const res = await call(
+				t,
+				t.owner,
+				"DELETE",
+				`/api/admin/traffic/domains/${encodeURIComponent(name)}`,
+			);
+			expect(res.status).toBe(400);
+		}
 	});
 });

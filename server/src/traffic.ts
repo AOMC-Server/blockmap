@@ -39,20 +39,77 @@ export function categoryOf(path: string): TrafficCategory {
 	return "static";
 }
 
-/** Where a request for tile data came from: the host of its Origin or Referer. */
+/**
+ * Where a request for tile data came from: the host of its Origin or Referer, or else the app
+ * named by its User-Agent (see appOf). Requests from this site are told apart by browser
+ * (`This site/Firefox 133 · Linux`, see browserOf).
+ *
+ * Neither host names nor "This site" contain "/", so the part before the first "/" groups the rows
+ * (an app's versions, this site's browsers) and the rest tells them apart.
+ */
 export function domainOf(
 	origin: string | undefined,
 	referer: string | undefined,
 	selfHost: string,
+	userAgent?: string,
 ): string {
 	for (const value of [origin, referer]) {
 		if (!value || value === "null") continue;
 		try {
 			const host = new URL(value).host.toLowerCase().slice(0, 100);
-			if (host) return host === selfHost ? SELF_DOMAIN : host;
+			if (!host) continue;
+			if (host !== selfHost) return host;
+			const browser = browserOf(userAgent);
+			return browser ? `${SELF_DOMAIN}/${browser}` : SELF_DOMAIN;
 		} catch {}
 	}
-	return NO_REFERRER;
+	return appOf(userAgent) ?? NO_REFERRER;
+}
+
+const BROWSERS: [name: string, pattern: RegExp][] = [
+	// Most browsers also claim to be Chrome or Safari, so the more specific ones go first.
+	["Edge", /\bEdg(?:e|A|iOS)?\/(\d+)/],
+	["Opera", /\b(?:OPR|OPT)\/(\d+)/],
+	["Samsung Internet", /\bSamsungBrowser\/(\d+)/],
+	["Firefox", /\b(?:Firefox|FxiOS)\/(\d+)/],
+	["Chrome", /\b(?:Chrome|CriOS)\/(\d+)/],
+	["Safari", /\bVersion\/(\d+)[\d.]* (?:Mobile\/\S+ )?Safari\//],
+];
+
+const PLATFORMS: [name: string, pattern: RegExp][] = [
+	["iOS", /\b(?:iPhone|iPad|iPod)\b/],
+	["Android", /\bAndroid\b/],
+	["ChromeOS", /\bCrOS\b/],
+	["Windows", /\bWindows\b/],
+	["macOS", /\bMac OS X\b/],
+	["Linux", /\bLinux\b/],
+];
+
+/**
+ * The browser, its major version and the platform, from a browser's User-Agent:
+ * `Firefox 133 · Linux`. Null for a User-Agent that is not a browser's. On iOS every browser runs
+ * on Safari's engine, whatever its name.
+ */
+export function browserOf(userAgent: string | undefined): string | null {
+	if (!userAgent?.startsWith("Mozilla/")) return null;
+	const platform = PLATFORMS.find(([, p]) => p.test(userAgent))?.[0] ?? "Other";
+	for (const [name, pattern] of BROWSERS) {
+		const m = pattern.exec(userAgent);
+		if (m) return `${name} ${m[1]} · ${platform}`;
+	}
+	return `Other · ${platform}`;
+}
+
+/**
+ * The app and version a User-Agent starts with (`AOMCGuessr/1.4 (Windows)` gives
+ * `AOMCGuessr/1.4`), for tools and scripts that send no Origin or Referer. Browsers (whose
+ * User-Agent starts with `Mozilla/`) and User-Agents without a version give null. Host names never
+ * contain "/", so an app can't be mistaken for a domain.
+ */
+export function appOf(userAgent: string | undefined): string | null {
+	const m = /^([A-Za-z][\w.+-]{0,39})\/([\w.+-]{1,24})/.exec(userAgent ?? "");
+	if (!m || m[1] === "Mozilla") return null;
+	return `${m[1]}/${m[2]}`;
 }
 
 const COUNTERS = ["requests", "bytes", "s2xx", "s3xx", "s4xx", "s5xx"] as const;
@@ -198,9 +255,28 @@ export function createTraffic(db: Db, env: Env) {
 		}
 	}
 
+	/**
+	 * Takes a domain out of the breakdown: everything counted for it, all time, is added to
+	 * "Other" instead, so the totals stay the same. Returns whether it had any traffic.
+	 */
+	function mergeDomain(domain: string, now = Date.now()): boolean {
+		flush(now);
+		const rows = db.all<{ hour: number; category: TrafficCategory } & Counter>(
+			sql`SELECT hour, category, requests, bytes, s2xx, s3xx, s4xx, s5xx
+				FROM traffic_hourly WHERE domain = ${domain}`,
+		);
+		if (rows.length === 0) return false;
+		db.transaction((tx) => {
+			tx.run(sql`DELETE FROM traffic_hourly WHERE domain = ${domain}`);
+			for (const row of rows) upsert(tx, { ...row, domain: OTHER_DOMAIN });
+		});
+		return true;
+	}
+
 	return {
 		record,
 		flush,
+		mergeDomain,
 		/** Starts writing to the database every minute. */
 		start() {
 			timer = setInterval(() => {
@@ -223,6 +299,7 @@ export function createTraffic(db: Db, env: Env) {
 				c.req.header("Origin"),
 				c.req.header("Referer"),
 				selfHost,
+				c.req.header("User-Agent"),
 			);
 			const res = c.res;
 			const status = res.status;

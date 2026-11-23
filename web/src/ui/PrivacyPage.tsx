@@ -83,7 +83,9 @@ export function PrivacyPage() {
 					</li>
 					<li>
 						The server records aggregate traffic metrics (request counts and
-						bandwidth by category and hour) without any visitor identifiers.
+						bandwidth by category and hour, and for map tiles by requesting
+						website, app, or browser name, version, and platform) without any
+						visitor identifiers.
 					</li>
 					<li>
 						Your display preferences, layer visibility choices, and last map

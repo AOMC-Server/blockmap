@@ -15,14 +15,19 @@ import {
 import { ADMIN_STATS_RANGES, type AdminStatsRange } from "@blockmap/shared";
 import { DAY, HOUR } from "@blockmap/shared/time";
 import type { InferResponseType } from "hono/client";
+import { Fragment } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api, attempt, showNotice } from "../api";
 import { subscribe } from "../events";
+import {
+	type DomainRow,
+	type DomainSort,
+	groupDomains,
+} from "../trafficDomains";
 import { useStats } from "./useStats";
 
 type Body = InferResponseType<typeof api.api.admin.stats.$get, 200>;
 type Category = keyof Body["traffic"]["range"]["byCategory"];
-type Domain = Body["traffic"]["domains"][number];
 
 const RANGE_NAMES: Record<AdminStatsRange, string> = {
 	"1h": "Last hour",
@@ -335,8 +340,6 @@ function Traffic(props: { data: Body }) {
 	);
 }
 
-type DomainSort = "bytes" | "tileRequests" | "blobRequests" | "lastSeen";
-
 const DOMAIN_COLUMNS: { key: DomainSort; label: string; hint: string }[] = [
 	{ key: "tileRequests", label: "Tile lookups", hint: "Requests for a tile" },
 	{ key: "blobRequests", label: "Images", hint: "Tile images downloaded" },
@@ -346,18 +349,86 @@ const DOMAIN_COLUMNS: { key: DomainSort; label: string; hint: string }[] = [
 
 const PSEUDO_DOMAINS = new Set(["This site", "No referrer", "Other"]);
 
-function Domains(props: { data: Body }) {
+function Domains(props: { data: Body; onChange: () => void }) {
 	const [sort, setSort] = useState<DomainSort>("bytes");
-	const rows: Domain[] = [...props.data.traffic.domains].sort(
-		(a, b) => b[sort] - a[sort] || a.domain.localeCompare(b.domain),
-	);
+	const [busy, setBusy] = useState(false);
+	const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+	const toggle = (name: string) =>
+		setOpen((prev) => {
+			const next = new Set(prev);
+			if (!next.delete(name)) next.add(name);
+			return next;
+		});
+	/** Removes the rows (an app's versions: all of them) after asking. */
+	const remove = async (label: string, domains: string[]) => {
+		const what =
+			domains.length > 1
+				? `"${label}" (${domains.length} versions)`
+				: `"${label}"`;
+		if (
+			!confirm(
+				`Remove ${what} from this list? Its traffic is added to "Other". It shows up again if it requests tiles again.`,
+			)
+		)
+			return;
+		setBusy(true);
+		for (const domain of domains) {
+			const res = await attempt(() =>
+				api.api.admin.traffic.domains[":domain{.+}"].$delete({
+					param: { domain },
+				}),
+			);
+			if (!res.ok) {
+				showNotice(res.error, "error");
+				break;
+			}
+		}
+		setBusy(false);
+		props.onChange();
+	};
+	const rows: DomainRow[] = props.data.traffic.domains;
+	const groups = groupDomains(rows, sort);
 	const total = rows.reduce((n, d) => n + d.bytes, 0);
+
+	const cells = (d: DomainRow) => {
+		const share = total > 0 ? d.bytes / total : 0;
+		return (
+			<>
+				<td class="num">{formatNumber(d.tileRequests)}</td>
+				<td class="num">{formatNumber(d.blobRequests)}</td>
+				<td class="num">{formatBytes(d.bytes)}</td>
+				<td class="num">{formatTime(d.lastSeen)}</td>
+				<td>
+					<span class="share-bar" aria-hidden="true">
+						<span class="share-fill" style={{ width: `${share * 100}%` }} />
+					</span>{" "}
+					{(share * 100).toFixed(1)}%
+				</td>
+			</>
+		);
+	};
+	const deleteButton = (label: string, domains: string[]) => (
+		<td>
+			<button
+				type="button"
+				class="btn small danger"
+				disabled={busy}
+				onClick={() => void remove(label, domains)}
+			>
+				Delete
+			</button>
+		</td>
+	);
+
 	return (
 		<>
 			<h2>Tile traffic by domain</h2>
 			<p class="muted">
-				Grouped by the request's Origin or Referer header. “No referrer”
-				includes scripts and direct downloads.
+				Grouped by the request's Origin or Referer header, this site's own
+				traffic by browser. Tools that send neither are listed by the name and
+				version their User-Agent starts with (such as{" "}
+				<code>AOMCGuessr/1.4</code>); “No referrer” is everything else, such as
+				direct downloads.
 			</p>
 			{rows.length === 0 ? (
 				<p class="muted">No tile requests in this period.</p>
@@ -380,32 +451,54 @@ function Domains(props: { data: Body }) {
 									/>
 								))}
 								<th>Share</th>
+								<th aria-label="Actions" />
 							</tr>
 						</thead>
 						<tbody>
-							{rows.map((d) => {
-								const share = total > 0 ? d.bytes / total : 0;
+							{groups.map((g) => {
+								const pseudo = PSEUDO_DOMAINS.has(g.name);
+								const expanded = open.has(g.name);
+								const nested = g.children.length > 0;
 								return (
-									<tr key={d.domain}>
-										<td
-											class={PSEUDO_DOMAINS.has(d.domain) ? "muted-cell" : ""}
-										>
-											{d.domain}
-										</td>
-										<td class="num">{formatNumber(d.tileRequests)}</td>
-										<td class="num">{formatNumber(d.blobRequests)}</td>
-										<td class="num">{formatBytes(d.bytes)}</td>
-										<td class="num">{formatTime(d.lastSeen)}</td>
-										<td>
-											<span class="share-bar" aria-hidden="true">
-												<span
-													class="share-fill"
-													style={{ width: `${share * 100}%` }}
-												/>
-											</span>{" "}
-											{(share * 100).toFixed(1)}%
-										</td>
-									</tr>
+									<Fragment key={g.name}>
+										<tr>
+											<td class={pseudo ? "muted-cell" : ""}>
+												{nested ? (
+													<button
+														type="button"
+														class="plain"
+														aria-expanded={expanded}
+														onClick={() => toggle(g.name)}
+													>
+														<span class="chevron" aria-hidden="true">
+															{expanded ? "▼" : "▶"}
+														</span>{" "}
+														{g.name}{" "}
+														<span class="muted">({g.children.length})</span>
+													</button>
+												) : (
+													g.name
+												)}
+											</td>
+											{cells(g.total)}
+											{pseudo ? (
+												<td />
+											) : (
+												deleteButton(
+													g.name,
+													nested ? g.children.map((c) => c.domain) : [g.name],
+												)
+											)}
+										</tr>
+										{expanded &&
+											g.children.map((c) => (
+												<tr key={c.domain}>
+													<td class="domain-child">{c.label}</td>
+													{cells(c)}
+													{pseudo ? <td /> : deleteButton(c.domain, [c.domain])}
+												</tr>
+											))}
+									</Fragment>
 								);
 							})}
 						</tbody>
@@ -494,7 +587,7 @@ export function AdminStats() {
 				<>
 					<Storage data={data} onCleaned={reload} />
 					<Traffic data={data} />
-					<Domains data={data} />
+					<Domains data={data} onChange={reload} />
 					<Overview data={data} />
 				</>
 			)}

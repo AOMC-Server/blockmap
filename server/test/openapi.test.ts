@@ -35,7 +35,9 @@ describe("OpenAPI spec", () => {
 					r.path !== "/api/asyncapi.json" &&
 					/^\/(api|auth|blobs)\//.test(r.path),
 			)
-			.map((r) => `${r.method} ${r.path.replace(/:(\w+)/g, "{$1}")}`)
+			.map(
+				(r) => `${r.method} ${r.path.replace(/:(\w+)(\{[^}]*\})?/g, "{$1}")}`,
+			)
 			.filter((key) => !documented.has(key));
 		expect(missing).toEqual([]);
 	});

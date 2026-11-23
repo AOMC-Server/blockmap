@@ -2696,6 +2696,12 @@ img.banner,
 	margin-top: 22px;
 }
 
+/* An app's version or one of this site's browsers, under its group in the traffic table. */
+.admin-stats .domain-child {
+	padding-left: 2.2em;
+	color: var(--muted);
+}
+
 .admin-toolbar {
 	display: flex;
 	align-items: center;
