@@ -20,6 +20,7 @@ import { LayerPanel } from "./LayerPanel";
 import { LayerSharing, layerSharingFor } from "./LayerSharing";
 import { MeasureCard } from "./MeasureCard";
 import { Popup } from "./Popup";
+import { QueueDialog, queueOpen } from "./QueuedJobs";
 import { ShareDialog, shareOpen } from "./ShareDialog";
 import { CenterCrosshair, StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
@@ -84,6 +85,7 @@ export function App() {
 					<Tooltip />
 					{uploadOpen.value && <UploadDialog />}
 					{shareOpen.value && <ShareDialog />}
+					{queueOpen.value && <QueueDialog />}
 					{featureHistoryFor.value && <FeatureHistory />}
 					{layerSharingFor.value && <LayerSharing />}
 					{deleteUploadFor.value && <DeleteUploadDialog />}

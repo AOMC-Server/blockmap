@@ -28,6 +28,7 @@ import { mapRoutes } from "./routes/map";
 import { meRoutes } from "./routes/me";
 import { memberRoutes } from "./routes/members";
 import { previewRoutes } from "./routes/preview";
+import { queueRoutes } from "./routes/queue";
 import { revisionRoutes } from "./routes/revisions";
 import { staticRoutes } from "./routes/static";
 import { statsRoutes } from "./routes/stats";
@@ -134,6 +135,7 @@ export function createApp({ db, env, services, fetch: fetchFn }: AppDeps) {
 		.route("/api/dimensions", dimensionRoutes)
 		.route("/api/members", memberRoutes)
 		.route("/api/revisions", revisionRoutes)
+		.route("/api/queue", queueRoutes)
 		.route("/api/layers", layerRoutes)
 		.route("/api/invites", inviteRoutes)
 		.route("/api/preview.png", previewRoutes)

@@ -211,7 +211,7 @@ export function commitRevision(
 			.run();
 		if (opts.jobId !== undefined) {
 			tx.update(jobs)
-				.set({ status: "done" })
+				.set({ status: "done", completedAt: Date.now() })
 				.where(eq(jobs.id, opts.jobId))
 				.run();
 		}

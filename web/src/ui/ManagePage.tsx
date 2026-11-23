@@ -28,19 +28,27 @@ import {
 import { slugify } from "../slug";
 import { currentMap, type Dimension, user } from "../state";
 import { DIMENSION_THEME_NAMES } from "../theme";
+import { AdminJobs } from "./AdminJobs";
 import { AdminStats } from "./AdminStats";
 import { InviteLinks } from "./InviteLinks";
 import { BlockIcon } from "./icons";
 import { MembersSection } from "./MembersSection";
 import { LoadFailed, Page, usePageLoad } from "./Page";
 
-type Tab = "settings" | "dimensions" | "members" | "invites" | "statistics";
+type Tab =
+	| "settings"
+	| "dimensions"
+	| "jobs"
+	| "members"
+	| "invites"
+	| "statistics";
 
 const slugSchema = createDimensionSchema.shape.slug;
 
 const TAB_LABELS: Record<Tab, string> = {
 	settings: "Settings",
 	dimensions: "Dimensions",
+	jobs: "Jobs",
 	members: "Members",
 	invites: "Invites",
 	statistics: "Statistics",
@@ -649,9 +657,14 @@ export function ManagePage() {
 	const role = detail?.role;
 	const tabs: Tab[] = [];
 	if (role && canManage(role)) tabs.push("settings");
-	if (role && canModerate(role)) tabs.push("dimensions");
+	if (role && canModerate(role)) tabs.push("dimensions", "jobs");
 	if (role && canManage(role)) tabs.push("members", "invites", "statistics");
-	const [tab, setTab] = useState<Tab>("settings");
+	// `?tab=jobs` opens a tab directly, as the map's queue popup does.
+	const [tab, setTab] = useState<Tab>(
+		() =>
+			(new URLSearchParams(location.search).get("tab") as Tab | null) ??
+			"settings",
+	);
 	const active = tabs.includes(tab) ? tab : tabs[0];
 
 	let body: ComponentChildren;
@@ -684,6 +697,7 @@ export function ManagePage() {
 				<div class="page-section">
 					{active === "settings" && <SettingsTab />}
 					{active === "dimensions" && <DimensionsTab />}
+					{active === "jobs" && <AdminJobs />}
 					{active === "members" && <MembersSection scope={mapScope} />}
 					{active === "invites" && <InviteLinks scope={mapScope} />}
 					{active === "statistics" && <AdminStats />}

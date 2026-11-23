@@ -48,7 +48,14 @@ export function createWorker(ctx: JobContext) {
 	const announceMap = () => events.emit("map", mapSnapshot(db));
 
 	const markJob = (id: number, status: "pending" | "done" | "failed") =>
-		db.update(jobs).set({ status }).where(eq(jobs.id, id)).run();
+		db
+			.update(jobs)
+			.set({
+				status,
+				completedAt: status === "pending" ? null : Date.now(),
+			})
+			.where(eq(jobs.id, id))
+			.run();
 
 	/**
 	 * Fails a job and its revision. A failed erase leaves the upload as it was, with the reason

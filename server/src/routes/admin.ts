@@ -11,6 +11,7 @@ import { Hono } from "hono";
 import { requireUser } from "../auth/session";
 import type { Db } from "../db/client";
 import { jobs, revisions } from "../db/schema";
+import { openJobs, recentJobs } from "../jobs/queue";
 import { removeUploads } from "../jobs/target";
 import { doc } from "../openapi";
 import { canManage, canModerate } from "../permissions";
@@ -29,6 +30,7 @@ const RANGE_MS: Record<AdminStatsRange, number | null> = {
 	all: null,
 };
 const MAX_STORAGE_POINTS = 300;
+const RECENT_JOBS = 50;
 
 type Counts = {
 	requests: number;
@@ -289,6 +291,25 @@ export const adminRoutes = new Hono<AppEnv>()
 					domains: domainBreakdown(db, since),
 				},
 				overview: overview(db, now),
+			});
+		},
+	)
+	.get(
+		"/jobs",
+		doc({
+			tag: "Admin",
+			summary: "The job queue, and the jobs that ran last",
+			description:
+				"Moderators. `open` are the jobs waiting or running, in the order they run; `recent` the last 50 that finished (`done`) or failed, newest first. `error` says why a job failed; `attempts` counts its starts (a job is retried when the server restarts while it runs).",
+			fails: [403],
+			login: true,
+		}),
+		(c) => {
+			if (!canModerate(c.var.role)) return c.json({ error: "forbidden" }, 403);
+			const { db } = c.var;
+			return c.json({
+				open: openJobs(db),
+				recent: recentJobs(db, RECENT_JOBS),
 			});
 		},
 	)

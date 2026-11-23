@@ -4,6 +4,7 @@ import { DEFAULT_VIEW } from "../map/MapView";
 import { currentMap, dimSlug, visibleDimensions } from "../state";
 import { BlockIcon } from "./icons";
 import { LoginButton } from "./LoginButton";
+import { QueueButton } from "./QueuedJobs";
 
 /** Map title, dimension picker and account, along the top edge. Tools live in the hotbar. */
 export function Toolbar() {
@@ -59,7 +60,10 @@ export function Toolbar() {
 					})}
 				</div>
 			</div>
-			<LoginButton />
+			<div class="topbar-right">
+				<QueueButton />
+				<LoginButton />
+			</div>
 		</header>
 	);
 }

@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
-import { jobs } from "../db/schema";
+import { dimensions, jobs, revisions, users } from "../db/schema";
 import type { QueueEvent } from "../events";
 import { waitingMessage } from "./messages";
 import { jobRevisionId } from "./target";
@@ -70,5 +70,71 @@ export function queueState(db: Db): QueueEvent {
 							: (running.revisionId as number | null),
 				}
 			: null,
+	};
+}
+
+/** The dimension a job is about: its upload's, or the one it deletes. */
+const jobDimensionId = sql<
+	number | null
+>`coalesce(${revisions.dimensionId}, json_extract(${jobs.payload}, '$.dimensionId'))`;
+
+/** Jobs with what they are about: the upload, its author and the dimension. */
+function jobRows(db: Db) {
+	return db
+		.select({
+			id: jobs.id,
+			type: jobs.type,
+			status: jobs.status,
+			attempts: jobs.attempts,
+			createdAt: jobs.createdAt,
+			completedAt: jobs.completedAt,
+			error: sql<string | null>`coalesce(${jobs.error}, ${revisions.error})`,
+			/** The internal error behind an upload's failure, for moderators. */
+			errorDetail: revisions.errorDetail,
+			revisionId: revisions.id,
+			fileCount: revisions.fileCount,
+			dimension: dimensions.name,
+			dimensionArchived: dimensions.archived,
+			author: users.username,
+		})
+		.from(jobs)
+		.leftJoin(revisions, eq(revisions.id, jobRevisionId))
+		.leftJoin(dimensions, eq(dimensions.id, jobDimensionId))
+		.leftJoin(users, eq(users.id, revisions.authorId));
+}
+
+export type JobRow = ReturnType<ReturnType<typeof jobRows>["all"]>[number];
+
+/** The jobs that wait or run, in the order they run: the running one first. */
+export function openJobs(db: Db): JobRow[] {
+	return jobRows(db)
+		.where(inArray(jobs.status, ["pending", "processing"]))
+		.orderBy(desc(sql`${jobs.status} = 'processing'`), asc(jobs.id))
+		.all();
+}
+
+/** The jobs that finished or failed last, newest first. */
+export function recentJobs(db: Db, limit: number): JobRow[] {
+	return jobRows(db)
+		.where(inArray(jobs.status, ["done", "failed"]))
+		.orderBy(
+			desc(sql`coalesce(${jobs.completedAt}, ${jobs.createdAt})`),
+			desc(jobs.id),
+		)
+		.limit(limit)
+		.all();
+}
+
+/** What anyone may see of a queued job: no errors, attempts, or archived dimensions. */
+export function publicJob(job: JobRow) {
+	return {
+		id: job.id,
+		type: job.type,
+		status: job.status as "pending" | "processing",
+		createdAt: job.createdAt,
+		revisionId: job.revisionId,
+		dimension: job.dimensionArchived ? null : job.dimension,
+		author: job.author,
+		fileCount: job.fileCount,
 	};
 }

@@ -499,6 +499,84 @@ img.banner,
 	flex-wrap: wrap;
 }
 
+.topbar-right {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+}
+
+/* While the server has jobs to do: how many, opening the list of them. */
+.queue-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	white-space: nowrap;
+}
+
+.queue-spinner {
+	width: 8px;
+	height: 8px;
+	background: var(--accent-hi);
+	animation: queue-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes queue-pulse {
+	50% {
+		opacity: 0.25;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.queue-spinner {
+		animation: none;
+	}
+}
+
+.queue-jobs {
+	list-style: none;
+	margin: 0 0 12px;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-height: 50vh;
+	overflow-y: auto;
+}
+
+.queue-job {
+	padding: 6px 10px;
+	border-radius: var(--radius);
+	background: var(--s2);
+	border: var(--bw) solid var(--line);
+}
+
+.queue-job.running {
+	border-color: var(--accent-hi);
+}
+
+.queue-job-meta {
+	font-size: 0.9em;
+}
+
+/* The manage page's Jobs tab. */
+.job-status {
+	font-weight: 600;
+}
+
+.job-status.processing {
+	color: var(--ok);
+}
+
+.job-status.failed {
+	color: var(--danger);
+}
+
+.job-error {
+	max-width: 40ch;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
 .map-title {
 	padding: 2px 12px 0;
 	white-space: nowrap;

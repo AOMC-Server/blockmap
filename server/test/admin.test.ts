@@ -3,7 +3,12 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DAY, FIVE_MINUTES, HOUR, MINUTE } from "@blockmap/shared";
 import { eq } from "drizzle-orm";
-import { blobFiles, storageHistory, trafficHourly } from "../src/db/schema";
+import {
+	blobFiles,
+	jobs,
+	storageHistory,
+	trafficHourly,
+} from "../src/db/schema";
 import { recordMissingBlobSizes } from "../src/storage";
 import {
 	categoryOf,
@@ -69,6 +74,48 @@ describe("storage", () => {
 		mkdirSync(stray, { recursive: true });
 		writeFileSync(join(stray, "notes.webp"), "x");
 		expect(await recordMissingBlobSizes(t.db, dir)).toBe(0);
+	});
+});
+
+describe("job queue", () => {
+	test("anyone sees the queued jobs; moderators also see the ones that ran", async () => {
+		const t = await boot();
+		const id = await upload(t, await solid(T, T, RED), 0, 0);
+		t.db.insert(jobs).values({ type: "gc_blobs", payload: {} }).run();
+		t.db
+			.insert(jobs)
+			.values({ type: "rebuild_history", payload: {}, status: "processing" })
+			.run();
+
+		const pub = await call(t, null, "GET", "/api/queue");
+		expect(pub.status).toBe(200);
+		expect(
+			pub.body.jobs.map((j: { type: string; status: string }) => [
+				j.type,
+				j.status,
+			]),
+		).toEqual([
+			["rebuild_history", "processing"],
+			["gc_blobs", "pending"],
+		]);
+		expect(pub.body.jobs[0]).not.toHaveProperty("error");
+
+		expect((await call(t, t.editor, "GET", "/api/admin/jobs")).status).toBe(
+			403,
+		);
+		const admin = await call(t, t.mod, "GET", "/api/admin/jobs");
+		expect(admin.status).toBe(200);
+		expect(admin.body.open).toHaveLength(2);
+		const [done] = admin.body.recent;
+		expect(done).toMatchObject({
+			type: "process_upload",
+			status: "done",
+			revisionId: id,
+			author: "editor",
+			dimension: "Overworld",
+			fileCount: 1,
+			attempts: 1,
+		});
 	});
 });
 
