@@ -367,6 +367,10 @@ export const adminRoutes = new Hono<AppEnv>()
 			summary: "Remove a domain from the traffic breakdown",
 			description:
 				'Owners. Moves everything counted for the domain, all time, to `Other`, so it leaves the breakdown by domain while the totals stay the same. `This site` (and its browsers), `No referrer` and `Other` cannot be removed. A domain that requests again shows up again. Domains with a "/" are not hosts: `App/version` is a tool that sent no Origin or Referer, named by its User-Agent, and `This site/<browser>` this site\'s traffic from one browser, version and platform.',
+			params: {
+				domain:
+					"Domain as listed in the traffic breakdown; may contain `/` (not encoded)",
+			},
 			fails: [400, 403, 404],
 			login: true,
 		}),

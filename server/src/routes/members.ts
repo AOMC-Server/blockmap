@@ -112,6 +112,7 @@ export const memberRoutes = new Hono<AppEnv>()
 			description: "Owners. The last owner cannot be demoted.",
 			fails: [400, 403, 404, 409],
 			login: true,
+			params: { userId: "Discord id of the member" },
 		}),
 		validate("json", updateMemberSchema),
 		async (c) => {
@@ -150,6 +151,7 @@ export const memberRoutes = new Hono<AppEnv>()
 				"Owners, or the member themselves. The last owner cannot be removed.",
 			fails: [403, 404, 409],
 			login: true,
+			params: { userId: "Discord id of the member" },
 		}),
 		async (c) => {
 			const { db } = c.var;

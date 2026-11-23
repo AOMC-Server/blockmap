@@ -13,13 +13,38 @@ const coord = z.coerce.number().pipe(blockCoord);
 
 /** The view parameters shared by /api/preview.png and the page's share tags. */
 export const viewQuerySchema = z.object({
-	dim: z.string().max(40).optional(),
-	x: coord.optional(),
-	z: coord.optional(),
-	zoom: z.coerce.number().finite().optional(),
-	rev: z.coerce.number().int().min(0).optional(),
+	dim: z
+		.string()
+		.max(40)
+		.optional()
+		.describe(
+			"Dimension slug (default: the first dimension that is not archived)",
+		),
+	x: coord.optional().describe("Block X coordinate of the centre (default: 0)"),
+	z: coord.optional().describe("Block Z coordinate of the centre (default: 0)"),
+	zoom: z.coerce
+		.number()
+		.finite()
+		.optional()
+		.describe(
+			"Zoom level, clamped to what the map supports (default: 2); fractions are allowed",
+		),
+	rev: z.coerce
+		.number()
+		.int()
+		.min(0)
+		.optional()
+		.describe(
+			"Show the map as of this revision (default and maximum: the latest)",
+		),
 	/** Layer ids, comma separated, like the viewer's `layers`; empty shows none, absent the defaults. */
-	layers: z.string().max(400).optional(),
+	layers: z
+		.string()
+		.max(400)
+		.optional()
+		.describe(
+			"Ids of the layers to show, comma-separated; empty shows none (default: each layer's default)",
+		),
 });
 export type ViewQuery = z.infer<typeof viewQuerySchema>;
 

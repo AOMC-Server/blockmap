@@ -10,11 +10,24 @@ const jsonSchema = (schema: z.ZodType) => {
 
 const envelope = (data: z.ZodType) =>
 	z.object({
-		topic: z.string(),
-		seq: z.string(),
-		snapshot: z.boolean(),
-		final: z.literal(true).optional(),
-		data,
+		topic: z
+			.string()
+			.describe("The topic this event is for, as given in `topics`"),
+		seq: z
+			.string()
+			.describe(
+				"Counts the topic's events since the server started; a snapshot with the `seq` you last saw means you missed nothing",
+			),
+		snapshot: z
+			.boolean()
+			.describe(
+				"Whether this is the initial snapshot of the topic's current state",
+			),
+		final: z
+			.literal(true)
+			.optional()
+			.describe("Set on the last event of a topic that ends"),
+		data: data.describe("The event payload"),
 	});
 
 const errorMessage = {
@@ -25,8 +38,10 @@ const errorMessage = {
 	contentType: "application/json",
 	payload: jsonSchema(
 		z.object({
-			topic: z.string(),
-			error: z.enum(["not found", "forbidden", "unknown topic"]),
+			topic: z.string().describe("The topic name, as given in `topics`"),
+			error: z
+				.enum(["not found", "forbidden", "unknown topic"])
+				.describe("Why the topic cannot be followed"),
 		}),
 	),
 };

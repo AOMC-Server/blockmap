@@ -115,10 +115,19 @@ export function authRoutes(fetchFn: DiscordFetch = fetch) {
 				return c.redirect(safeReturnTo(returnTo, env.PUBLIC_URL));
 			},
 		)
-		.post("/logout", doc({ tag: "Session", summary: "Log out" }), async (c) => {
-			const cookie = getCookie(c, SESSION_COOKIE);
-			if (cookie) await destroySession(c.var.db, cookie);
-			deleteCookie(c, SESSION_COOKIE, { path: "/" });
-			return c.json({ ok: true });
-		});
+		.post(
+			"/logout",
+			doc({
+				tag: "Session",
+				summary: "Log out",
+				description:
+					"Ends the browser session and clears the session cookie. Answers `ok` even when there was no session. API tokens are not affected; delete them with `DELETE /api/tokens/{id}`.",
+			}),
+			async (c) => {
+				const cookie = getCookie(c, SESSION_COOKIE);
+				if (cookie) await destroySession(c.var.db, cookie);
+				deleteCookie(c, SESSION_COOKIE, { path: "/" });
+				return c.json({ ok: true });
+			},
+		);
 }

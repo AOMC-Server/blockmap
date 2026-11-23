@@ -25,7 +25,12 @@ const mapFields = (m: typeof mapInfo.$inferSelect) => ({
 export const mapRoutes = new Hono<AppEnv>()
 	.get(
 		"/",
-		doc({ tag: "Map", summary: "Get the map, its dimensions and your role" }),
+		doc({
+			tag: "Map",
+			summary: "Get the map, its dimensions and your role",
+			description:
+				"Public. `map` holds the name, tile size, current revision (`headRev`) and `maintenance`. `role` is your role on the map. Also lists `dimensions` (including archived ones), `maxZoom`, the `privacy` contacts, and the `limits` for uploads, JSON bodies, layers and features.",
+		}),
 		async (c) => {
 			const { db, env, map, role } = c.var;
 			const dims = await db.query.dimensions.findMany({

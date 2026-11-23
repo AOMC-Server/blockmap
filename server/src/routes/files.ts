@@ -379,7 +379,8 @@ export const fileRoutes = new Hono<AppEnv>()
 			tag: "Files",
 			summary: "Rename, describe or move a folder",
 			description:
-				"The description needs write access to the folder; renaming and moving need it for the folder it is in, and moving also for the destination (`parentId`, null for the top). A folder can't move into itself or below itself (409).",
+				"The description needs write access to the folder; renaming and moving need it for the folder it is in, and moving also for the destination (`parentId`, `null` for the top). A folder cannot be moved into itself or below itself (409).",
+			params: { id: "Folder id" },
 			fails: [400, 403, 404, 409],
 			login: true,
 		}),
@@ -444,15 +445,20 @@ export const fileRoutes = new Hono<AppEnv>()
 			tag: "Files",
 			summary: "Delete a folder",
 			description:
-				"Needs write access to the folder it is in. A folder that holds anything is only deleted with `recursive=1`, along with everything in it (409 otherwise).",
-			fails: [403, 404, 409],
+				"Needs write access to the folder it is in. A non-empty folder is only deleted with `recursive=1`, along with everything in it (409 otherwise).",
+			params: { id: "Folder id" },
+			fails: [400, 403, 404, 409],
 			login: true,
 		}),
 		validate(
 			"query",
 			z.object({
-				/** `1` to delete what the folder holds too. */
-				recursive: z.enum(["0", "1"]).optional(),
+				recursive: z
+					.enum(["0", "1"])
+					.optional()
+					.describe(
+						"`1` also deletes everything the folder contains; `0` or omitted deletes it only when empty (409 otherwise)",
+					),
 			}),
 		),
 		async (c) => {
@@ -491,7 +497,8 @@ export const fileRoutes = new Hono<AppEnv>()
 			tag: "Files",
 			summary: "Rename or move a file",
 			description:
-				"Needs write access to the file's folder, and to the destination (`folderId`, null for the top) when moving it.",
+				"Needs write access to the file's folder, and to the destination (`folderId`, `null` for the top) when moving it.",
+			params: { id: "File id" },
 			fails: [400, 403, 404, 409],
 			login: true,
 		}),
@@ -543,6 +550,7 @@ export const fileRoutes = new Hono<AppEnv>()
 			tag: "Files",
 			summary: "Delete a file",
 			description: "Needs write access to the file's folder.",
+			params: { id: "File id" },
 			fails: [403, 404],
 			login: true,
 		}),
@@ -570,7 +578,8 @@ export const fileRoutes = new Hono<AppEnv>()
 			tag: "Files",
 			summary: "List who may change a folder",
 			description:
-				"Moderators. `grants` are the people given this folder; `inherited` those given a folder above it, which covers this one too. Moderators may change every folder and are not listed.",
+				"Moderators. `grants` lists users granted access to this folder; `inherited` lists those granted access to a parent folder, which covers this one too. Moderators may change every folder and are not listed.",
+			params: { id: "Folder id" },
 			fails: [403, 404],
 			login: true,
 		}),
@@ -619,8 +628,9 @@ export const fileRoutes = new Hono<AppEnv>()
 			tag: "Files",
 			summary: "Let someone change a folder",
 			description:
-				"Moderators. They may then add, rename, move and delete files and folders in it and below it. The user must have logged in once.",
+				"Moderators. The user may then add, rename, move and delete files and folders in it and below it. The user must have logged in at least once.",
 			ok: { 201: "Given" },
+			params: { id: "Folder id" },
 			fails: [400, 403, 404],
 			login: true,
 		}),
@@ -647,7 +657,12 @@ export const fileRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Files",
 			summary: "Take away someone's access to a folder",
-			description: "Moderators.",
+			description:
+				"Moderators. Answers 404 when the user has no direct grant on this folder (access inherited from a parent folder remains).",
+			params: {
+				id: "Folder id",
+				userId: "Id of the user whose access is to be revoked",
+			},
 			fails: [403, 404],
 			login: true,
 		}),

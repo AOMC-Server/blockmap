@@ -4,6 +4,14 @@ import { MIN_ZOOM } from "./view";
 export const roleSchema = z.enum(["viewer", "editor", "moderator", "owner"]);
 export type Role = z.infer<typeof roleSchema>;
 
+/** Id of a user who has logged in once. */
+export const userIdSchema = z
+	.string()
+	.check(
+		z.minLength(1),
+		z.describe("Id of the user, who must have logged in at least once"),
+	);
+
 export const nonEmpty = (o: object) => Object.keys(o).length > 0;
 
 /** Longest name of a map, dimension, layer, token or feature. */
@@ -50,9 +58,16 @@ const entityName = z
 
 export const updateMapSchema = z
 	.object({
-		name: z.optional(entityName),
-		/** Read only for everyone but owners. */
-		maintenance: z.optional(z.boolean()),
+		name: z.optional(entityName.check(z.describe("Map name"))),
+		maintenance: z.optional(
+			z
+				.boolean()
+				.check(
+					z.describe(
+						"Maintenance mode: the map is read-only for everyone but owners",
+					),
+				),
+		),
 	})
 	.check(z.refine(nonEmpty, "nothing to update"));
 
@@ -60,9 +75,13 @@ export const updateMapSchema = z
  * Overworld blocks per block of the dimension (1 for the overworld, 8 for the Nether).
  * null: the coordinates cannot be mapped to other dimensions (the End).
  */
-export const dimensionScaleSchema = z.nullable(
-	z.number().check(z.positive(), z.maximum(1_000_000)),
-);
+export const dimensionScaleSchema = z
+	.nullable(z.number().check(z.positive(), z.maximum(1_000_000)))
+	.check(
+		z.describe(
+			"Overworld blocks per block of the dimension, such as 8 for the Nether; `null` if its coordinates cannot be mapped to other dimensions (such as the End)",
+		),
+	);
 
 /** Picks the dimension's block icon and the interface colours while it is shown. */
 export const DIMENSION_THEMES = [
@@ -71,7 +90,13 @@ export const DIMENSION_THEMES = [
 	"end",
 	"unknown",
 ] as const;
-export const dimensionThemeSchema = z.enum(DIMENSION_THEMES);
+export const dimensionThemeSchema = z
+	.enum(DIMENSION_THEMES)
+	.check(
+		z.describe(
+			"Picks the dimension's block icon and the interface colours while it is shown",
+		),
+	);
 export type DimensionTheme = z.infer<typeof dimensionThemeSchema>;
 
 /** The theme a dimension most likely wants, from its slug. */
@@ -92,6 +117,9 @@ export const xaeroDimensionSchema = z
 		z.minLength(1),
 		z.maxLength(100),
 		z.regex(/^[^:\s]+$/, "no colons or spaces"),
+		z.describe(
+			"How Xaero's Minimap names the dimension in a shared waypoint: `dim%0` for the Overworld, `dim%-1` for the Nether, `dim%1` for the End",
+		),
 	);
 
 /** The Xaero dimension id a dimension most likely has, from its theme. */
@@ -107,13 +135,30 @@ export function guessXaeroDimension(theme: DimensionTheme): string {
  * of the dimension.
  */
 export const preloadRingSchema = z.object({
-	level: z.int().check(z.minimum(0), z.maximum(12)),
-	radius: z.int().check(z.minimum(0), z.maximum(MAX_COORD)),
+	level: z
+		.int()
+		.check(
+			z.minimum(0),
+			z.maximum(12),
+			z.describe("Tile level, where level `n` has 1/2^n resolution"),
+		),
+	radius: z
+		.int()
+		.check(
+			z.minimum(0),
+			z.maximum(MAX_COORD),
+			z.describe("Distance from (0, 0) in dimension blocks"),
+		),
 });
 export type PreloadRing = z.infer<typeof preloadRingSchema>;
 export const dimensionPreloadSchema = z
 	.array(preloadRingSchema)
-	.check(z.maxLength(8));
+	.check(
+		z.maxLength(8),
+		z.describe(
+			"Low-resolution tiles around spawn (0, 0) that viewers load in the background and keep (at most 8 rings)",
+		),
+	);
 
 export const DEFAULT_PRELOAD: PreloadRing[] = [
 	{ level: 2, radius: 2048 },
@@ -122,22 +167,53 @@ export const DEFAULT_PRELOAD: PreloadRing[] = [
 ];
 
 export const createDimensionSchema = z.object({
-	slug: slugSchema,
-	name: entityName,
+	slug: slugSchema.check(
+		z.describe(
+			"Short unique name used in URLs: lowercase letters, digits, `-` and `_`, at most 40 characters",
+		),
+	),
+	name: entityName.check(z.describe("Display name")),
 	scale: z.optional(dimensionScaleSchema),
-	/** Defaults to a guess from the slug. */
-	theme: z.optional(dimensionThemeSchema),
-	/** Defaults to DEFAULT_PRELOAD. */
-	preload: z.optional(dimensionPreloadSchema),
-	/** Defaults to a guess from the theme. */
-	xaeroDimension: z.optional(xaeroDimensionSchema),
+	theme: z.optional(
+		dimensionThemeSchema.check(
+			z.describe(
+				"Picks the block icon and the interface colours while the dimension is shown; defaults to a guess from the slug",
+			),
+		),
+	),
+	preload: z.optional(
+		dimensionPreloadSchema.check(
+			z.describe(
+				"Low-resolution tiles around spawn (0, 0) that viewers load in the background and keep, at most 8 rings; defaults to level 2 to 2048 blocks, level 3 to 8192 and level 4 to 16384",
+			),
+		),
+	),
+	xaeroDimension: z.optional(
+		xaeroDimensionSchema.check(
+			z.describe(
+				"How Xaero's Minimap names the dimension in a shared waypoint, such as `dim%0` for the Overworld; defaults to a guess from the theme",
+			),
+		),
+	),
 });
 
 export const updateDimensionSchema = z
 	.object({
-		name: z.optional(entityName),
-		sortOrder: z.optional(z.int()),
-		archived: z.optional(z.boolean()),
+		name: z.optional(entityName.check(z.describe("Display name"))),
+		sortOrder: z.optional(
+			z
+				.int()
+				.check(z.describe("Position in the list of dimensions, lowest first")),
+		),
+		archived: z.optional(
+			z
+				.boolean()
+				.check(
+					z.describe(
+						"Whether the dimension is archived; archived dimensions refuse uploads and can be deleted",
+					),
+				),
+		),
 		scale: z.optional(dimensionScaleSchema),
 		theme: z.optional(dimensionThemeSchema),
 		preload: z.optional(dimensionPreloadSchema),
@@ -153,13 +229,37 @@ export const MAX_SHARED_LAYERS = 500;
  * revision (none: the latest), and which layers are shown (none listed: each layer's default).
  */
 export const shareViewSchema = z.object({
-	dim: slugSchema,
-	x: blockCoord,
-	z: blockCoord,
-	zoom: z.number().check(z.minimum(MIN_ZOOM), z.maximum(64)),
-	rev: z.optional(z.int().check(z.minimum(0))),
+	dim: slugSchema.check(z.describe("Slug of the dimension")),
+	x: blockCoord.check(z.describe("X of the centre of the view, in blocks")),
+	z: blockCoord.check(z.describe("Z of the centre of the view, in blocks")),
+	zoom: z
+		.number()
+		.check(
+			z.minimum(MIN_ZOOM),
+			z.maximum(64),
+			z.describe(
+				"Zoom level: CSS pixels per block is 2^-zoom, so 0 is 1:1 and negative values zoom in",
+			),
+		),
+	rev: z.optional(
+		z
+			.int()
+			.check(
+				z.minimum(0),
+				z.describe(
+					"Revision number to show the map as of; omitted or beyond the head revision: the latest",
+				),
+			),
+	),
 	layers: z.optional(
-		z.array(z.int().check(z.positive())).check(z.maxLength(MAX_SHARED_LAYERS)),
+		z
+			.array(z.int().check(z.positive()))
+			.check(
+				z.maxLength(MAX_SHARED_LAYERS),
+				z.describe(
+					"Ids of the layers shown; omitted: each layer's default, empty: none",
+				),
+			),
 	),
 });
 export type ShareView = z.infer<typeof shareViewSchema>;
@@ -169,11 +269,13 @@ export const memberRoleSchema = z.enum(["moderator", "owner"]);
 export type MemberRole = z.infer<typeof memberRoleSchema>;
 
 export const setMemberSchema = z.object({
-	userId: z.string().check(z.minLength(1)),
-	role: memberRoleSchema,
+	userId: userIdSchema,
+	role: memberRoleSchema.check(z.describe("Role to assign")),
 });
 
-export const updateMemberSchema = z.object({ role: memberRoleSchema });
+export const updateMemberSchema = z.object({
+	role: memberRoleSchema.check(z.describe("New role")),
+});
 
 export const DEFAULT_TOKEN_EXPIRY_DAYS = 180;
 export const MAX_TOKEN_EXPIRY_DAYS = 3650;
@@ -209,26 +311,39 @@ export function normalizeScopes(scopes: readonly TokenScope[]): TokenScope[] {
 }
 
 export const createTokenSchema = z.object({
-	name: entityName,
-	/** null = never expires. */
-	expiresInDays: z._default(
-		z.nullable(z.int().check(z.minimum(1), z.maximum(MAX_TOKEN_EXPIRY_DAYS))),
-		DEFAULT_TOKEN_EXPIRY_DAYS,
-	),
-	scopes: z.pipe(
-		z._default(
-			z.array(z.enum(TOKEN_SCOPES)).check(z.minLength(1)),
-			DEFAULT_TOKEN_SCOPES,
+	name: entityName.check(z.describe("Name to identify the token by")),
+	expiresInDays: z
+		._default(
+			z.nullable(z.int().check(z.minimum(1), z.maximum(MAX_TOKEN_EXPIRY_DAYS))),
+			DEFAULT_TOKEN_EXPIRY_DAYS,
+		)
+		.check(
+			z.describe(
+				`Days until the token expires, default ${DEFAULT_TOKEN_EXPIRY_DAYS}; \`null\` never expires`,
+			),
 		),
-		z.transform((scopes: TokenScope[]) => normalizeScopes(scopes)),
-	),
+	scopes: z
+		.pipe(
+			z._default(
+				z.array(z.enum(TOKEN_SCOPES)).check(z.minLength(1)),
+				DEFAULT_TOKEN_SCOPES,
+			),
+			z.transform((scopes: TokenScope[]) => normalizeScopes(scopes)),
+		)
+		.check(
+			z.describe(
+				"What the token may do, within its owner's role (default: `read`, `upload` and `features`; `manage` implies `moderate`)",
+			),
+		),
 });
 
 export const STATS_RANGES = ["all", "30d", "7d"] as const;
 export type StatsRange = (typeof STATS_RANGES)[number];
 
 export const statsQuerySchema = z.object({
-	range: z._default(z.enum(STATS_RANGES), "all"),
+	range: z
+		._default(z.enum(STATS_RANGES), "all")
+		.check(z.describe("Period to count, ending now; `all` covers all time")),
 });
 
 export const ADMIN_STATS_RANGES = [
@@ -243,5 +358,7 @@ export const ADMIN_STATS_RANGES = [
 export type AdminStatsRange = (typeof ADMIN_STATS_RANGES)[number];
 
 export const adminStatsQuerySchema = z.object({
-	range: z._default(z.enum(ADMIN_STATS_RANGES), "7d"),
+	range: z
+		._default(z.enum(ADMIN_STATS_RANGES), "7d")
+		.check(z.describe("Period to cover, ending now; `all` covers all time")),
 });

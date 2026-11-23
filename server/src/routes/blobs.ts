@@ -27,6 +27,7 @@ export const blobRoutes = new Hono<AppEnv>().get(
 		].join("\n"),
 		ok: { 200: "The image" },
 		fails: [404],
+		params: { file: "Tile hash and format suffix, `<hash>.<suffix>`" },
 	}),
 	async (c) => {
 		const parsed = parseBlobName(c.req.param("file"));

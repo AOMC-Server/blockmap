@@ -72,6 +72,7 @@ export const tokenRoutes = new Hono<AppEnv>()
 			description: "Needs a browser session.",
 			fails: [403, 404],
 			login: true,
+			params: { id: "Token id" },
 		}),
 		async (c) => {
 			const ok = await deleteApiToken(

@@ -60,6 +60,9 @@ export const layerInviteRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Sharing",
 			summary: "List a layer's invites",
+			description:
+				"The layer's creator or a moderator. Newest first, with each invite's `status` and `uses`. The links themselves are not shown again.",
+			params: { id: "Layer id" },
 			fails: [403, 404],
 			login: true,
 		}),
@@ -79,7 +82,9 @@ export const layerInviteRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Sharing",
 			summary: "Create a layer invite",
-			description: "The link is in `url` and shown once.",
+			description:
+				"The layer's creator or a moderator. The link is in `url` and shown only once.",
+			params: { id: "Layer id" },
 			ok: { 201: "Invite created" },
 			fails: [400, 403, 404, 429],
 			login: true,
@@ -164,6 +169,9 @@ export const inviteRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Sharing",
 			summary: "Look up an invite by its token",
+			description:
+				"Open to anyone who has the token. Returns what the invite offers (`kind`, `role`, `mapName`, `layerName`, `inviterName`) and whether you already have at least that access (`alreadyMember`). 404 for an unknown token; 410 if the invite is expired, revoked or used up.",
+			params: { token: "Invite token, the last part of the invite link" },
 			fails: [404, 410],
 		}),
 		async (c) => {
@@ -203,8 +211,9 @@ export const inviteRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Sharing",
 			summary: "Accept an invite",
+			params: { token: "Invite token, the last part of the invite link" },
 			description:
-				"Never lowers anyone's role. Map invites need a browser session or a token with the `manage` scope. Answers 410 when the invite is no longer valid, including when its creator lost the right to make it.",
+				"Never lowers anyone's role. Map invites need a browser session or a token with the `manage` scope. Answers 410 when the invite is no longer valid, including if its creator lost the permission to create it.",
 			fails: [403, 404, 410],
 			login: true,
 		}),
@@ -230,6 +239,9 @@ export const inviteRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Sharing",
 			summary: "Revoke an invite",
+			description:
+				"For a layer invite, the layer's creator or a moderator; for a map invite, an owner. The link stops working.",
+			params: { id: "Invite id (`id` in the invite list, not its token)" },
 			fails: [403, 404],
 			login: true,
 		}),

@@ -32,16 +32,39 @@ export type TopicDef<F extends Family> = {
 };
 
 const nullableInt = z.number().int().nullable();
-const status = <S extends string>(s: S) => z.literal(s);
+const revNumber = nullableInt
+	.optional()
+	.describe(
+		"The upload's position in history (1 for the oldest export); `null` until it is published",
+	);
+const revisionError = z
+	.string()
+	.nullable()
+	.optional()
+	.describe("Why the upload failed; `null` otherwise");
+const waitMessage = z
+	.string()
+	.optional()
+	.describe("What the job is doing or waiting for, as a sentence");
+const status = <S extends string>(s: S) =>
+	z.literal(s).describe("The status, which is also the event name");
 const invalidation = z.object({}).strict();
 
 const jobProgress = z
 	.object({
 		step: z.number().int().describe("1-based"),
-		steps: z.number().int(),
+		steps: z.number().int().describe("Total number of steps in the job"),
 		message: z.string().describe("The step, as a sentence"),
-		done: z.number().int().optional(),
-		total: z.number().int().optional(),
+		done: z
+			.number()
+			.int()
+			.optional()
+			.describe("How much of this step is done, in `unit`"),
+		total: z
+			.number()
+			.int()
+			.optional()
+			.describe("Total work for this step, in `unit`"),
 		unit: z
 			.string()
 			.optional()
@@ -60,9 +83,9 @@ const revisionMessages = {
 			"The job is queued. `message` says what it waits for (for example a running history rebuild, or how many jobs are ahead); a new event follows whenever that changes.",
 		schema: z.object({
 			status: status("pending"),
-			message: z.string().optional(),
-			rev: nullableInt.optional(),
-			error: z.string().nullable().optional(),
+			message: waitMessage,
+			rev: revNumber,
+			error: revisionError,
 		}),
 	},
 	processing: {
@@ -70,28 +93,28 @@ const revisionMessages = {
 			"The job is running; `message`, `done` and `total` tell how far, and `progress` the detail: the step of how many, the rate and facts about the work. As the first event, with a `message` that says what it waits for, the upload is waiting for its queued delete to start and is otherwise unchanged.",
 		schema: z.object({
 			status: status("processing"),
-			message: z.string().optional(),
-			done: z.number().int().optional(),
-			total: z.number().int().optional(),
+			message: waitMessage,
+			done: z.number().int().optional().describe("Same as `progress.done`"),
+			total: z.number().int().optional().describe("Same as `progress.total`"),
 			progress: jobProgress.optional(),
-			rev: nullableInt.optional(),
-			error: z.string().nullable().optional(),
+			rev: revNumber,
+			error: revisionError,
 		}),
 	},
 	done: {
 		summary: "The job finished; `rev` is the revision number.",
 		schema: z.object({
 			status: status("done"),
-			rev: nullableInt.optional(),
-			error: z.string().nullable().optional(),
+			rev: revNumber,
+			error: revisionError,
 		}),
 	},
 	failed: {
 		summary: "The job failed; `error` says why.",
 		schema: z.object({
 			status: status("failed"),
-			rev: nullableInt.optional(),
-			error: z.string().nullable().optional(),
+			rev: revNumber,
+			error: revisionError,
 		}),
 	},
 	gone: {
@@ -211,9 +234,19 @@ export const topics: { [F in Family]: TopicDef<F> } = {
 			changed: {
 				summary: "The map changed.",
 				schema: z.object({
-					headRev: z.number().int(),
-					epoch: z.number().int(),
-					maintenance: z.boolean(),
+					headRev: z
+						.number()
+						.int()
+						.describe("Number of the newest revision (0 before any upload)"),
+					epoch: z
+						.number()
+						.int()
+						.describe(
+							"Increases when history is rewritten (an upload is deleted, or inserted before newer ones), which renumbers revisions",
+						),
+					maintenance: z
+						.boolean()
+						.describe("Whether only owners may make changes right now"),
 				}),
 			},
 		},
@@ -228,14 +261,19 @@ export const topics: { [F in Family]: TopicDef<F> } = {
 			changed: {
 				summary: "The queue changed.",
 				schema: z.object({
-					pending: z.number().int(),
+					pending: z.number().int().describe("How many jobs are waiting"),
 					running: z
 						.object({
-							type: jobType,
-							revisionId: nullableInt,
-							progress: jobProgress.nullable(),
+							type: jobType.describe("Kind of job"),
+							revisionId: nullableInt.describe(
+								"Revision id of the upload or its deletion; `null` for other jobs",
+							),
+							progress: jobProgress
+								.nullable()
+								.describe("Current progress; `null` until the job reports"),
 						})
-						.nullable(),
+						.nullable()
+						.describe("The job currently running; `null` when none is"),
 				}),
 			},
 		},

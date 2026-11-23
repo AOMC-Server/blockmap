@@ -26,15 +26,21 @@ export const normalizeFileName = (name: string) => name.normalize("NFC");
 export const fileNameKey = (name: string) =>
 	normalizeFileName(name).toLowerCase();
 
-export const fileNameSchema = z.pipe(
-	z.pipe(z.string(), z.transform(normalizeFileName)),
-	z.string().check(
-		z.superRefine((name, ctx) => {
-			const problem = fileNameProblem(name);
-			if (problem) ctx.addIssue({ code: "custom", message: problem });
-		}),
-	),
-);
+export const fileNameSchema = z
+	.pipe(
+		z.pipe(z.string(), z.transform(normalizeFileName)),
+		z.string().check(
+			z.superRefine((name, ctx) => {
+				const problem = fileNameProblem(name);
+				if (problem) ctx.addIssue({ code: "custom", message: problem });
+			}),
+		),
+	)
+	.check(
+		z.describe(
+			`Name, a single path segment of at most ${MAX_FILE_NAME} characters: no slashes or control characters, not \`.\` or \`..\`, and no spaces at either end`,
+		),
+	);
 
 /** "world.zip" numbered: "world (2).zip". A leading dot is part of the name, not an extension. */
 export function numberedFileName(name: string, n: number): string {
@@ -58,6 +64,12 @@ export const filePathSchema = z._default(
 	z.string().check(z.maxLength(4000)),
 	"/",
 );
+const folderPathSchema = (what: string) =>
+	filePathSchema.check(
+		z.describe(
+			`Path to the ${what}, as slash-separated names like \`/voxy/world\`; \`/\` (default) is the top`,
+		),
+	);
 
 /** The names in a path such as "/voxy/world 1/"; empty for the top. */
 export const splitFilePath = (path: string) =>
@@ -72,43 +84,91 @@ export function fileUrl(names: readonly string[], folder = false): string {
 	return `/files${encoded ? `/${encoded}` : ""}${folder ? "/" : ""}`;
 }
 
-export const fileTreeQuerySchema = z.object({ path: filePathSchema });
+export const fileTreeQuerySchema = z.object({
+	path: folderPathSchema("folder to list (case-insensitive)"),
+});
 
 export const fileUploadQuerySchema = z.object({
-	/** The folder to upload into. */
-	path: filePathSchema,
-	name: fileNameSchema,
-	onConflict: z._default(z.enum(FILE_CONFLICT_MODES), "fail"),
+	path: folderPathSchema(
+		"folder to upload into, which must exist (case-insensitive)",
+	),
+	name: fileNameSchema.check(z.describe("Name of the file")),
+	onConflict: z
+		._default(z.enum(FILE_CONFLICT_MODES), "fail")
+		.check(
+			z.describe(
+				"What to do when the folder already has an item with that name (case-insensitive): `fail` (default) answers 409, `replace` gives the existing file the new content, `rename` keeps both and numbers the new one",
+			),
+		),
 });
 
 const descriptionSchema = z
 	.string()
 	.check(z.trim(), z.maxLength(MAX_FOLDER_DESCRIPTION));
+const folderDescription = descriptionSchema.check(
+	z.describe(
+		`Folder description, at most ${MAX_FOLDER_DESCRIPTION} characters, default empty`,
+	),
+);
 
 export const createFileFolderSchema = z.object({
-	/** null: at the top of the library. */
-	parentId: z.nullable(z.int().check(z.positive())),
-	name: fileNameSchema,
-	description: z._default(descriptionSchema, ""),
+	parentId: z
+		.nullable(z.int().check(z.positive()))
+		.check(
+			z.describe(
+				"Id of the folder to create it in; `null` is the top of the library",
+			),
+		),
+	name: fileNameSchema.check(z.describe("Name of the folder")),
+	description: z._default(folderDescription, ""),
 });
 
 export const updateFileFolderSchema = z
 	.object({
-		name: z.optional(fileNameSchema),
-		description: z.optional(descriptionSchema),
-		/** Move it: null is the top of the library. */
-		parentId: z.optional(z.nullable(z.int().check(z.positive()))),
+		name: z.optional(
+			fileNameSchema.check(z.describe("New name of the folder")),
+		),
+		description: z.optional(
+			descriptionSchema.check(
+				z.describe(
+					`New folder description, at most ${MAX_FOLDER_DESCRIPTION} characters`,
+				),
+			),
+		),
+		parentId: z.optional(
+			z
+				.nullable(z.int().check(z.positive()))
+				.check(
+					z.describe(
+						"Id of the folder to move it into; `null` is the top of the library",
+					),
+				),
+		),
 	})
 	.check(z.refine((o) => Object.keys(o).length > 0, "nothing to update"));
 
 export const updateFileEntrySchema = z
 	.object({
-		name: z.optional(fileNameSchema),
-		/** Move it: null is the top of the library. */
-		folderId: z.optional(z.nullable(z.int().check(z.positive()))),
+		name: z.optional(fileNameSchema.check(z.describe("New name of the file"))),
+		folderId: z.optional(
+			z
+				.nullable(z.int().check(z.positive()))
+				.check(
+					z.describe(
+						"Id of the folder to move it into; `null` is the top of the library",
+					),
+				),
+		),
 	})
 	.check(z.refine((o) => Object.keys(o).length > 0, "nothing to update"));
 
 export const fileGrantSchema = z.object({
-	userId: z.string().check(z.minLength(1)),
+	userId: z
+		.string()
+		.check(
+			z.minLength(1),
+			z.describe(
+				"Id of the user to give access to the folder, who must have logged in at least once",
+			),
+		),
 });

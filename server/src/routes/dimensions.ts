@@ -70,6 +70,7 @@ export const dimensionRoutes = new Hono<AppEnv>()
 			description: "Moderators. `dim` is the slug.",
 			fails: [400, 403, 404],
 			login: true,
+			params: { dim: "Dimension slug" },
 		}),
 		requireUser,
 		validate("json", updateDimensionSchema),
@@ -97,6 +98,7 @@ export const dimensionRoutes = new Hono<AppEnv>()
 			ok: { 202: "Queued" },
 			fails: [403, 404, 409],
 			login: true,
+			params: { dim: "Dimension slug" },
 		}),
 		requireUser,
 		(c) => {

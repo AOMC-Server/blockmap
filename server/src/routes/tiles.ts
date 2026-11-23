@@ -76,6 +76,12 @@ export const tileRoutes = new Hono<AppEnv>()
 				302: "Redirect to `/blobs/<hash>.<suffix>` (see *Get a tile image by hash*)",
 			},
 			fails: [400, 404],
+			params: {
+				dim: "Dimension slug",
+				zoom: "Zoom level; 0 is the most detailed",
+				x: "Tile index along X",
+				y: "Tile index along Z",
+			},
 			query: {
 				rev: "Show the map as of this revision: the uploads up to it in export order (default: latest)",
 				v: "The map epoch (`epoch` of `GET /api/map`). `rev` and `only` responses are cached for good only when it matches",
@@ -192,6 +198,10 @@ export const tileRoutes = new Hono<AppEnv>()
 			].join("\n"),
 			ok: { 200: "`{ tiles: [{ x, y, hash }] }`" },
 			fails: [400, 404],
+			params: {
+				dim: "Dimension slug",
+				zoom: "Zoom level; 0 is the most detailed",
+			},
 		}),
 		validate("query", hashesQuerySchema),
 		async (c) => {

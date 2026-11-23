@@ -158,6 +158,11 @@ export const legacyTileRoutes = new Hono<AppEnv>().get(
 		].join("\n"),
 		ok: { 200: "The tile image", 304: "Not modified (`If-None-Match`)" },
 		fails: [404],
+		params: {
+			dim: "Dimension slug",
+			zoom: "Zoom level; 0 is one pixel per block",
+			tile: "Tile name, `<x>_<z>.png`",
+		},
 	}),
 	async (c) => {
 		const { db, env, svc } = c.var;

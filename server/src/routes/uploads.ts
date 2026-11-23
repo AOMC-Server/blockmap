@@ -36,10 +36,11 @@ export const uploadRoutes = new Hono<AppEnv>().post(
 		tag: "Uploads",
 		summary: "Upload Xaero exports",
 		description:
-			"Send PNG files or ZIPs as multipart/form-data. Coordinates come from `_x<X>_z<Z>` in file names unless `coords` is given. A file that is already part of an upload to the dimension (the same image at the same coordinates), or that appears twice in the request, is skipped and listed in `skipped` as `{ file, reason }`; if every file is skipped the answer is 409. An upload from the in-game mod is recognised by its `User-Agent` (see `MOD_USER_AGENTS`; by default AOMC Webmapper and AOMC Visited) and counted separately in the statistics. Processing runs in the background: poll `GET /api/revisions/{id}` or stream its events. An upload with several export dates creates one revision per date. The history is always in export order: an upload goes in at its export date (files without one count as made now), and the revisions after it move up one number, so a revision number only names a moment until an older export is uploaded or an upload is deleted. Uploads with the same export date go in the order they were finished.",
+			"Needs the editor role or above; tokens need the `upload` scope. The dimension must not be archived (400). Send PNG files or ZIPs as multipart/form-data. Coordinates come from `_x<X>_z<Z>` in file names unless `coords` is given. A file that is already part of an upload to the dimension (the same image at the same coordinates), or that appears twice in the request, is skipped and listed in `skipped` as `{ file, reason }`; if every file is skipped, the answer is 409. An upload from the in-game mod is recognised by its `User-Agent` (see `MOD_USER_AGENTS`; by default AOMC Webmapper and AOMC Visited) and counted separately in the statistics. Processing runs in the background: poll `GET /api/revisions/{id}` or stream its events. An upload with several export dates creates one revision per date. The history is always in export order: an upload goes in at its export date (files without one count as created now), and the revisions after it move up one number, so a revision number only names a moment until an older export is uploaded or an upload is deleted. Uploads with the same export date go in the order they were finished.",
 		ok: {
-			202: "Accepted. `revisionId` is the last revision, `revisionIds` all of them, oldest first; `skipped` lists files left out as duplicates",
+			202: "Accepted. `revisionId` is the last revision, `revisionIds` lists all of them, oldest first; `skipped` lists files omitted as duplicates",
 		},
+		params: { dim: "Dimension slug" },
 		fails: [400, 403, 404, 409, 413, 429],
 		login: true,
 		requestBody: {

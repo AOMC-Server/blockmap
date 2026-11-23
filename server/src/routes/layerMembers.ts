@@ -20,6 +20,9 @@ export const layerMemberRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Sharing",
 			summary: "List a layer's members",
+			description:
+				"The layer's creator or a moderator. Returns each member's `userId`, `role`, `username` and `avatarUrl`.",
+			params: { id: "Layer id" },
 			fails: [403, 404],
 			login: true,
 		}),
@@ -47,7 +50,8 @@ export const layerMemberRoutes = new Hono<AppEnv>()
 			tag: "Sharing",
 			summary: "Add a layer member or change their role",
 			description:
-				"The user must have logged in once. The layer's creator always has editor access and cannot be changed (409).",
+				"The layer's creator or a moderator. The user must have logged in at least once (404 otherwise). The layer's creator always has editor access and cannot be changed (409).",
+			params: { id: "Layer id" },
 			ok: { 201: "Role set" },
 			fails: [400, 403, 404, 409, 429],
 			login: true,
@@ -82,6 +86,12 @@ export const layerMemberRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Sharing",
 			summary: "Change a layer member's role",
+			description:
+				"The layer's creator or a moderator. 404 if the user is not a member. The layer's creator always has editor access and cannot be changed (409).",
+			params: {
+				id: "Layer id",
+				userId: "Discord user id of the member",
+			},
 			fails: [400, 403, 404, 409, 429],
 			login: true,
 		}),
@@ -117,7 +127,11 @@ export const layerMemberRoutes = new Hono<AppEnv>()
 			tag: "Sharing",
 			summary: "Remove a layer member",
 			description:
-				"Members may always remove themselves, except the layer's creator (409).",
+				"The layer's creator or a moderator may remove anyone; members may always remove themselves. The layer's creator cannot be removed (409). 404 if the user is not a member.",
+			params: {
+				id: "Layer id",
+				userId: "Discord user id of the member",
+			},
 			fails: [403, 404, 409, 429],
 			login: true,
 		}),

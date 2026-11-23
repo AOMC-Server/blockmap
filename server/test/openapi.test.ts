@@ -81,6 +81,38 @@ describe("OpenAPI spec", () => {
 		]);
 	});
 
+	test("describes every event field", async () => {
+		const { app } = makeTestApp();
+		const doc = (await (await app.request("/api/asyncapi.json")).json()) as {
+			channels: Record<
+				string,
+				{ messages: Record<string, { summary?: string; payload: unknown }> }
+			>;
+		};
+		type Schema = {
+			description?: string;
+			properties?: Record<string, Schema>;
+			items?: Schema;
+			anyOf?: Schema[];
+		};
+		const undescribed: string[] = [];
+		const walk = (s: Schema | undefined, at: string) => {
+			if (!s || typeof s !== "object") return;
+			for (const [name, prop] of Object.entries(s.properties ?? {})) {
+				if (!prop.description) undescribed.push(`${at}${name}`);
+				walk(prop, `${at}${name}.`);
+			}
+			walk(s.items, `${at}[].`);
+			for (const sub of s.anyOf ?? []) walk(sub, at);
+		};
+		for (const [channel, { messages }] of Object.entries(doc.channels))
+			for (const [name, message] of Object.entries(messages)) {
+				if (!message.summary) undescribed.push(`${channel}/${name}: summary`);
+				walk(message.payload as Schema, `${channel}/${name}: `);
+			}
+		expect(undescribed).toEqual([]);
+	});
+
 	test("titles the docs with the map name, following renames", async () => {
 		const t = makeTestApp();
 		const titles = async () => ({
@@ -126,6 +158,57 @@ describe("OpenAPI spec", () => {
 			((await asyncapi.json()) as { info: { title: string } }).info.title,
 		).toBe("Blockmap events");
 		expect((await t.app.request("/scalar")).status).toBe(200);
+	});
+
+	test("describes every operation, parameter and request body field", async () => {
+		const { app } = makeTestApp();
+		const spec = (await (await app.request("/api/openapi.json")).json()) as {
+			paths: Record<
+				string,
+				Record<
+					string,
+					{
+						description?: string;
+						parameters?: { name: string; in: string; description?: string }[];
+						requestBody?: { content: Record<string, { schema?: unknown }> };
+					}
+				>
+			>;
+		};
+		type Schema = {
+			description?: string;
+			properties?: Record<string, Schema>;
+			items?: Schema;
+			oneOf?: Schema[];
+			anyOf?: Schema[];
+			allOf?: Schema[];
+		};
+		const undescribed: string[] = [];
+		const walk = (s: Schema | undefined, at: string) => {
+			if (!s || typeof s !== "object") return;
+			for (const [name, prop] of Object.entries(s.properties ?? {})) {
+				if (!prop.description) undescribed.push(`${at}${name}`);
+				walk(prop, `${at}${name}.`);
+			}
+			walk(s.items, `${at}[].`);
+			for (const sub of [
+				...(s.oneOf ?? []),
+				...(s.anyOf ?? []),
+				...(s.allOf ?? []),
+			])
+				walk(sub, at);
+		};
+		for (const [path, methods] of Object.entries(spec.paths)) {
+			for (const [method, op] of Object.entries(methods)) {
+				const id = `${method.toUpperCase()} ${path}`;
+				if (!op.description) undescribed.push(`${id}: description`);
+				for (const p of op.parameters ?? [])
+					if (!p.description) undescribed.push(`${id}: ${p.in} ${p.name}`);
+				for (const c of Object.values(op.requestBody?.content ?? {}))
+					walk(c.schema as Schema, `${id}: body `);
+			}
+		}
+		expect(undescribed).toEqual([]);
 	});
 
 	test("describes request bodies from the zod schemas", async () => {

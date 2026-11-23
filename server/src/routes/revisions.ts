@@ -188,6 +188,7 @@ export const revisionRoutes = new Hono<AppEnv>()
 			description:
 				"404 for a failed upload that is not yours, unless you are a moderator. `viaMod` is true for uploads sent by the in-game mod (recognised by its `User-Agent`, see `MOD_USER_AGENTS`).",
 			fails: [404],
+			params: { id: "Revision id" },
 		}),
 		(c) => {
 			const row = loadRevision(c.var.db, parseId(c.req.param("id")));
@@ -202,8 +203,9 @@ export const revisionRoutes = new Hono<AppEnv>()
 			tag: "Revisions",
 			summary: "Tiles an upload covers",
 			description:
-				"The zoom 0 tiles (`[x, y]`, y along the z axis) the upload put map data in, which outline where it is more closely than its `bbox`. Each spans `tileSize` blocks. Empty for anything that is not a finished upload.",
+				"The zoom 0 tiles (`[x, y]`, `y` along the Z axis) that the upload added map data to, outlining its coverage more closely than its `bbox`. Each spans `tileSize` blocks. Empty for anything that is not a finished upload.",
 			fails: [404],
+			params: { id: "Revision id" },
 		}),
 		async (c) => {
 			const { db } = c.var;
@@ -227,9 +229,10 @@ export const revisionRoutes = new Hono<AppEnv>()
 			tag: "Revisions",
 			summary: "Stream a revision's progress",
 			description:
-				"The `revision:<id>` topic of `GET /api/events` on its own, as server-sent events named after the status (`pending`, `processing`, `done`, `failed`, `gone`); the stream ends when the revision is done, failed or gone (an erased upload ends with `gone`). The first event is the current status (for a queued job with a `message` that says what it waits for, repeated when that changes); for an upload whose delete is waiting in the queue it is `processing` with a `message` that says what it waits for.",
+				"The `revision:<id>` topic of `GET /api/events` on its own, as server-sent events named after the status (`pending`, `processing`, `done`, `failed`, `gone`). The stream ends when the revision is done, failed or gone (an erased upload ends with `gone`). The first event is the current status (for a queued job, `message` explains what it is waiting for, and is sent again when that changes); for an upload whose deletion is queued, the status is `processing` with a `message` explaining what it is waiting for.",
 			ok: { 200: "text/event-stream" },
 			fails: [404],
+			params: { id: "Revision id" },
 		}),
 		async (c) => {
 			const { db } = c.var;
@@ -266,6 +269,7 @@ export const revisionRoutes = new Hono<AppEnv>()
 			},
 			fails: [403, 404, 409],
 			login: true,
+			params: { id: "Revision id" },
 		}),
 		requireUser,
 		async (c) => {
