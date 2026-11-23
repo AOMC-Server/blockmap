@@ -117,7 +117,7 @@ export function Hotbar() {
 			secondary: true,
 			icon: "files",
 			label: "Files",
-			hint: "Shared downloads and presets",
+			hint: "Shared downloads and LOD/Map data",
 			active: false,
 			href: "/files/",
 		},

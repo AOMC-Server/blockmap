@@ -74,8 +74,8 @@ export function FilesPage() {
 				<section class="page-section">
 					<h2>Files</h2>
 					<p class="muted">
-						Shared downloads such as Voxy data and Xaero presets. Log in to
-						browse and download files.
+						Shared downloads such as Voxy/Distant Horizons/Other LOD mod data.
+						Log in to browse and download files.
 					</p>
 					<a class="btn primary" href={loginUrl()}>
 						Log in with Discord
