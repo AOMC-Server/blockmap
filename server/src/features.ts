@@ -210,10 +210,15 @@ export function resolveContent(
 	if ("unknown" in ownerIds) return { unknownPlayer: ownerIds.unknown };
 	const builderIds = resolvePlayerRefs(db, builders, userId);
 	if ("unknown" in builderIds) return { unknownPlayer: builderIds.unknown };
+	const ownerId = ownerIds.ids[0] ?? null;
 	return {
 		...rest,
-		ownerId: ownerIds.ids[0] ?? null,
-		builderIds: builderIds.ids,
+		ownerId,
+		// The owner is always a builder too.
+		builderIds:
+			ownerId === null || builderIds.ids.includes(ownerId)
+				? builderIds.ids
+				: [ownerId, ...builderIds.ids],
 	};
 }
 

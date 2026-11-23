@@ -236,7 +236,7 @@ const common = {
 		._default(builderList(), [])
 		.check(
 			z.describe(
-				`Players who helped build it, as player ids or \`{uuid, name}\`; at most ${MAX_BUILDERS}, default none`,
+				`Players who helped build it, as player ids or \`{uuid, name}\`; at most ${MAX_BUILDERS}, default none. The owner is always added`,
 			),
 		),
 };

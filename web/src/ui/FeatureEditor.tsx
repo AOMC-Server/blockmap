@@ -395,7 +395,14 @@ export function FeatureEditor() {
 
 			<div class="field flow">
 				<span class="label">Owner</span>
-				<OwnerPicker value={owner} onChange={setOwner} />
+				<OwnerPicker
+					value={owner}
+					onChange={(next) => {
+						setOwner(next);
+						if (next && !builders.some((b) => b.id === next.id))
+							setBuilders([next, ...builders]);
+					}}
+				/>
 			</div>
 
 			<div class="field flow">
@@ -405,7 +412,7 @@ export function FeatureEditor() {
 						({builders.length}/{MAX_BUILDERS})
 					</small>
 				</span>
-				<BuildersPicker value={builders} onChange={setBuilders} />
+				<BuildersPicker value={builders} owner={owner} onChange={setBuilders} />
 			</div>
 
 			{type !== "pin" && (
