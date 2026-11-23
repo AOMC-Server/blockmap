@@ -4,7 +4,15 @@ import { mapView } from "../controller";
 import { featureStats, featureTitle, TYPE_LABEL } from "../featureInfo";
 import { deleteFeature } from "../layers";
 import { playerPageUrl } from "../players";
-import { canEditMap, editor, embed, layersData, popup, view } from "../state";
+import {
+	canEditMap,
+	editor,
+	embed,
+	layerOfFeature,
+	layersData,
+	popup,
+	view,
+} from "../state";
 import { dyeScope } from "../theme";
 import { measureFrom } from "../tools/measure";
 import { formatBlocks } from "../tools/measureMath";
@@ -20,9 +28,14 @@ export function Popup() {
 	view.value; // re-render when the camera moves
 	if (!p || !mv) return null;
 
-	const layer = layersData.value.find((l) => l.id === p.layerId);
-	const feature = layer?.features.find((f) => f.id === p.featureId);
-	if (!layer || !feature) return null;
+	const listing = layerOfFeature(p.featureId, p.layerId);
+	const feature = listing?.features.find((f) => f.id === p.featureId);
+	if (!listing || !feature) return null;
+	const home = layersData.value.find((l) => l.id === p.layerId);
+	const layer = home ?? listing;
+	const alsoIn = feature.alsoIn
+		.map((id) => layersData.value.find((l) => l.id === id)?.name)
+		.filter((n): n is string => !!n);
 
 	const at = mv.blockToScreen(p.x, p.z);
 	const size = mv.getSize();
@@ -32,7 +45,7 @@ export function Popup() {
 		? at.y + 14
 		: at.y - (feature.type === "pin" ? 34 : 12);
 	const dye = feature.color ?? layer.color;
-	const editable = layer.canEdit && canEditMap.value;
+	const editable = !!home && home.canEdit && canEditMap.value;
 	const spot = p.at;
 	const stats = featureStats(
 		feature,
@@ -63,7 +76,8 @@ export function Popup() {
 				</h3>
 				<div class="popup-meta">
 					<span class="popup-kind">
-						{TYPE_LABEL[feature.type]} · {layer.name}
+						{TYPE_LABEL[feature.type]} · {home ? home.name : "another layer"}
+						{alsoIn.length > 0 && ` · also in ${alsoIn.join(", ")}`}
 					</span>
 					<button
 						type="button"

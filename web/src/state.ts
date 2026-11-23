@@ -25,6 +25,7 @@ export type UploadLimits = MapDetail["limits"];
 export type FeatureData = {
 	id: number;
 	layerId: number;
+	alsoIn: number[];
 	revisionId: number;
 	type: FeatureType;
 	name: string;
@@ -44,6 +45,18 @@ export type LayerData = Omit<
 	InferResponseType<typeof api.api.layers.$get, 200>["layers"][number],
 	"features" | "color"
 > & { color: Dye; features: FeatureData[] };
+
+/** The layer a feature is looked up in: its home, or when that is not visible one that lists it. */
+export function layerOfFeature(
+	featureId: number,
+	homeLayerId: number,
+): LayerData | undefined {
+	const layers = layersData.value;
+	return (
+		layers.find((l) => l.id === homeLayerId) ??
+		layers.find((l) => l.features.some((f) => f.id === featureId))
+	);
+}
 
 export type SidePanelName = "layers" | "history";
 

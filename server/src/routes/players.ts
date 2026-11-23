@@ -44,6 +44,19 @@ import { parseId } from "./util";
 
 type Role = AppEnv["Variables"]["role"];
 
+/** The features that are in one of `layerIds`, as their home or as one of their other layers, and whose home layer still exists. */
+const inVisibleLayers = (layerIds: number[]) =>
+	and(
+		or(
+			inArray(features.layerId, layerIds),
+			sql`EXISTS (SELECT 1 FROM feature_layers fl WHERE fl.feature_id = ${features.id} AND fl.layer_id IN (${sql.join(
+				layerIds.map((id) => sql`${id}`),
+				sql`, `,
+			)}))`,
+		),
+		sql`EXISTS (SELECT 1 FROM layers h WHERE h.id = ${features.layerId} AND h.deleted_at IS NULL)`,
+	);
+
 /** Ids of the live layers the actor may see. */
 function visibleLayerIds(db: Db, actor: Actor, role: Role): number[] {
 	const rows = db.select().from(layers).where(isNull(layers.deletedAt)).all();
@@ -82,7 +95,7 @@ function attributionCounts(db: Db, layerIds: number[], playerIds?: number[]) {
 		.innerJoin(features, eq(features.id, featurePlayers.featureId))
 		.where(
 			and(
-				inArray(features.layerId, layerIds),
+				inVisibleLayers(layerIds),
 				playerIds ? inArray(featurePlayers.playerId, playerIds) : undefined,
 			),
 		)
@@ -337,7 +350,7 @@ export function playerRoutes(mojang: Mojang) {
 								.where(
 									and(
 										eq(featurePlayers.playerId, row.id),
-										inArray(features.layerId, layerIds),
+										inVisibleLayers(layerIds),
 									),
 								)
 								.all();

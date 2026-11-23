@@ -362,6 +362,7 @@ describe("feature validation", () => {
 			geometry: [1, 2],
 			popup: "",
 			color: null,
+			alsoIn: [],
 			owner: null,
 			builders: [],
 		});

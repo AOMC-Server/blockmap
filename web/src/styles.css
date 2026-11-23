@@ -3556,3 +3556,110 @@ a.player-name:hover .player-label {
 	padding: 6px 0;
 	border-bottom: 1px dashed var(--line);
 }
+
+.layers-picker {
+	position: relative;
+}
+
+.layer-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 4px;
+}
+
+.layer-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 4px;
+	max-width: 100%;
+}
+
+.layer-chip.primary {
+	border-color: var(--accent, var(--line));
+}
+
+.layer-chip-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.layer-chip-remove {
+	padding: 0 4px;
+	font-size: 16px;
+	line-height: 1;
+	color: var(--muted);
+}
+
+.layer-chip-remove:hover,
+.layer-chip-remove:focus-visible {
+	color: var(--text);
+}
+
+.layer-search {
+	position: relative;
+}
+
+.layer-options {
+	position: absolute;
+	z-index: 5;
+	top: calc(100% + 4px);
+	left: 0;
+	right: 0;
+	max-height: 260px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 4px;
+	background: var(--s1);
+	border: var(--bw) solid var(--line);
+	border-radius: var(--radius);
+	box-shadow: var(--surface-shadow);
+}
+
+/* The rows look like those of the other drop-downs. */
+.layer-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 36px;
+	padding: 4px 10px;
+	font-weight: 600;
+	border-radius: var(--radius);
+	background: var(--well);
+	border: 2px solid var(--s3);
+	box-shadow: var(--surface-shadow);
+	cursor: pointer;
+}
+
+.layer-option.active {
+	border-color: var(--focus);
+}
+
+.layer-option.picked {
+	border-color: var(--text);
+}
+
+.layer-option.picked.active {
+	border-color: var(--focus);
+}
+
+.layer-option-mark {
+	width: 14px;
+	text-align: center;
+}
+
+.layer-option-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.layer-option-note {
+	padding: 4px 8px;
+	font-size: 13px;
+}

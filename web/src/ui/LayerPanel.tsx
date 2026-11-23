@@ -19,6 +19,7 @@ import {
 	deleteLayer,
 	importFeatures,
 	moveFeature,
+	removeFeatureFromLayer,
 	reorderFeatures,
 	reorderLayers,
 	updateLayer,
@@ -32,6 +33,7 @@ import {
 	type FeatureData,
 	isLayerFull,
 	isLayerHidden,
+	isModerator,
 	type LayerData,
 	layerLimitReached,
 	layersData,
@@ -226,6 +228,7 @@ function LayerSettings(props: {
 	onBack: () => void;
 }) {
 	const { layer: l, editable, onBack } = props;
+	const mayDelete = isModerator.value || l.features.length === 0;
 	return (
 		<div class="layer-settings">
 			<div class="settings-head">
@@ -285,16 +288,25 @@ function LayerSettings(props: {
 			{editable && l.canManage && (
 				<section class="danger-zone">
 					<h4 class="section-title">Danger zone</h4>
-					<button
-						type="button"
-						class="btn small danger"
-						onClick={async () => {
-							if (confirm(`Delete layer "${l.name}" and its features?`))
-								await deleteLayer(l.id);
-						}}
-					>
-						Delete layer
-					</button>
+					{mayDelete ? (
+						<button
+							type="button"
+							class="btn small danger"
+							onClick={async () => {
+								const text =
+									l.features.length > 0
+										? `Delete layer "${l.name}"? Features whose home it is will be deleted with it.`
+										: `Delete layer "${l.name}"?`;
+								if (confirm(text)) await deleteLayer(l.id);
+							}}
+						>
+							Delete layer
+						</button>
+					) : (
+						<p class="hint">
+							Only moderators can delete a layer that has features.
+						</p>
+					)}
 				</section>
 			)}
 		</div>
@@ -316,10 +328,11 @@ function LayerRow(props: {
 	const maxFeatures = currentMap.value?.limits.maxFeaturesPerLayer;
 	const full = isLayerFull(l);
 	const hidden = isLayerHidden(l);
+	const homeFeatures = l.features.filter((f) => f.layerId === l.id);
 	// A search shows only some of the features, so their order cannot be changed meanwhile.
 	const featureOrder =
-		editable && !props.filtering && l.features.length > 1
-			? l.features.map((f) => f.id)
+		editable && !props.filtering && homeFeatures.length > 1
+			? homeFeatures.map((f) => f.id)
 			: null;
 
 	/** Layers of the dimension that a feature of this one can be moved to. */
@@ -339,7 +352,7 @@ function LayerRow(props: {
 
 	/** Dragging a feature onto another layer of the list. */
 	const dropOn = (f: FeatureData): CrossDrop | undefined =>
-		editable && targets.length > 0
+		editable && f.layerId === l.id && targets.length > 0
 			? {
 					rows: ".features > li:not(.muted)",
 					accepts: (id) => {
@@ -459,69 +472,98 @@ function LayerRow(props: {
 
 					{!settingsOpen && (
 						<ul class="features">
-							{features.map((f, i) => (
-								<li
-									key={f.id}
-									onMouseEnter={() => hoverFeature(f.id)}
-									onMouseLeave={() => hoverFeature(null)}
-								>
-									{(featureOrder || dropOn(f)) && (
-										<Grip
-											id={`feature-${f.id}`}
-											label={f.name || TYPE_LABEL[f.type]}
-											index={i}
-											count={featureOrder?.length ?? 0}
-											onMove={(from, to) =>
-												featureOrder &&
-												void reorderFeatures(
-													l.id,
-													moveItem(featureOrder, from, to),
-												)
-											}
-											cross={dropOn(f)}
-										/>
-									)}
-									<button
-										type="button"
-										class="plain feature-link"
-										onClick={() => goToFeature(f)}
+							{features.map((f, i) => {
+								const linked = f.layerId !== l.id;
+								const home = layersData.value.find((h) => h.id === f.layerId);
+								const homeEditable = !!home && home.canEdit && canEditMap.value;
+								return (
+									<li
+										key={f.id}
+										onMouseEnter={() => hoverFeature(f.id)}
+										onMouseLeave={() => hoverFeature(null)}
 									>
-										<Banner dye={f.color ?? l.color} />
-										<span class="type">{TYPE_LABEL[f.type]}</span>
-										<span class="feature-name">
-											{f.name || <em>unnamed</em>}
-										</span>
-										{f.owner && <PlayerHead player={f.owner} size={18} />}
-									</button>
-									{editable && (
-										<span class="feature-actions">
-											<button
-												type="button"
-												class="plain link"
-												onClick={() => {
-													editor.value = {
-														mode: "edit",
-														layerId: l.id,
-														featureId: f.id,
-													};
-												}}
-											>
-												edit
-											</button>
-											<button
-												type="button"
-												class="plain link"
-												onClick={async () => {
-													if (confirm(`Delete "${featureTitle(f)}"?`))
-														await deleteFeature(f.id);
-												}}
-											>
-												delete
-											</button>
-										</span>
-									)}
-								</li>
-							))}
+										{!linked && (featureOrder || dropOn(f)) && (
+											<Grip
+												id={`feature-${f.id}`}
+												label={f.name || TYPE_LABEL[f.type]}
+												index={i}
+												count={featureOrder?.length ?? 0}
+												onMove={(from, to) =>
+													featureOrder &&
+													void reorderFeatures(
+														l.id,
+														moveItem(featureOrder, from, to),
+													)
+												}
+												cross={dropOn(f)}
+											/>
+										)}
+										<button
+											type="button"
+											class="plain feature-link"
+											onClick={() => goToFeature(f)}
+										>
+											<Banner dye={f.color ?? home?.color ?? l.color} />
+											<span class="type">{TYPE_LABEL[f.type]}</span>
+											<span class="feature-name">
+												{f.name || <em>unnamed</em>}
+											</span>
+											{linked && (
+												<span
+													class="badge"
+													title={`Shown here from “${home?.name ?? "another layer"}”`}
+												>
+													↗
+												</span>
+											)}
+											{f.owner && <PlayerHead player={f.owner} size={18} />}
+										</button>
+										{(editable || homeEditable) && (
+											<span class="feature-actions">
+												{homeEditable && (
+													<button
+														type="button"
+														class="plain link"
+														onClick={() => {
+															editor.value = {
+																mode: "edit",
+																layerId: f.layerId,
+																featureId: f.id,
+															};
+														}}
+													>
+														edit
+													</button>
+												)}
+												{!linked && editable && (
+													<button
+														type="button"
+														class="plain link"
+														onClick={async () => {
+															if (confirm(`Delete "${featureTitle(f)}"?`))
+																await deleteFeature(f.id);
+														}}
+													>
+														delete
+													</button>
+												)}
+												{linked && editable && (
+													<button
+														type="button"
+														class="plain link"
+														title={`Stop showing it in “${l.name}”`}
+														onClick={() =>
+															void removeFeatureFromLayer(f.id, l.id)
+														}
+													>
+														remove
+													</button>
+												)}
+											</span>
+										)}
+									</li>
+								);
+							})}
 							{features.length === 0 && <li class="muted">No features yet.</li>}
 						</ul>
 					)}

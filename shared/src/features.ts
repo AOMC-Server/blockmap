@@ -7,6 +7,8 @@ export { MAX_NAME };
 export const MAX_POPUP = 2000;
 export const MAX_VERTICES = 2000;
 export const MAX_FEATURES_PER_LAYER = 5000;
+/** Most layers besides its home that one feature can be shown in. */
+export const MAX_ALSO_IN = 50;
 /** Live (not deleted) layers one user may have created; moderators are exempt. */
 export const MAX_LAYERS_PER_USER = 50;
 /** Largest JSON request body the server takes (uploads have their own limit). */
@@ -194,6 +196,16 @@ export function mergeStyle(
 	return { ...cleanStyle(base), ...cleanStyle(over) };
 }
 
+function alsoInList() {
+	return z.array(z.int().check(z.positive())).check(
+		z.maxLength(MAX_ALSO_IN),
+		z.refine(
+			(list) => new Set(list).size === list.length,
+			"a layer is listed twice",
+		),
+	);
+}
+
 const refKey = (r: PlayerRef) =>
 	typeof r === "number" ? `#${r}` : r.uuid.toLowerCase();
 
@@ -225,6 +237,13 @@ const common = {
 		.check(
 			z.describe("Dye colour; `null` (default) uses the colour of the layer"),
 		),
+	alsoIn: z
+		._default(alsoInList(), [])
+		.check(
+			z.describe(
+				`Ids of other layers of the same dimension to show the feature in as well (you must be able to edit them); at most ${MAX_ALSO_IN}, default none. The feature's own layer, its home, decides its colour and style`,
+			),
+		),
 	owner: z
 		._default(z.nullable(playerRefSchema), null)
 		.check(
@@ -236,7 +255,7 @@ const common = {
 		._default(builderList(), [])
 		.check(
 			z.describe(
-				`Players who helped build it, as player ids or \`{uuid, name}\`; at most ${MAX_BUILDERS}, default none. The owner is always added`,
+				`Players who helped build it, as player ids or \`{uuid, name}\`; at most ${MAX_BUILDERS}, default none`,
 			),
 		),
 };
@@ -331,6 +350,13 @@ export const featurePatchSchema = z.object({
 					"New geometry matching the feature's type; validated against it after the update",
 				),
 			),
+	),
+	alsoIn: z.optional(
+		alsoInList().check(
+			z.describe(
+				"New list of other layers to show the feature in, replacing the old one",
+			),
+		),
 	),
 	owner: z.optional(
 		z

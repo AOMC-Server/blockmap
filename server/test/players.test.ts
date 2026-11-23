@@ -295,9 +295,9 @@ describe("attribution", () => {
 		expect(created.status).toBe(201);
 		expect(created.body.feature).toMatchObject({
 			ownerId: notch.id,
-			builderIds: [notch.id, jeb.id],
+			builderIds: [jeb.id],
 			owner: notch,
-			builders: [notch, jeb],
+			builders: [jeb],
 		});
 		const id = created.body.feature.id;
 
@@ -314,7 +314,7 @@ describe("attribution", () => {
 			owner: jeb.id,
 			builders: [],
 		});
-		expect(moved.body.feature).toMatchObject({ owner: jeb, builders: [jeb] });
+		expect(moved.body.feature).toMatchObject({ owner: jeb, builders: [] });
 
 		const history = await call(t, null, "GET", `/api/features/${id}/history`);
 		expect(
@@ -351,10 +351,10 @@ describe("attribution", () => {
 		]);
 
 		const list = await call(t, null, "GET", "/api/players?q=j");
-		expect(list.body.players).toEqual([{ ...jeb, owned: 1, built: 1 }]);
+		expect(list.body.players).toEqual([{ ...jeb, owned: 1, built: 0 }]);
 	});
 
-	test("the owner is always a builder too", async () => {
+	test("the owner is not made a builder", async () => {
 		const t = await boot();
 		const notch = await addPlayer(t, NOTCH);
 		const jeb = await addPlayer(t, JEB);
@@ -366,33 +366,28 @@ describe("attribution", () => {
 			`/api/layers/${layer}/features`,
 			pin({ owner: notch.id, builders: [jeb.id] }),
 		);
-		expect(created.body.feature.builders).toEqual([notch, jeb]);
+		expect(created.body.feature).toMatchObject({
+			owner: notch,
+			builders: [jeb],
+		});
 		const id = created.body.feature.id;
 
-		// Already listed: not added twice.
-		const same = await call(t, t.editor, "PATCH", `/api/features/${id}`, {
-			builders: [jeb.id, notch.id],
+		// An owner who did build it can be listed as one too.
+		const both = await call(t, t.editor, "PATCH", `/api/features/${id}`, {
+			builders: [notch.id, jeb.id],
 		});
-		expect(same.body.feature.builderIds).toEqual([jeb.id, notch.id]);
+		expect(both.body.feature.builderIds).toEqual([notch.id, jeb.id]);
 
-		// A new owner joins the builders; the old one stays.
+		// Changing the owner leaves the builders alone.
 		const next = await call(t, t.editor, "PATCH", `/api/features/${id}`, {
 			owner: jeb.id,
 		});
-		expect(next.body.feature.builderIds).toEqual([jeb.id, notch.id]);
-
-		// Removing the owner from the list puts them back.
-		const removed = await call(t, t.editor, "PATCH", `/api/features/${id}`, {
-			builders: [],
-		});
-		expect(removed.body.feature.builderIds).toEqual([jeb.id]);
-
-		// No owner, no extra builder.
+		expect(next.body.feature.builderIds).toEqual([notch.id, jeb.id]);
 		const none = await call(t, t.editor, "PATCH", `/api/features/${id}`, {
 			owner: null,
-			builders: [notch.id],
+			builders: [],
 		});
-		expect(none.body.feature.builderIds).toEqual([notch.id]);
+		expect(none.body.feature).toMatchObject({ owner: null, builders: [] });
 	});
 
 	test("unknown player ids are refused", async () => {
@@ -466,7 +461,7 @@ describe("attribution", () => {
 		);
 		expect(exported.body[0]).toMatchObject({
 			owner: { uuid: NOTCH, name: "Notch" },
-			builders: [{ uuid: NOTCH, name: "Notch" }],
+			builders: [],
 		});
 
 		const target = await boot();

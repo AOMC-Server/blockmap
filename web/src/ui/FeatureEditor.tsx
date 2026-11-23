@@ -40,7 +40,7 @@ import {
 } from "../tools/draw";
 import { DyePicker } from "./DyePicker";
 import { Banner } from "./icons";
-import { LayerSelect } from "./LayerSelect";
+import { LayersPicker } from "./LayersPicker";
 import { BuildersPicker, OwnerPicker } from "./PlayerPicker";
 import { PointsList, ShapeStats } from "./PointsList";
 import { StyleControls } from "./StyleControls";
@@ -86,12 +86,9 @@ export function FeatureEditor() {
 			: undefined;
 
 	const shape = target?.mode === "create" ? target.shape : undefined;
-	// When editing, the layer the feature is going to; `layer` stays the one it is in now.
+	// The primary layer the feature is going to; `layer` stays the one it is in now.
 	const [destId, setDestId] = useState(target?.layerId);
-	const dest =
-		target?.mode === "edit"
-			? (layersData.value.find((l) => l.id === destId) ?? layer)
-			: layer;
+	const dest = layersData.value.find((l) => l.id === destId) ?? layer;
 
 	const [type, setType] = useState<FeatureType>(
 		existing?.type ?? shape?.type ?? "pin",
@@ -102,6 +99,7 @@ export function FeatureEditor() {
 	const [style, setStyle] = useState<FeatureStyle>(existing?.style ?? {});
 	const [owner, setOwner] = useState<Player | null>(existing?.owner ?? null);
 	const [builders, setBuilders] = useState<Player[]>(existing?.builders ?? []);
+	const [alsoIn, setAlsoIn] = useState<number[]>(existing?.alsoIn ?? []);
 	const [saving, setSaving] = useState(false);
 	// The revision the edit is based on; moves forward only when a conflict is reported.
 	const [baseRevision, setBaseRevision] = useState<number | undefined>(
@@ -143,10 +141,30 @@ export function FeatureEditor() {
 	const d = drawing.value;
 	const points = d?.points ?? [];
 	const ready = !!d && drawReady(d);
-	// A new feature can go to any layer that can take it.
-	const layers = layersData.value.filter(
-		(l) => l.canEdit && (l.id === layer.id || !isLayerFull(l)),
+	const homeId = dest?.id ?? layer.id;
+	// The layers that can be picked: ones that can be edited and have room, or are picked already.
+	const options = layersData.value.filter(
+		(l) =>
+			l.canEdit &&
+			(l.id === layer.id ||
+				l.id === homeId ||
+				alsoIn.includes(l.id) ||
+				!isLayerFull(l)),
 	);
+	const primaryOptions = options
+		.filter((l) => l.id === layer.id || !isLayerFull(l))
+		.map((l) => l.id);
+	// Layers the feature is shown in that cannot be picked here are kept as they are.
+	const otherNames = new Map(
+		alsoIn.flatMap((id) => {
+			const l = layersData.value.find((x) => x.id === id);
+			return l ? [[id, l.name] as const] : [];
+		}),
+	);
+	const pick = {
+		primary: homeId,
+		also: alsoIn.filter((id) => id !== homeId),
+	};
 	const moving = target.mode === "edit" && dest && dest.id !== layer.id;
 
 	const changeType = (next: FeatureType) => {
@@ -167,12 +185,13 @@ export function FeatureEditor() {
 			geometry: drawnGeometry(d),
 			owner: owner?.id ?? null,
 			builders: builders.map((b) => b.id),
+			alsoIn: alsoIn.filter((id) => id !== homeId),
 		} as FeatureInput;
 		setSaving(true);
 		let saved = false;
 		try {
 			if (target.mode === "create") {
-				saved = (await createFeature(layer.id, input)) !== null;
+				saved = (await createFeature(homeId, input)) !== null;
 			} else {
 				const out = await updateFeature(
 					target.featureId,
@@ -187,7 +206,7 @@ export function FeatureEditor() {
 			setSaving(false);
 		}
 		if (!saved) return;
-		const finalLayer = moving && dest ? dest : layer;
+		const finalLayer = dest ?? layer;
 		lastEditLayer.value = finalLayer.id;
 		if (finalLayer !== layer && isLayerHidden(finalLayer))
 			setLayersHidden([finalLayer], false);
@@ -268,21 +287,21 @@ export function FeatureEditor() {
 				</>
 			}
 		>
-			{layers.length > 1 ? (
+			{options.length > 1 || alsoIn.length > 0 ? (
 				<div class="field flow editor-layer-pick">
-					<span class="label">Layer</span>
-					<LayerSelect
-						options={layers}
-						value={dest?.id ?? layer.id}
-						onChange={(id) => {
-							const next = layers.find((l) => l.id === id);
-							if (!next) return;
-							if (target.mode === "edit") {
-								setDestId(next.id);
-								return;
-							}
-							if (isLayerHidden(next)) setLayersHidden([next], false);
-							editor.value = { ...target, layerId: next.id };
+					<span class="label">Layers</span>
+					<LayersPicker
+						options={options}
+						primaryOptions={primaryOptions}
+						otherNames={otherNames}
+						value={pick}
+						onChange={(next) => {
+							setAlsoIn(next.also);
+							if (next.primary === homeId) return;
+							setDestId(next.primary);
+							const to = layersData.value.find((l) => l.id === next.primary);
+							if (to && target.mode === "create" && isLayerHidden(to))
+								setLayersHidden([to], false);
 						}}
 					/>
 				</div>
@@ -412,7 +431,7 @@ export function FeatureEditor() {
 						({builders.length}/{MAX_BUILDERS})
 					</small>
 				</span>
-				<BuildersPicker value={builders} owner={owner} onChange={setBuilders} />
+				<BuildersPicker value={builders} onChange={setBuilders} />
 			</div>
 
 			{type !== "pin" && (

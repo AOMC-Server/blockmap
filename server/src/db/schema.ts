@@ -283,6 +283,26 @@ export const features = sqliteTable(
 	(t) => [index("features_layer_order").on(t.layerId, t.sortOrder)],
 );
 
+/**
+ * The layers besides its home that a feature is shown in now; kept in step with the features'
+ * latest revisions by insertRevision.
+ */
+export const featureLayers = sqliteTable(
+	"feature_layers",
+	{
+		featureId: integer("feature_id")
+			.notNull()
+			.references(() => features.id, { onDelete: "cascade" }),
+		layerId: integer("layer_id")
+			.notNull()
+			.references(() => layers.id, { onDelete: "cascade" }),
+	},
+	(t) => [
+		primaryKey({ columns: [t.featureId, t.layerId] }),
+		index("feature_layers_layer").on(t.layerId),
+	],
+);
+
 export const featureRevisions = sqliteTable(
 	"feature_revisions",
 	{
@@ -306,6 +326,11 @@ export const featureRevisions = sqliteTable(
 		/** How a line or an area is drawn; null: the defaults. */
 		style: text("style", { mode: "json" }).$type<FeatureStyle>(),
 		geometry: text("geometry", { mode: "json" }).notNull(),
+		/** The other layers the feature is shown in, as of this revision; `layer_id` is its home. */
+		alsoIn: text("also_in", { mode: "json" })
+			.$type<number[]>()
+			.notNull()
+			.default([]),
 		/** The player who owns the build or land, as of this revision. */
 		ownerId: integer("owner_player_id").references(() => players.id),
 		/** Ids of the other players who built it. */

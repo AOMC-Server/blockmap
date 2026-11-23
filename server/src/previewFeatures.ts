@@ -77,11 +77,39 @@ export function loadOverlayLayers(
 		rows.map((l) => l.id),
 		at,
 	);
-	return rows.map((l) => ({
-		color: l.color,
-		style: l.style,
-		features: byLayer.get(l.id) ?? [],
-	}));
+	// A feature shown in several layers is drawn once, in the style of its own layer when that
+	// is a public one, otherwise of the first layer it turns up in.
+	const owners = new Map(
+		db
+			.select()
+			.from(layers)
+			.where(
+				and(
+					eq(layers.dimensionId, dimensionId),
+					eq(layers.visibility, "public"),
+					layerLiveAt(at),
+				),
+			)
+			.all()
+			.map((l) => [l.id, l]),
+	);
+	const seen = new Set<number>();
+	const drawn = new Map<number, OverlayLayer["features"]>();
+	for (const l of rows)
+		for (const feature of byLayer.get(l.id) ?? []) {
+			if (seen.has(feature.id)) continue;
+			seen.add(feature.id);
+			const owner = owners.get(feature.layerId) ?? l;
+			drawn.set(owner.id, [...(drawn.get(owner.id) ?? []), feature]);
+		}
+	return [...owners.values()]
+		.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+		.filter((l) => drawn.has(l.id))
+		.map((l) => ({
+			color: l.color,
+			style: l.style,
+			features: drawn.get(l.id) ?? [],
+		}));
 }
 
 const f = (n: number) => String(Math.round(n * 10) / 10);

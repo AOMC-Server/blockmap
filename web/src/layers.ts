@@ -69,6 +69,22 @@ export async function createFeature(layerId: number, input: FeatureInput) {
 	return out?.feature ?? null;
 }
 
+export function addFeatureToLayer(featureId: number, layerId: number) {
+	return mutate(() =>
+		api.api.features[":id"].layers[":layerId"].$put({
+			param: { id: String(featureId), layerId: String(layerId) },
+		}),
+	);
+}
+
+export function removeFeatureFromLayer(featureId: number, layerId: number) {
+	return mutateOk(() =>
+		api.api.features[":id"].layers[":layerId"].$delete({
+			param: { id: String(featureId), layerId: String(layerId) },
+		}),
+	);
+}
+
 export type FeatureUpdate =
 	| { saved: true }
 	| { saved: false; conflict: { revisionId: number } | null };
@@ -126,7 +142,8 @@ export async function moveFeature(
 		const ids =
 			layersData.value
 				.find((l) => l.id === layerId)
-				?.features.map((f) => f.id) ?? [];
+				?.features.filter((f) => f.layerId === layerId)
+				.map((f) => f.id) ?? [];
 		const last = ids.indexOf(id);
 		if (last >= 0 && index < last)
 			await reorderFeatures(layerId, moveItem(ids, last, index));
@@ -178,8 +195,13 @@ export async function reorderLayers(ids: number[]) {
 export async function reorderFeatures(layerId: number, ids: number[]) {
 	layersData.value = layersData.value.map((l) => {
 		if (l.id !== layerId) return l;
-		const byId = new Map(l.features.map((f) => [f.id, f]));
-		return { ...l, features: ids.flatMap((id) => byId.get(id) ?? []) };
+		const home = l.features.filter((f) => f.layerId === layerId);
+		const linked = l.features.filter((f) => f.layerId !== layerId);
+		const byId = new Map(home.map((f) => [f.id, f]));
+		return {
+			...l,
+			features: [...ids.flatMap((id) => byId.get(id) ?? []), ...linked],
+		};
 	});
 	const out = await run(() =>
 		api.api.layers[":id"].features.reorder.$post({

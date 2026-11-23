@@ -169,26 +169,19 @@ function PlayerSearch(props: {
 	);
 }
 
-function PlayerChip(props: {
-	player: Player;
-	/** Without it the chip cannot be removed. */
-	onRemove?: () => void;
-	title?: string;
-}) {
+function PlayerChip(props: { player: Player; onRemove: () => void }) {
 	return (
-		<span class="chip player-chip" title={props.title}>
+		<span class="chip player-chip">
 			<PlayerHead player={props.player} size={18} />
 			<span class="player-chip-name">{props.player.name}</span>
-			{props.onRemove && (
-				<button
-					type="button"
-					class="plain player-chip-remove"
-					aria-label={`Remove ${props.player.name}`}
-					onClick={props.onRemove}
-				>
-					×
-				</button>
-			)}
+			<button
+				type="button"
+				class="plain player-chip-remove"
+				aria-label={`Remove ${props.player.name}`}
+				onClick={props.onRemove}
+			>
+				×
+			</button>
 		</span>
 	);
 }
@@ -211,13 +204,9 @@ export function OwnerPicker(props: {
 	);
 }
 
-/**
- * Picks the builders of a feature: any number of players, up to `MAX_BUILDERS`. The owner is
- * always one of them, so their chip stays until they are no longer the owner.
- */
+/** Picks the builders of a feature: any number of players, up to `MAX_BUILDERS`. */
 export function BuildersPicker(props: {
 	value: Player[];
-	owner: Player | null;
 	onChange: (players: Player[]) => void;
 }) {
 	const { value } = props;
@@ -230,15 +219,8 @@ export function BuildersPicker(props: {
 						<PlayerChip
 							key={p.id}
 							player={p}
-							title={
-								p.id === props.owner?.id
-									? "The owner is always a builder"
-									: undefined
-							}
-							onRemove={
-								p.id === props.owner?.id
-									? undefined
-									: () => props.onChange(value.filter((b) => b.id !== p.id))
+							onRemove={() =>
+								props.onChange(value.filter((b) => b.id !== p.id))
 							}
 						/>
 					))}

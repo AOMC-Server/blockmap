@@ -8,6 +8,7 @@ import { loadLayers } from "./layers";
 import { boundsOf } from "./map/geometry";
 import { MapView } from "./map/MapView";
 import type { TileLookup } from "./map/tileLayer";
+import { buildRenderLayers } from "./renderLayers";
 import {
 	loadPosition,
 	mapOutlineScales,
@@ -207,7 +208,14 @@ export function revealLayer(layerId: number) {
 export function goToFeature(f: FeatureData) {
 	const mv = mapView.value;
 	if (!mv) return;
-	revealLayer(f.layerId);
+	const layers = layersData.value;
+	const listing = layers.filter((l) => l.features.some((x) => x.id === f.id));
+	if (!listing.some((l) => !isLayerHidden(l)))
+		revealLayer(
+			listing.find((l) => l.id === f.layerId)?.id ??
+				listing[0]?.id ??
+				f.layerId,
+		);
 	mv.fitBounds(boundsOf(pointsOf(f)), { padding: 140 });
 	openFeaturePopup(f);
 }
@@ -391,16 +399,7 @@ export async function boot(container: HTMLElement) {
 
 	// Draw the layers the user has switched on.
 	effect(() => {
-		mv.setFeatures(
-			layersData.value
-				.filter((l) => !isLayerHidden(l))
-				.map((l) => ({
-					id: l.id,
-					color: l.color,
-					style: l.style,
-					features: l.features,
-				})),
-		);
+		mv.setFeatures(buildRenderLayers(layersData.value, isLayerHidden));
 	});
 
 	let urlTimer: ReturnType<typeof setTimeout> | undefined;

@@ -11,7 +11,14 @@ import { z } from "zod";
 import { announceLayers } from "../announce";
 import { requireUser, userOf } from "../auth/session";
 import type { Db } from "../db/client";
-import { featureRevisions, features, layers, users } from "../db/schema";
+import {
+	featureLayers,
+	featureRevisions,
+	features,
+	layers,
+	users,
+} from "../db/schema";
+import { checkLinkChange, firstFullLayer, liveLayerIds } from "../featureLinks";
 import {
 	attributionOf,
 	contentOf,
@@ -48,7 +55,20 @@ async function loadFeatureAccess(
 		.where(eq(features.id, featureId));
 	if (!feature) return null;
 	const found = await loadLayerAccess(db, actor, role, feature.layerId);
-	return found && { feature, ...found };
+	if (found) return { feature, ...found, viaLink: false };
+	// Its home may be one the actor cannot see; the feature is still theirs to look at if it is
+	// shown in a layer they can, but it is not theirs to edit.
+	if (liveLayerIds(db, [feature.layerId]).length === 0) return null;
+	const links = db
+		.select({ layerId: featureLayers.layerId })
+		.from(featureLayers)
+		.where(eq(featureLayers.featureId, feature.id))
+		.all();
+	for (const { layerId } of links) {
+		const via = await loadLayerAccess(db, actor, role, layerId);
+		if (via) return { feature, ...via, viaLink: true };
+	}
+	return null;
 }
 
 const layerIsLive = (db: Pick<Db, "select">, id: number) =>
@@ -69,6 +89,7 @@ async function viewable(v: Vars, id: string | undefined) {
 async function editable(v: Vars, id: string | undefined) {
 	const found = await viewable(v, id);
 	if (found === 404) return found;
+	if (found.viaLink) return 403;
 	return canEditLayer(v.role, found.layer, found.layerRole) ? found : 403;
 }
 
@@ -98,6 +119,19 @@ export const featureRoutes = new Hono<AppEnv>()
 			const { baseRevisionId, layerId, ...patch } = c.req.valid("json");
 			const toLayerId = layerId ?? found.feature.layerId;
 			const moving = toLayerId !== found.feature.layerId;
+			const before = latestRevision(db, found.feature.id)?.alsoIn ?? [];
+			if (patch.alsoIn !== undefined) {
+				const failed = await checkLinkChange(
+					db,
+					c.var.user,
+					c.var.role,
+					found.layer.dimensionId,
+					before,
+					patch.alsoIn,
+					[found.feature.layerId, toLayerId],
+				);
+				if (failed) return c.json({ error: failed.error }, failed.status);
+			}
 			if (moving) {
 				const target = await loadLayerAccess(
 					db,
@@ -125,7 +159,16 @@ export const featureRoutes = new Hono<AppEnv>()
 						liveFeatureCount(tx, toLayerId) >= MAX_FEATURES_PER_LAYER)
 				)
 					return { status: 422 } as const;
+				// The layer it moves to is its home now, not one of the others.
+				const alsoIn = liveLayerIds(tx, patch.alsoIn ?? current.alsoIn).filter(
+					(id) => id !== toLayerId,
+				);
+				const added = alsoIn.filter(
+					(id) => !current.alsoIn.includes(id) && id !== found.feature.layerId,
+				);
+				if (firstFullLayer(tx, added) !== null) return { status: 422 } as const;
 				const merged = featureInputSchema.safeParse({
+					alsoIn,
 					type: patch.type ?? current.type,
 					name: patch.name ?? current.name,
 					popup: patch.popup ?? current.popup,
@@ -212,6 +255,120 @@ export const featureRoutes = new Hono<AppEnv>()
 			if (!deleted) return c.json({ error: "not found" }, 404);
 			announceLayers(c, found.layer.dimensionId);
 			return c.json({ ok: true });
+		},
+	)
+	.put(
+		"/:id/layers/:layerId",
+		doc({
+			tag: "Features",
+			summary: "Show a feature in another layer",
+			description: `Anyone who may see the feature and edit the layer. The feature keeps its own layer (its home), which decides its colour and style; it is shown in this one as well. The layer must be in the feature's dimension. Answers 200 if it was already shown there, 409 if the layer holds ${MAX_FEATURES_PER_LAYER} features.`,
+			params: { id: "Feature id", layerId: "Id of the layer to show it in" },
+			ok: { 200: "Already shown there", 201: "Added" },
+			fails: [400, 403, 404, 409, 429],
+			login: true,
+		}),
+		requireUser,
+		async (c) => {
+			const { db } = c.var;
+			const user = userOf(c);
+			const found = await viewable(c.var, c.req.param("id"));
+			if (typeof found === "number")
+				return c.json({ error: failure[found] }, found);
+			const layerId = parseId(c.req.param("layerId"));
+			if (layerId === found.feature.layerId)
+				return c.json({ error: "that is the feature's own layer" }, 400);
+			const failed = await checkLinkChange(
+				db,
+				c.var.user,
+				c.var.role,
+				found.layer.dimensionId,
+				[],
+				[layerId],
+				[],
+			);
+			if (failed) return c.json({ error: failed.error }, failed.status);
+
+			const out = db.transaction((tx) => {
+				const current = latestRevision(tx, found.feature.id);
+				if (!current || current.deleted) return { status: 404 } as const;
+				if (current.alsoIn.includes(layerId))
+					return { status: 200, row: current } as const;
+				if (firstFullLayer(tx, [layerId]) !== null)
+					return { status: 409 } as const;
+				return {
+					status: 201,
+					row: insertRevision(tx, found.feature, user.id, {
+						...contentOf(current),
+						alsoIn: [...liveLayerIds(tx, current.alsoIn), layerId],
+					}),
+				} as const;
+			});
+			if (out.status === 404) return c.json({ error: "not found" }, 404);
+			if (out.status === 409) return c.json({ error: "layer is full" }, 409);
+			if (out.status === 201) announceLayers(c, found.layer.dimensionId);
+			return c.json(
+				{ feature: viewOf(db, found.feature, out.row) },
+				out.status,
+			);
+		},
+	)
+	.delete(
+		"/:id/layers/:layerId",
+		doc({
+			tag: "Features",
+			summary: "Stop showing a feature in a layer",
+			description:
+				"Anyone who may see the feature and edit the layer. Only for layers the feature is shown in besides its own (400 for its own layer: delete the feature instead); 404 if it is not shown there.",
+			params: {
+				id: "Feature id",
+				layerId: "Id of the layer to take it out of",
+			},
+			fails: [400, 403, 404, 429],
+			login: true,
+		}),
+		requireUser,
+		async (c) => {
+			const { db } = c.var;
+			const user = userOf(c);
+			const found = await viewable(c.var, c.req.param("id"));
+			if (typeof found === "number")
+				return c.json({ error: failure[found] }, found);
+			const layerId = parseId(c.req.param("layerId"));
+			if (layerId === found.feature.layerId)
+				return c.json(
+					{
+						error:
+							"that is the feature's own layer, delete the feature instead",
+					},
+					400,
+				);
+			const failed = await checkLinkChange(
+				db,
+				c.var.user,
+				c.var.role,
+				found.layer.dimensionId,
+				[layerId],
+				[],
+				[],
+			);
+			if (failed) return c.json({ error: failed.error }, failed.status);
+
+			const row = db.transaction((tx) => {
+				const current = latestRevision(tx, found.feature.id);
+				if (!current || current.deleted || !current.alsoIn.includes(layerId))
+					return null;
+				return insertRevision(tx, found.feature, user.id, {
+					...contentOf(current),
+					alsoIn: liveLayerIds(
+						tx,
+						current.alsoIn.filter((id) => id !== layerId),
+					),
+				});
+			});
+			if (!row) return c.json({ error: "not found" }, 404);
+			announceLayers(c, found.layer.dimensionId);
+			return c.json({ feature: viewOf(db, found.feature, row) });
 		},
 	)
 	.get(
@@ -329,6 +486,7 @@ export const featureRoutes = new Hono<AppEnv>()
 					user.id,
 					{
 						...contentOf(old),
+						alsoIn: liveLayerIds(tx, old.alsoIn).filter((id) => id !== dest),
 						deleted: old.deleted,
 					},
 				);

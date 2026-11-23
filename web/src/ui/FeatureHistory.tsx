@@ -3,6 +3,7 @@ import { formatTime } from "@aomc-server/block-ui/format";
 import { signal } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { dyeLabel, pointsOf, TYPE_LABEL } from "../featureInfo";
+import { alsoInChange } from "../featureLayers";
 import { type AttributionChange, attributionChange } from "../players";
 import {
 	type FeatureHistoryEntry,
@@ -39,6 +40,21 @@ function moved(e: FeatureHistoryEntry, older: FeatureHistoryEntry | undefined) {
 	// Names of layers the user cannot see are not known to the client.
 	const name = layersData.value.find((l) => l.id === e.layerId)?.name;
 	return name ? `Moved to ${name}` : "Moved to another layer";
+}
+
+/** "Added to …" / "Removed from …" lines for the layers an entry changed. */
+function layerNotes(
+	e: FeatureHistoryEntry,
+	older: FeatureHistoryEntry | undefined,
+) {
+	const change = alsoInChange(older?.alsoIn, e.alsoIn);
+	if (!change) return [];
+	const name = (id: number) =>
+		`“${layersData.value.find((l) => l.id === id)?.name ?? "another layer"}”`;
+	return [
+		...change.added.map((id) => `Added to ${name(id)}`),
+		...change.removed.map((id) => `Removed from ${name(id)}`),
+	];
 }
 
 function PlayerName(props: { player: { id: number; name: string } }) {
@@ -171,6 +187,11 @@ export function FeatureHistory() {
 							{moved(e, entries[i + 1]) && (
 								<div class="muted">{moved(e, entries[i + 1])}</div>
 							)}
+							{layerNotes(e, entries[i + 1]).map((note) => (
+								<div key={note} class="muted">
+									{note}
+								</div>
+							))}
 							<div class="muted">{summary(e)}</div>
 							{attributionNote(i)}
 							<div class="muted">

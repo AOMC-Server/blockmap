@@ -17,6 +17,7 @@ import { requireUser, userOf } from "../auth/session";
 import type { Db } from "../db/client";
 import { features, layerMembers, layers } from "../db/schema";
 import { dimensionBySlug } from "../dimensionLookup";
+import { checkLinkChange, firstFullLayer } from "../featureLinks";
 import {
 	contentOf,
 	featuresOfLayers,
@@ -347,7 +348,8 @@ export const layerRoutes = new Hono<AppEnv>()
 		doc({
 			tag: "Layers",
 			summary: "Delete a layer",
-			description: "The creator or a moderator.",
+			description:
+				"The creator or a moderator, but only moderators may delete a layer that has features in it. Features that have it as their own layer are deleted with it; features that are only shown in it stay where they are.",
 			params: { id: "Layer id" },
 			fails: [403, 404, 429],
 			login: true,
@@ -360,6 +362,11 @@ export const layerRoutes = new Hono<AppEnv>()
 			if (!found) return c.json({ error: "not found" }, 404);
 			if (!canManageLayer(user, c.var.role, found.layer))
 				return c.json({ error: "forbidden" }, 403);
+			if (!canModerate(c.var.role) && liveFeatureCount(db, found.layer.id) > 0)
+				return c.json(
+					{ error: "only moderators can delete a layer that has features" },
+					403,
+				);
 			await db
 				.update(layers)
 				.set({ deletedAt: Date.now() })
@@ -391,10 +398,22 @@ export const layerRoutes = new Hono<AppEnv>()
 
 			const content = c.req.valid("json");
 			const layerId = found.layer.id;
+			const alsoIn = content.alsoIn.filter((id) => id !== layerId);
+			const failed = await checkLinkChange(
+				db,
+				c.var.user,
+				c.var.role,
+				found.layer.dimensionId,
+				[],
+				alsoIn,
+				[],
+			);
+			if (failed) return c.json({ error: failed.error }, failed.status);
 			const view = db.transaction((tx) => {
 				if (!layerIsLive(tx, layerId)) return "gone";
 				if (liveFeatureCount(tx, layerId) >= MAX_FEATURES_PER_LAYER)
 					return "full";
+				if (firstFullLayer(tx, alsoIn) !== null) return "full";
 				const resolved = resolveContent(tx, content, user.id);
 				if ("unknownPlayer" in resolved) return "no player";
 				return insertFeature(
@@ -419,7 +438,7 @@ export const layerRoutes = new Hono<AppEnv>()
 			tag: "Layers",
 			summary: "Reorder the features of a layer",
 			description:
-				"Anyone who may edit the layer. `ids` must contain all current feature ids of the layer in their new order; answers 409 if the list is out of date.",
+				"Anyone who may edit the layer. `ids` must contain the ids of all the features that have this layer as their own, in their new order; features that are only shown in it come after them and cannot be moved. Answers 409 if the list is out of date.",
 			params: { id: "Layer id" },
 			fails: [400, 403, 404, 409, 429],
 			login: true,
@@ -535,14 +554,27 @@ export const layerRoutes = new Hono<AppEnv>()
 				if (playersById(tx, ids).size !== new Set(ids).size) return "no player";
 
 				for (const f of existing) {
-					insertRevision(tx, f, user.id, {
-						...contentOf(f),
-						deleted: true,
-					});
+					// Features that are only shown here stay where they are.
+					insertRevision(
+						tx,
+						f,
+						user.id,
+						f.layerId === layerId
+							? { ...contentOf(f), deleted: true }
+							: {
+									...contentOf(f),
+									alsoIn: f.alsoIn.filter((id) => id !== layerId),
+								},
+					);
 				}
 				let order = nextFeatureOrder(tx, layerId);
 				for (const item of items) {
-					const resolved = resolveContent(tx, item, user.id);
+					const resolved = resolveContent(
+						tx,
+						// Layer ids in a file belong to the map it came from.
+						{ ...item, alsoIn: [] },
+						user.id,
+					);
 					// Checked above, so this cannot happen.
 					if ("unknownPlayer" in resolved) throw new Error("unknown player");
 					insertFeature(tx, layerId, order++, user.id, resolved);
