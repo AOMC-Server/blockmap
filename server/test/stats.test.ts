@@ -393,4 +393,24 @@ describe("stats", () => {
 			totalBlocks: T * T,
 		});
 	});
+
+	test("the short ranges cover three days and one day", async () => {
+		const t = await bootTiles();
+		await upload(t, await solid(T, T, RED), 0, 0);
+		for (const [range, days] of [
+			["3d", 3],
+			["1d", 1],
+		] as const) {
+			const res = await stats(t, null, range);
+			expect(res.status).toBe(200);
+			expect(res.body.range).toBe(range);
+			expect(Date.now() - res.body.since).toBeGreaterThan(
+				days * 24 * 3600_000 - 5000,
+			);
+			expect(Date.now() - res.body.since).toBeLessThan(
+				days * 24 * 3600_000 + 5000,
+			);
+			expect(res.body.areaHistory.at(-1).totalBlocks).toBe(T * T);
+		}
+	});
 });

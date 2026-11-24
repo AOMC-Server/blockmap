@@ -20,6 +20,8 @@ const RANGE_DAYS: Record<StatsRange, number | null> = {
 	all: null,
 	"30d": 30,
 	"7d": 7,
+	"3d": 3,
+	"1d": 1,
 };
 
 export type UserStats = {
@@ -421,7 +423,7 @@ export const statsRoutes = new Hono<AppEnv>().get(
 		tag: "Stats",
 		summary: "Contribution statistics and leaderboard",
 		description:
-			"Public. `me` is your own activity (null when not logged in) and includes private layers; `leaderboard` and `totals` (everyone combined) only count public layers and are reused for a minute. `modUploads`, `modUploadedBlocks` (volume, repeats counted) and `modAreaTiles`/`modAreaBlocks` (distinct ground) are the part sent by the in-game mod (AOMC Webmapper, or whatever `MOD_USER_AGENTS` lists); it is also counted in the other numbers. `areaHistory` is the mapped area over time, for the whole map and for you, by the date the uploaded data was exported. `featureHistory` is how many features there were over time (`total` on public layers, `mine` including your private ones, and `pin`/`line`/`polygon` of the total), by when they were created; features that were deleted since, or whose layer was, are not counted. Both histories have about 250 steps whatever the range (the time each covers divided into whole minutes, so the features, being newer, get finer steps than the area). `range` is `all` (default), `30d` or `7d`.",
+			"Public. `me` is your own activity (null when not logged in) and includes private layers; `leaderboard` and `totals` (everyone combined) only count public layers and are reused for a minute. `modUploads`, `modUploadedBlocks` (volume, repeats counted) and `modAreaTiles`/`modAreaBlocks` (distinct ground) are the part sent by the in-game mod (AOMC Webmapper, or whatever `MOD_USER_AGENTS` lists); it is also counted in the other numbers. `areaHistory` is the mapped area over time, for the whole map and for you, by the date the uploaded data was exported. `featureHistory` is how many features there were over time (`total` on public layers, `mine` including your private ones, and `pin`/`line`/`polygon` of the total), by when they were created; features that were deleted since, or whose layer was, are not counted. Both histories have about 250 steps whatever the range (the time each covers divided into whole minutes, so the features, being newer, get finer steps than the area). `range` is `all` (default), `30d`, `7d`, `3d` or `1d`.",
 		fails: [400],
 	}),
 	validate("query", statsQuerySchema),

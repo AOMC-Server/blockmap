@@ -30,6 +30,8 @@ const RANGE_NAMES: Record<StatsRange, string> = {
 	all: "All time",
 	"30d": "30 days",
 	"7d": "7 days",
+	"3d": "3 days",
+	"1d": "1 day",
 };
 
 type Column = {
@@ -194,6 +196,7 @@ function HistoryChart(props: {
 			series={series}
 			formatY={formatY}
 			ariaLabel={ariaLabel}
+			fit
 			formatX={(t) =>
 				new Date(t).toLocaleString(
 					undefined,

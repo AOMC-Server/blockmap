@@ -337,7 +337,7 @@ export const createTokenSchema = z.object({
 		),
 });
 
-export const STATS_RANGES = ["all", "30d", "7d"] as const;
+export const STATS_RANGES = ["all", "30d", "7d", "3d", "1d"] as const;
 export type StatsRange = (typeof STATS_RANGES)[number];
 
 export const statsQuerySchema = z.object({
