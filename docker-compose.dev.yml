@@ -42,7 +42,7 @@ services:
 
   web:
     <<: *dev
-    command: ["bun", "run", "--cwd", "web", "dev", "--host", "0.0.0.0", "--port", "3000", "--strictPort"]
+    command: bun run --cwd web dev --host 0.0.0.0 --port 3000 --strictPort
     depends_on:
       install:
         condition: service_completed_successfully
