@@ -122,6 +122,9 @@ describe("stats", () => {
 			myBlocks: T * T,
 		});
 		expect(last.totalBlocks).toBe(all.body.totals.areaBlocks);
+		// A fixed number of steps, however long the history is (40 days here).
+		expect(all.body.areaHistory.length).toBeGreaterThan(200);
+		expect(all.body.areaHistory.length).toBeLessThanOrEqual(260);
 		expect(last.myBlocks).toBe(all.body.me.areaBlocks);
 		const values = all.body.areaHistory.map(
 			(p: { totalBlocks: number }) => p.totalBlocks,

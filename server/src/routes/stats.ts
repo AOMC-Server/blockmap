@@ -2,7 +2,6 @@ import {
 	DAY,
 	FEATURE_TYPES,
 	type FeatureType,
-	HOUR,
 	MINUTE,
 	type StatsRange,
 	statsQuerySchema,
@@ -326,6 +325,8 @@ type Everyone = {
 		avatarUrl: string | null;
 	})[];
 	totals: UserStats;
+	/** Length of a step of the history charts, in ms. */
+	bucket: number;
 	firstUploads: FirstUploads;
 	features: FeatureRow[];
 };
@@ -363,6 +364,7 @@ function everyone(
 				.where(inArray(users.id, ids))
 				.all()
 		: [];
+	const bucket = bucketOf(db, since, now);
 	const fresh: Everyone = {
 		at: now,
 		since,
@@ -373,15 +375,33 @@ function everyone(
 			...(all.get(p.id) as UserStats),
 		})),
 		totals: totalsOf(db, scope, [...all.values()]),
-		firstUploads: firstUploads(db, bucketOf(range)),
-		features: featureRows(db, bucketOf(range), true),
+		bucket,
+		firstUploads: firstUploads(db, bucket),
+		features: featureRows(db, bucket, true),
 	};
 	cache.set(key, fresh);
 	return fresh;
 }
 
-/** The week is drawn in 6 hour steps, everything longer in days. */
-const bucketOf = (range: StatsRange) => (range === "7d" ? 6 * HOUR : DAY);
+/** About how many steps the history charts have, whatever the time they cover. */
+const HISTORY_STEPS = 250;
+
+/**
+ * The length of a step: the time shown (the range, or everything since the first upload or
+ * feature) over `HISTORY_STEPS`, in whole minutes.
+ */
+function bucketOf(db: Db, since: number | null, now: number) {
+	let from = since;
+	if (from === null) {
+		const [first] = db.all<{ t: number | null }>(sql`
+			SELECT MIN(t) AS t FROM (
+				SELECT MIN(COALESCE(r.exported_at, r.created_at)) AS t FROM revisions r WHERE ${DONE_UPLOAD}
+				UNION ALL SELECT MIN(created_at) FROM feature_revisions
+			)`);
+		from = first?.t ?? now;
+	}
+	return Math.max(1, Math.ceil((now - from) / HISTORY_STEPS / MINUTE)) * MINUTE;
+}
 
 export const statsRoutes = new Hono<AppEnv>().get(
 	"/",
@@ -389,7 +409,7 @@ export const statsRoutes = new Hono<AppEnv>().get(
 		tag: "Stats",
 		summary: "Contribution statistics and leaderboard",
 		description:
-			"Public. `me` is your own activity (null when not logged in) and includes private layers; `leaderboard` and `totals` (everyone combined) only count public layers and are reused for a minute. `modUploads`, `modUploadedBlocks` (volume, repeats counted) and `modAreaTiles`/`modAreaBlocks` (distinct ground) are the part sent by the in-game mod (AOMC Webmapper, or whatever `MOD_USER_AGENTS` lists); it is also counted in the other numbers. `areaHistory` is the mapped area over time, for the whole map and for you, by the date the uploaded data was exported. `featureHistory` is how many features there were over time (`total` on public layers, `mine` including your private ones, and `pin`/`line`/`polygon` of the total), by when they were created; features that were deleted since, or whose layer was, are not counted. `range` is `all` (default), `30d` or `7d`.",
+			"Public. `me` is your own activity (null when not logged in) and includes private layers; `leaderboard` and `totals` (everyone combined) only count public layers and are reused for a minute. `modUploads`, `modUploadedBlocks` (volume, repeats counted) and `modAreaTiles`/`modAreaBlocks` (distinct ground) are the part sent by the in-game mod (AOMC Webmapper, or whatever `MOD_USER_AGENTS` lists); it is also counted in the other numbers. `areaHistory` is the mapped area over time, for the whole map and for you, by the date the uploaded data was exported. `featureHistory` is how many features there were over time (`total` on public layers, `mine` including your private ones, and `pin`/`line`/`polygon` of the total), by when they were created; features that were deleted since, or whose layer was, are not counted. Both histories have about 250 steps whatever the range (the time shown divided into whole minutes). `range` is `all` (default), `30d` or `7d`.",
 		fails: [400],
 	}),
 	validate("query", statsQuerySchema),
@@ -417,18 +437,18 @@ export const statsRoutes = new Hono<AppEnv>().get(
 			totals: shared.totals,
 			areaHistory: areaHistory(
 				shared.firstUploads,
-				user ? firstUploads(db, bucketOf(range), user.id) : null,
+				user ? firstUploads(db, shared.bucket, user.id) : null,
 				since,
 				now,
-				bucketOf(range),
+				shared.bucket,
 				map.tileSize,
 			),
 			featureHistory: featureHistory(
 				shared.features,
-				user ? featureRows(db, bucketOf(range), false, user.id) : null,
+				user ? featureRows(db, shared.bucket, false, user.id) : null,
 				since,
 				now,
-				bucketOf(range),
+				shared.bucket,
 			),
 		});
 	},
