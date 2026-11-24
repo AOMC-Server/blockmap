@@ -122,6 +122,14 @@ describe("stats", () => {
 			myBlocks: T * T,
 		});
 		expect(last.totalBlocks).toBe(all.body.totals.areaBlocks);
+		// The tile uploaded again counts every time in the uploaded area.
+		const uploaded = all.body.uploadedHistory.at(-1);
+		expect(uploaded).toMatchObject({
+			totalBlocks: 3 * T * T,
+			myBlocks: 2 * T * T,
+		});
+		expect(uploaded.totalBlocks).toBe(all.body.totals.uploadedBlocks);
+		expect(uploaded.myBlocks).toBe(all.body.me.uploadedBlocks);
 		// A fixed number of steps, however long the history is (40 days here).
 		expect(all.body.areaHistory.length).toBeGreaterThan(200);
 		expect(all.body.areaHistory.length).toBeLessThanOrEqual(260);

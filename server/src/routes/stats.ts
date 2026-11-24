@@ -203,6 +203,18 @@ function firstUploads(db: Db, bucket: number, userId?: string): FirstUploads {
 }
 
 /**
+ * How many tiles were uploaded in each period, repeats of the same tile included, dated like
+ * `firstUploads`; optionally by one user.
+ */
+function uploadedTiles(db: Db, bucket: number, userId?: string): FirstUploads {
+	return db.all<{ t: number; n: number }>(sql`
+		SELECT (COALESCE(r.exported_at, r.created_at) / ${bucket}) * ${bucket} AS t, COUNT(*) AS n
+		FROM revisions r JOIN upload_patches p ON p.revision_id = r.id
+		WHERE ${DONE_UPLOAD} ${userId ? sql`AND r.author_id = ${userId}` : sql``}
+		GROUP BY 1 ORDER BY 1`);
+}
+
+/**
  * Running totals of things counted per period (`rows`, each series by period start), on one time
  * grid that starts where the first series does (or when the range began). Each series starts from
  * what was already there when the range began. Null when the first series is empty.
@@ -335,6 +347,7 @@ type Everyone = {
 	areaBucket: number;
 	featureBucket: number;
 	firstUploads: FirstUploads;
+	uploaded: FirstUploads;
 	features: FeatureRow[];
 };
 
@@ -395,6 +408,7 @@ function everyone(
 		areaBucket,
 		featureBucket,
 		firstUploads: firstUploads(db, areaBucket),
+		uploaded: uploadedTiles(db, areaBucket),
 		features: featureRows(db, featureBucket, true),
 	};
 	cache.set(key, fresh);
@@ -423,7 +437,7 @@ export const statsRoutes = new Hono<AppEnv>().get(
 		tag: "Stats",
 		summary: "Contribution statistics and leaderboard",
 		description:
-			"Public. `me` is your own activity (null when not logged in) and includes private layers; `leaderboard` and `totals` (everyone combined) only count public layers and are reused for a minute. `modUploads`, `modUploadedBlocks` (volume, repeats counted) and `modAreaTiles`/`modAreaBlocks` (distinct ground) are the part sent by the in-game mod (AOMC Webmapper, or whatever `MOD_USER_AGENTS` lists); it is also counted in the other numbers. `areaHistory` is the mapped area over time, for the whole map and for you, by the date the uploaded data was exported. `featureHistory` is how many features there were over time (`total` on public layers, `mine` including your private ones, and `pin`/`line`/`polygon` of the total), by when they were created; features that were deleted since, or whose layer was, are not counted. Both histories have about 250 steps whatever the range (the time each covers divided into whole minutes, so the features, being newer, get finer steps than the area). `range` is `all` (default), `30d`, `7d`, `3d` or `1d`.",
+			"Public. `me` is your own activity (null when not logged in) and includes private layers; `leaderboard` and `totals` (everyone combined) only count public layers and are reused for a minute. `modUploads`, `modUploadedBlocks` (volume, repeats counted) and `modAreaTiles`/`modAreaBlocks` (distinct ground) are the part sent by the in-game mod (AOMC Webmapper, or whatever `MOD_USER_AGENTS` lists); it is also counted in the other numbers. `areaHistory` is the mapped area over time, for the whole map and for you, by the date the uploaded data was exported. `uploadedHistory` is the same for the area uploaded, with tiles uploaded again counted every time. `featureHistory` is how many features there were over time (`total` on public layers, `mine` including your private ones, and `pin`/`line`/`polygon` of the total), by when they were created; features that were deleted since, or whose layer was, are not counted. Both histories have about 250 steps whatever the range (the time each covers divided into whole minutes, so the features, being newer, get finer steps than the area). `range` is `all` (default), `30d`, `7d`, `3d` or `1d`.",
 		fails: [400],
 	}),
 	validate("query", statsQuerySchema),
@@ -452,6 +466,14 @@ export const statsRoutes = new Hono<AppEnv>().get(
 			areaHistory: areaHistory(
 				shared.firstUploads,
 				user ? firstUploads(db, shared.areaBucket, user.id) : null,
+				since,
+				now,
+				shared.areaBucket,
+				map.tileSize,
+			),
+			uploadedHistory: areaHistory(
+				shared.uploaded,
+				user ? uploadedTiles(db, shared.areaBucket, user.id) : null,
 				since,
 				now,
 				shared.areaBucket,

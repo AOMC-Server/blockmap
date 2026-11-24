@@ -222,15 +222,21 @@ function HistoryChart(props: {
 	);
 }
 
-function AreaChart(props: { data: StatsBody; signedIn: boolean }) {
-	const { areaHistory: points, since } = props.data;
+function AreaChart(props: {
+	data: StatsBody;
+	points: StatsBody["areaHistory"];
+	label: string;
+	signedIn: boolean;
+}) {
+	const { since } = props.data;
+	const points = props.points;
 	const mine = props.signedIn && props.data.me !== null;
 	return (
 		<HistoryChart
 			xs={points.map((p) => p.t)}
 			since={since}
 			formatY={formatArea}
-			ariaLabel="Mapped area over time"
+			ariaLabel={props.label}
 			series={[
 				{
 					key: "map",
@@ -512,7 +518,34 @@ export function StatsPage() {
 					Cumulative unique area mapped over time, ordered by export date (or
 					upload date when undated). Excludes deleted uploads.
 				</p>
-				{data ? <AreaChart data={data} signedIn={u !== null} /> : <Loading />}
+				{data ? (
+					<AreaChart
+						data={data}
+						points={data.areaHistory}
+						label="Mapped area over time"
+						signedIn={u !== null}
+					/>
+				) : (
+					<Loading />
+				)}
+			</section>
+
+			<section class={section}>
+				<h2>Area uploaded</h2>
+				<p class="muted">
+					Cumulative area uploaded over time, counting a region every time it is
+					uploaded again. Excludes deleted uploads.
+				</p>
+				{data ? (
+					<AreaChart
+						data={data}
+						points={data.uploadedHistory}
+						label="Area uploaded over time"
+						signedIn={u !== null}
+					/>
+				) : (
+					<Loading />
+				)}
 			</section>
 
 			<section class={section}>
