@@ -6,6 +6,7 @@ import {
 	groupPlayerFeatures,
 	MAX_RECENT_PLAYERS,
 	type PlayerFeature,
+	type PlayerFeatureRole,
 	parseRecentPlayers,
 	withRecentPlayer,
 } from "./players";
@@ -118,31 +119,39 @@ describe("groupPlayerFeatures", () => {
 	});
 	const players = new Map([A, B, C].map((p) => [p.id, p]));
 
-	test("one row per feature, grouped by layer, the layers with most owned first", () => {
+	test("one row per feature, grouped by layer, the layers listing the most first", () => {
 		const shared = feature(3, 20, { builderIds: [A.id] });
 		const groups = groupPlayerFeatures({
 			playerId: A.id,
-			owned: [feature(1, 10), shared, feature(4, 20)],
-			built: [shared, feature(2, 10, { ownerId: B.id, builderIds: [A.id] })],
+			owned: [feature(1, 10), shared, feature(4, 20), feature(5, 30)],
+			built: [shared, feature(2, 30, { ownerId: B.id, builderIds: [A.id] })],
 			players,
 		});
+		// Layers 20 and 30 list two features each, so their names decide; layer 10 lists one.
 		expect(groups.map((g) => [g.layerId, g.owned, g.built])).toEqual([
 			[20, 2, 1],
-			[10, 1, 1],
+			[30, 1, 1],
+			[10, 1, 0],
 		]);
 		expect(groups[0]?.features.map((f) => [f.id, f.owns, f.built])).toEqual([
 			[3, true, true],
 			[4, true, false],
 		]);
-		expect(
-			groupPlayerFeatures({
-				playerId: A.id,
-				owned: [feature(1, 10), shared, feature(4, 20)],
-				built: [shared, feature(2, 10, { ownerId: B.id, builderIds: [A.id] })],
-				players,
-				sort: "name",
-			}).map((g) => g.layerId),
-		).toEqual([10, 20]);
+	});
+
+	test("features go by name, the unnamed last", () => {
+		const [group] = groupPlayerFeatures({
+			playerId: A.id,
+			owned: [
+				feature(1, 10, { name: "" }),
+				feature(2, 10, { name: "Tower 10" }),
+				feature(3, 10, { name: "tower 9" }),
+				feature(4, 10, { name: "Castle" }),
+			],
+			built: [],
+			players,
+		});
+		expect(group?.features.map((f) => f.id)).toEqual([4, 3, 2, 1]);
 	});
 
 	test("the others are the owner, then the builders, without the player", () => {
@@ -179,5 +188,28 @@ describe("groupPlayerFeatures", () => {
 		expect(ids("cyd")).toEqual([2]);
 		expect(ids("layer 20")).toEqual([3]);
 		expect(ids("nothing")).toEqual([]);
+	});
+
+	test("role: only the features the player owns, or only the ones they built", () => {
+		const both = feature(1, 10, { builderIds: [A.id] });
+		const opts = {
+			playerId: A.id,
+			owned: [both, feature(2, 10), feature(3, 20)],
+			built: [both, feature(4, 30, { ownerId: B.id, builderIds: [A.id] })],
+			players,
+		};
+		const ids = (role: PlayerFeatureRole) =>
+			groupPlayerFeatures({ ...opts, role }).flatMap((g) =>
+				g.features.map((f) => f.id),
+			);
+		expect(ids("all")).toEqual([1, 2, 3, 4]);
+		expect(ids("owned")).toEqual([1, 2, 3]);
+		expect(ids("built")).toEqual([1, 4]);
+		// The layer counts stay whole, and a search narrows within the role.
+		const [layer] = groupPlayerFeatures({ ...opts, role: "built" });
+		expect([layer?.layerId, layer?.owned, layer?.built]).toEqual([10, 2, 1]);
+		expect(
+			groupPlayerFeatures({ ...opts, role: "owned", query: "feature 4" }),
+		).toEqual([]);
 	});
 });

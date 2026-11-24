@@ -18,7 +18,7 @@ import {
 	featureMapUrl,
 	groupPlayerFeatures,
 	type PlayerFeature,
-	type PlayerFeatureSort,
+	type PlayerFeatureRole,
 	playerPageUrl,
 } from "../players";
 import { currentMap, isModerator, readOnly } from "../state";
@@ -30,10 +30,10 @@ import { PlayerHead } from "./PlayerHead";
 export const playerKeyFromPath = (path: string) =>
 	/^\/players\/([^/]+)\/?$/.exec(path)?.[1] ?? null;
 
-const SORT_NAMES: Record<PlayerFeatureSort, string> = {
-	owned: "Most owned",
-	built: "Most built",
-	name: "Name",
+const ROLE_NAMES: Record<PlayerFeatureRole, string> = {
+	all: "All",
+	owned: "Owned",
+	built: "Built",
 };
 
 /** The features a player owns or built, searchable, in groups by layer. */
@@ -44,7 +44,7 @@ function PlayerFeatures(props: {
 	players: ReadonlyMap<number, Player>;
 }) {
 	const [text, setText] = useState("");
-	const [sort, setSort] = useState<PlayerFeatureSort>("owned");
+	const [role, setRole] = useState<PlayerFeatureRole>("all");
 	const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
 	const dimensions = currentMap.value?.dimensions ?? [];
 	const dimensionName = (slug: string) =>
@@ -56,7 +56,7 @@ function PlayerFeatures(props: {
 		built: props.built,
 		players: props.players,
 		query,
-		sort,
+		role,
 		dimensionName,
 	});
 	const total = new Set([...props.owned, ...props.built].map((f) => f.id)).size;
@@ -93,14 +93,22 @@ function PlayerFeatures(props: {
 				/>
 				<Segmented
 					small
-					label="Sort by"
-					value={sort}
-					options={["owned", "built", "name"] as const}
-					names={SORT_NAMES}
-					onChange={setSort}
+					label="Show"
+					value={role}
+					options={["all", "owned", "built"] as const}
+					names={ROLE_NAMES}
+					onChange={setRole}
 				/>
 			</div>
-			{groups.length === 0 && <Empty>No features match “{query}”.</Empty>}
+			{groups.length === 0 && (
+				<Empty>
+					{query
+						? `No ${role === "all" ? "" : `${role} `}features match “${query}”.`
+						: role === "owned"
+							? "Doesn't own any features you can see."
+							: "Hasn't helped build any features you can see."}
+				</Empty>
+			)}
 			<ul class="layers">
 				{groups.map((g) => {
 					const layerDye = g.layerColor as Dye;
