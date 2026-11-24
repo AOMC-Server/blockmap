@@ -253,9 +253,19 @@ function areaHistory(
 type FeatureRow = { t: number; type: FeatureType; n: number };
 
 /**
- * Features that exist now (their layer is live and their latest revision is not a deletion), by
- * the period their first revision was made in. `publicOnly` leaves out private layers.
+ * The first revisions of the features that exist now: their layer is live and their latest
+ * revision is not a deletion. `publicOnly` leaves out private layers.
  */
+const liveFeatures = (publicOnly: boolean, userId?: string) => sql`
+	FROM feature_revisions fr
+	JOIN features f ON f.id = fr.feature_id
+	JOIN layers l ON l.id = f.layer_id AND l.deleted_at IS NULL
+		${publicOnly ? sql.raw("AND l.visibility = 'public'") : sql``}
+	WHERE fr.id = ${FIRST_REVISION}
+		AND (SELECT deleted FROM feature_revisions WHERE feature_id = fr.feature_id ORDER BY id DESC LIMIT 1) = 0
+		${userId ? sql`AND fr.author_id = ${userId}` : sql``}`;
+
+/** Those features by the period their first revision was made in. */
 function featureRows(
 	db: Db,
 	bucket: number,
@@ -264,13 +274,7 @@ function featureRows(
 ): FeatureRow[] {
 	return db.all<FeatureRow>(sql`
 		SELECT (fr.created_at / ${bucket}) * ${bucket} AS t, fr.type AS type, COUNT(*) AS n
-		FROM feature_revisions fr
-		JOIN features f ON f.id = fr.feature_id
-		JOIN layers l ON l.id = f.layer_id AND l.deleted_at IS NULL
-			${publicOnly ? sql.raw("AND l.visibility = 'public'") : sql``}
-		WHERE fr.id = ${FIRST_REVISION}
-			AND (SELECT deleted FROM feature_revisions WHERE feature_id = fr.feature_id ORDER BY id DESC LIMIT 1) = 0
-			${userId ? sql`AND fr.author_id = ${userId}` : sql``}
+		${liveFeatures(publicOnly, userId)}
 		GROUP BY 1, fr.type ORDER BY 1`);
 }
 
@@ -325,8 +329,9 @@ type Everyone = {
 		avatarUrl: string | null;
 	})[];
 	totals: UserStats;
-	/** Length of a step of the history charts, in ms. */
-	bucket: number;
+	/** Length of a step of the area and of the feature history, in ms. */
+	areaBucket: number;
+	featureBucket: number;
 	firstUploads: FirstUploads;
 	features: FeatureRow[];
 };
@@ -364,7 +369,17 @@ function everyone(
 				.where(inArray(users.id, ids))
 				.all()
 		: [];
-	const bucket = bucketOf(db, since, now);
+	// Each history is cut into steps by its own time span: the features are far younger than the tiles.
+	const areaBucket = bucketOf(since, now, () => {
+		const [first] = db.all<{ t: number | null }>(sql`
+			SELECT MIN(COALESCE(r.exported_at, r.created_at)) AS t FROM revisions r WHERE ${DONE_UPLOAD}`);
+		return first?.t ?? null;
+	});
+	const featureBucket = bucketOf(since, now, () => {
+		const [first] = db.all<{ t: number | null }>(sql`
+			SELECT MIN(fr.created_at) AS t ${liveFeatures(true)}`);
+		return first?.t ?? null;
+	});
 	const fresh: Everyone = {
 		at: now,
 		since,
@@ -375,9 +390,10 @@ function everyone(
 			...(all.get(p.id) as UserStats),
 		})),
 		totals: totalsOf(db, scope, [...all.values()]),
-		bucket,
-		firstUploads: firstUploads(db, bucket),
-		features: featureRows(db, bucket, true),
+		areaBucket,
+		featureBucket,
+		firstUploads: firstUploads(db, areaBucket),
+		features: featureRows(db, featureBucket, true),
 	};
 	cache.set(key, fresh);
 	return fresh;
@@ -387,19 +403,15 @@ function everyone(
 const HISTORY_STEPS = 250;
 
 /**
- * The length of a step: the time shown (the range, or everything since the first upload or
- * feature) over `HISTORY_STEPS`, in whole minutes.
+ * The length of a step: the time shown over `HISTORY_STEPS`, in whole minutes. The time is the
+ * range, or for all time everything since `earliest` (when the first item of the history was made).
  */
-function bucketOf(db: Db, since: number | null, now: number) {
-	let from = since;
-	if (from === null) {
-		const [first] = db.all<{ t: number | null }>(sql`
-			SELECT MIN(t) AS t FROM (
-				SELECT MIN(COALESCE(r.exported_at, r.created_at)) AS t FROM revisions r WHERE ${DONE_UPLOAD}
-				UNION ALL SELECT MIN(created_at) FROM feature_revisions
-			)`);
-		from = first?.t ?? now;
-	}
+function bucketOf(
+	since: number | null,
+	now: number,
+	earliest: () => number | null,
+) {
+	const from = since ?? earliest() ?? now;
 	return Math.max(1, Math.ceil((now - from) / HISTORY_STEPS / MINUTE)) * MINUTE;
 }
 
@@ -409,7 +421,7 @@ export const statsRoutes = new Hono<AppEnv>().get(
 		tag: "Stats",
 		summary: "Contribution statistics and leaderboard",
 		description:
-			"Public. `me` is your own activity (null when not logged in) and includes private layers; `leaderboard` and `totals` (everyone combined) only count public layers and are reused for a minute. `modUploads`, `modUploadedBlocks` (volume, repeats counted) and `modAreaTiles`/`modAreaBlocks` (distinct ground) are the part sent by the in-game mod (AOMC Webmapper, or whatever `MOD_USER_AGENTS` lists); it is also counted in the other numbers. `areaHistory` is the mapped area over time, for the whole map and for you, by the date the uploaded data was exported. `featureHistory` is how many features there were over time (`total` on public layers, `mine` including your private ones, and `pin`/`line`/`polygon` of the total), by when they were created; features that were deleted since, or whose layer was, are not counted. Both histories have about 250 steps whatever the range (the time shown divided into whole minutes). `range` is `all` (default), `30d` or `7d`.",
+			"Public. `me` is your own activity (null when not logged in) and includes private layers; `leaderboard` and `totals` (everyone combined) only count public layers and are reused for a minute. `modUploads`, `modUploadedBlocks` (volume, repeats counted) and `modAreaTiles`/`modAreaBlocks` (distinct ground) are the part sent by the in-game mod (AOMC Webmapper, or whatever `MOD_USER_AGENTS` lists); it is also counted in the other numbers. `areaHistory` is the mapped area over time, for the whole map and for you, by the date the uploaded data was exported. `featureHistory` is how many features there were over time (`total` on public layers, `mine` including your private ones, and `pin`/`line`/`polygon` of the total), by when they were created; features that were deleted since, or whose layer was, are not counted. Both histories have about 250 steps whatever the range (the time each covers divided into whole minutes, so the features, being newer, get finer steps than the area). `range` is `all` (default), `30d` or `7d`.",
 		fails: [400],
 	}),
 	validate("query", statsQuerySchema),
@@ -437,18 +449,18 @@ export const statsRoutes = new Hono<AppEnv>().get(
 			totals: shared.totals,
 			areaHistory: areaHistory(
 				shared.firstUploads,
-				user ? firstUploads(db, shared.bucket, user.id) : null,
+				user ? firstUploads(db, shared.areaBucket, user.id) : null,
 				since,
 				now,
-				shared.bucket,
+				shared.areaBucket,
 				map.tileSize,
 			),
 			featureHistory: featureHistory(
 				shared.features,
-				user ? featureRows(db, shared.bucket, false, user.id) : null,
+				user ? featureRows(db, shared.featureBucket, false, user.id) : null,
 				since,
 				now,
-				shared.bucket,
+				shared.featureBucket,
 			),
 		});
 	},
