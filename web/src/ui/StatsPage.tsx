@@ -2,6 +2,7 @@ import {
 	Avatar,
 	Badge,
 	Chart,
+	type ChartSeries,
 	Empty,
 	ErrorBox,
 	Loading,
@@ -176,34 +177,23 @@ function StatTiles(props: { stats: UserStats; note: string }) {
 	);
 }
 
-function AreaChart(props: { data: StatsBody; signedIn: boolean }) {
-	const { areaHistory: points, since } = props.data;
-	const mine = props.signedIn && props.data.me !== null;
-	const xs = points.map((p) => p.t);
+/** A line chart over time; the dates are shown in hours when the range is a week or less. */
+function HistoryChart(props: {
+	xs: number[];
+	series: ChartSeries[];
+	since: number | null;
+	formatY: (value: number) => string;
+	ariaLabel: string;
+}) {
+	const { xs, series, since, formatY, ariaLabel } = props;
 	const short = since !== null && Date.now() - since <= 7 * DAY;
 	return (
 		<Chart
 			kind="steps"
 			xs={xs}
-			series={[
-				{
-					key: "map",
-					label: "Whole map",
-					color: "var(--chart-1)",
-					values: points.map((p) => p.totalBlocks),
-				},
-				...(mine
-					? [
-							{
-								key: "me",
-								label: "You",
-								color: "var(--chart-2)",
-								values: points.map((p) => p.myBlocks ?? 0),
-							},
-						]
-					: []),
-			]}
-			formatY={formatArea}
+			series={series}
+			formatY={formatY}
+			ariaLabel={ariaLabel}
 			formatX={(t) =>
 				new Date(t).toLocaleString(
 					undefined,
@@ -225,6 +215,100 @@ function AreaChart(props: { data: StatsBody; signedIn: boolean }) {
 						: { year: "numeric", month: "short", day: "numeric" },
 				)
 			}
+		/>
+	);
+}
+
+function AreaChart(props: { data: StatsBody; signedIn: boolean }) {
+	const { areaHistory: points, since } = props.data;
+	const mine = props.signedIn && props.data.me !== null;
+	return (
+		<HistoryChart
+			xs={points.map((p) => p.t)}
+			since={since}
+			formatY={formatArea}
+			ariaLabel="Mapped area over time"
+			series={[
+				{
+					key: "map",
+					label: "Whole map",
+					color: "var(--chart-1)",
+					values: points.map((p) => p.totalBlocks),
+				},
+				...(mine
+					? [
+							{
+								key: "me",
+								label: "You",
+								color: "var(--chart-2)",
+								values: points.map((p) => p.myBlocks ?? 0),
+							},
+						]
+					: []),
+			]}
+		/>
+	);
+}
+
+function FeatureChart(props: { data: StatsBody; signedIn: boolean }) {
+	const { featureHistory: points, since } = props.data;
+	const mine = props.signedIn && props.data.me !== null;
+	return (
+		<HistoryChart
+			xs={points.map((p) => p.t)}
+			since={since}
+			formatY={formatNumber}
+			ariaLabel="Features over time"
+			series={[
+				{
+					key: "map",
+					label: "Whole map",
+					color: "var(--chart-1)",
+					values: points.map((p) => p.total),
+				},
+				...(mine
+					? [
+							{
+								key: "me",
+								label: "You",
+								color: "var(--chart-2)",
+								values: points.map((p) => p.mine ?? 0),
+							},
+						]
+					: []),
+			]}
+		/>
+	);
+}
+
+function FeatureTypeChart(props: { data: StatsBody }) {
+	const { featureHistory: points, since } = props.data;
+	return (
+		<HistoryChart
+			xs={points.map((p) => p.t)}
+			since={since}
+			formatY={formatNumber}
+			ariaLabel="Features by type over time"
+			series={[
+				{
+					key: "pin",
+					label: "Pins",
+					color: "var(--chart-3)",
+					values: points.map((p) => p.pin),
+				},
+				{
+					key: "line",
+					label: "Lines",
+					color: "var(--chart-4)",
+					values: points.map((p) => p.line),
+				},
+				{
+					key: "polygon",
+					label: "Areas",
+					color: "var(--chart-5)",
+					values: points.map((p) => p.polygon),
+				},
+			]}
 		/>
 	);
 }
@@ -426,6 +510,24 @@ export function StatsPage() {
 					upload date when undated). Excludes deleted uploads.
 				</p>
 				{data ? <AreaChart data={data} signedIn={u !== null} /> : <Loading />}
+			</section>
+
+			<section class={section}>
+				<h2>Features</h2>
+				<p class="muted">
+					Features by when they were created. Deleted features and private
+					layers are not counted (yours include your private layers).
+				</p>
+				{data ? (
+					<FeatureChart data={data} signedIn={u !== null} />
+				) : (
+					<Loading />
+				)}
+			</section>
+
+			<section class={section}>
+				<h2>Features by type</h2>
+				{data ? <FeatureTypeChart data={data} /> : <Loading />}
 			</section>
 
 			<section class={section}>

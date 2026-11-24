@@ -143,6 +143,56 @@ describe("stats", () => {
 		expect((await stats(await bootTiles(), null)).body.areaHistory).toEqual([]);
 	});
 
+	test("the feature history counts the features that exist, by type and for you", async () => {
+		const t = await bootTiles();
+		const open = await makeLayer(t, t.editor);
+		const secret = await makeLayer(t, t.editor, { visibility: "private" });
+		await addPin(t, t.editor, open.id);
+		await addPin(t, t.editor, secret.id);
+		await addPin(t, t.mod, open.id);
+		const gone = await addPin(t, t.mod, open.id);
+		const line = await call(
+			t,
+			t.mod,
+			"POST",
+			`/api/layers/${open.id}/features`,
+			{
+				type: "line",
+				name: "Road",
+				geometry: [
+					[0, 0],
+					[5, 5],
+				],
+			},
+		);
+		expect(line.status).toBe(201);
+		expect(
+			(await call(t, t.mod, "DELETE", `/api/features/${gone.id}`)).status,
+		).toBe(200);
+
+		const mine = await stats(t, t.editor);
+		expect(mine.body.featureHistory.at(-1)).toMatchObject({
+			total: 3,
+			pin: 2,
+			line: 1,
+			polygon: 0,
+			mine: 2,
+		});
+		const values = mine.body.featureHistory.map(
+			(p: { total: number }) => p.total,
+		);
+		expect(values).toEqual([...values].sort((a, b) => a - b));
+
+		const anon = await stats(t, null);
+		expect(anon.body.featureHistory.at(-1)).toMatchObject({
+			total: 3,
+			mine: null,
+		});
+		expect((await stats(await bootTiles(), null)).body.featureHistory).toEqual(
+			[],
+		);
+	});
+
 	test("uploads from the AOMC Webmapper mod are counted separately, and still as uploads", async () => {
 		const t = await bootTiles();
 		await upload(t, await solid(T, T, RED), 0, 0);

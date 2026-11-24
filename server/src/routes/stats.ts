@@ -202,6 +202,34 @@ function firstUploads(db: Db, bucket: number, userId?: string): FirstUploads {
 }
 
 /**
+ * Running totals of things counted per period (`rows`, each series by period start), on one time
+ * grid that starts where the first series does (or when the range began). Each series starts from
+ * what was already there when the range began. Null when the first series is empty.
+ */
+function growth(
+	rows: FirstUploads[],
+	since: number,
+	now: number,
+	bucket: number,
+) {
+	const first = rows[0]?.[0];
+	if (!first) return null;
+	const start = since > 0 ? Math.floor(since / bucket) * bucket : first.t;
+
+	const grid: number[] = [];
+	for (let t = start; t <= now; t += bucket) grid.push(t);
+	const cumulative = (series: FirstUploads) => {
+		const added = new Map(series.map((r) => [r.t, r.n]));
+		let sum = series.filter((r) => r.t < start).reduce((n, r) => n + r.n, 0);
+		return [sum, ...grid.map((t) => (sum += added.get(t) ?? 0))];
+	};
+	return {
+		ts: [Math.max(start, since), ...grid.map((t) => Math.min(t + bucket, now))],
+		values: rows.map(cumulative),
+	};
+}
+
+/**
  * The mapped area as it grew: distinct tiles, counted from the earliest export that covered them.
  * Starts from what was already mapped when the range began.
  */
@@ -213,33 +241,79 @@ function areaHistory(
 	bucket: number,
 	tileSize: number,
 ) {
-	const first = total[0];
-	if (!first) return [];
-	const start = since > 0 ? Math.floor(since / bucket) * bucket : first.t;
-
-	const grid: number[] = [];
-	for (let t = start; t <= now; t += bucket) grid.push(t);
-	const cumulative = (rows: FirstUploads) => {
-		const added = new Map(rows.map((r) => [r.t, r.n]));
-		let sum = rows.filter((r) => r.t < start).reduce((n, r) => n + r.n, 0);
-		return { base: sum, at: grid.map((t) => (sum += added.get(t) ?? 0)) };
-	};
-	const all = cumulative(total);
-	const own = mine ? cumulative(mine) : null;
+	const g = growth(mine ? [total, mine] : [total], since, now, bucket);
+	if (!g) return [];
 	const blocks = (tiles: number) => tiles * tileSize * tileSize;
+	return g.ts.map((t, i) => ({
+		t,
+		totalBlocks: blocks(g.values[0]?.[i] as number),
+		myBlocks: g.values[1] ? blocks(g.values[1][i] as number) : null,
+	}));
+}
 
-	return [
-		{
-			t: Math.max(start, since),
-			totalBlocks: blocks(all.base),
-			myBlocks: own ? blocks(own.base) : null,
-		},
-		...grid.map((t, i) => ({
-			t: Math.min(t + bucket, now),
-			totalBlocks: blocks(all.at[i] as number),
-			myBlocks: own ? blocks(own.at[i] as number) : null,
-		})),
-	];
+type FeatureRow = { t: number; type: FeatureType; n: number };
+
+/**
+ * Features that exist now (their layer is live and their latest revision is not a deletion), by
+ * the period their first revision was made in. `publicOnly` leaves out private layers.
+ */
+function featureRows(
+	db: Db,
+	bucket: number,
+	publicOnly: boolean,
+	userId?: string,
+): FeatureRow[] {
+	return db.all<FeatureRow>(sql`
+		SELECT (fr.created_at / ${bucket}) * ${bucket} AS t, fr.type AS type, COUNT(*) AS n
+		FROM feature_revisions fr
+		JOIN features f ON f.id = fr.feature_id
+		JOIN layers l ON l.id = f.layer_id AND l.deleted_at IS NULL
+			${publicOnly ? sql.raw("AND l.visibility = 'public'") : sql``}
+		WHERE fr.id = ${FIRST_REVISION}
+			AND (SELECT deleted FROM feature_revisions WHERE feature_id = fr.feature_id ORDER BY id DESC LIMIT 1) = 0
+			${userId ? sql`AND fr.author_id = ${userId}` : sql``}
+		GROUP BY 1, fr.type ORDER BY 1`);
+}
+
+/** The rows of one feature type, or of all of them added together. */
+function countsOf(rows: FeatureRow[], type?: FeatureType): FirstUploads {
+	const byTime = new Map<number, number>();
+	for (const r of rows)
+		if (!type || r.type === type) byTime.set(r.t, (byTime.get(r.t) ?? 0) + r.n);
+	return [...byTime].map(([t, n]) => ({ t, n })).sort((a, b) => a.t - b.t);
+}
+
+/**
+ * How many features there were over time: all of them, yours, and each type. Dated by creation, so
+ * a feature that was later deleted is not counted at all.
+ */
+function featureHistory(
+	rows: FeatureRow[],
+	mine: FeatureRow[] | null,
+	since: number,
+	now: number,
+	bucket: number,
+) {
+	const g = growth(
+		[
+			countsOf(rows),
+			...FEATURE_TYPES.map((t) => countsOf(rows, t)),
+			...(mine ? [countsOf(mine)] : []),
+		],
+		since,
+		now,
+		bucket,
+	);
+	if (!g) return [];
+	const at = (k: number, i: number) => g.values[k]?.[i] as number;
+	return g.ts.map((t, i) => ({
+		t,
+		total: at(0, i),
+		pin: at(1 + FEATURE_TYPES.indexOf("pin"), i),
+		line: at(1 + FEATURE_TYPES.indexOf("line"), i),
+		polygon: at(1 + FEATURE_TYPES.indexOf("polygon"), i),
+		mine: mine ? at(1 + FEATURE_TYPES.length, i) : null,
+	}));
 }
 
 /** What is the same for every visitor; reused for `CACHE_MS`. */
@@ -253,6 +327,7 @@ type Everyone = {
 	})[];
 	totals: UserStats;
 	firstUploads: FirstUploads;
+	features: FeatureRow[];
 };
 
 const caches = new WeakMap<Db, Map<string, Everyone>>();
@@ -299,6 +374,7 @@ function everyone(
 		})),
 		totals: totalsOf(db, scope, [...all.values()]),
 		firstUploads: firstUploads(db, bucketOf(range)),
+		features: featureRows(db, bucketOf(range), true),
 	};
 	cache.set(key, fresh);
 	return fresh;
@@ -313,7 +389,7 @@ export const statsRoutes = new Hono<AppEnv>().get(
 		tag: "Stats",
 		summary: "Contribution statistics and leaderboard",
 		description:
-			"Public. `me` is your own activity (null when not logged in) and includes private layers; `leaderboard` and `totals` (everyone combined) only count public layers and are reused for a minute. `modUploads`, `modUploadedBlocks` (volume, repeats counted) and `modAreaTiles`/`modAreaBlocks` (distinct ground) are the part sent by the in-game mod (AOMC Webmapper, or whatever `MOD_USER_AGENTS` lists); it is also counted in the other numbers. `areaHistory` is the mapped area over time, for the whole map and for you, by the date the uploaded data was exported. `range` is `all` (default), `30d` or `7d`.",
+			"Public. `me` is your own activity (null when not logged in) and includes private layers; `leaderboard` and `totals` (everyone combined) only count public layers and are reused for a minute. `modUploads`, `modUploadedBlocks` (volume, repeats counted) and `modAreaTiles`/`modAreaBlocks` (distinct ground) are the part sent by the in-game mod (AOMC Webmapper, or whatever `MOD_USER_AGENTS` lists); it is also counted in the other numbers. `areaHistory` is the mapped area over time, for the whole map and for you, by the date the uploaded data was exported. `featureHistory` is how many features there were over time (`total` on public layers, `mine` including your private ones, and `pin`/`line`/`polygon` of the total), by when they were created; features that were deleted since, or whose layer was, are not counted. `range` is `all` (default), `30d` or `7d`.",
 		fails: [400],
 	}),
 	validate("query", statsQuerySchema),
@@ -346,6 +422,13 @@ export const statsRoutes = new Hono<AppEnv>().get(
 				now,
 				bucketOf(range),
 				map.tileSize,
+			),
+			featureHistory: featureHistory(
+				shared.features,
+				user ? featureRows(db, bucketOf(range), false, user.id) : null,
+				since,
+				now,
+				bucketOf(range),
 			),
 		});
 	},
