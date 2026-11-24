@@ -58,6 +58,14 @@ bun run dev               # API on :3000, restarts on change
 bun run dev:web           # Vite dev server with hot reload; proxies /api, /auth, /blobs, /map, /files and /scalar to :3000 (set `BACKEND_URL` to proxy elsewhere)
 ```
 
+Or both in Docker, without installing Bun:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+The repository is bind-mounted, so the API restarts and the web app hot-reloads as you edit. Open `PUBLIC_URL` as usual: Vite serves the web app on `PORT` and proxies the API, which is not published itself. Data is in `./data` as with `docker-compose.yml`, and the dependencies live in Docker volumes, reinstalled from `bun.lock` on every `up` (`down -v` clears them).
+
 | Command               | What it does                                                 |
 | --------------------- | ------------------------------------------------------------ |
 | `bun run test`        | all tests (server, shared, web logic, scripts)               |

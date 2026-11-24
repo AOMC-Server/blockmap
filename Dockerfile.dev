@@ -1,0 +1,10 @@
+# Development image for docker-compose.dev.yml: the source is bind-mounted, not copied, and the
+# dependencies live in named volumes that the compose file's `install` service fills.
+FROM oven/bun:1-alpine
+WORKDIR /app
+# The named volumes take these directories' owner when Docker first creates them, so bun can
+# install into them without root.
+RUN mkdir -p node_modules server/node_modules shared/node_modules web/node_modules \
+		block-ui/node_modules /home/bun/.bun/install/cache \
+	&& chown -R bun:bun /app /home/bun/.bun
+USER bun

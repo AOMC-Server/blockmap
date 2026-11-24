@@ -1,0 +1,61 @@
+# Development: the API restarts and the web app hot-reloads when the source changes.
+#   docker compose -f docker-compose.dev.yml up --build
+# Open PUBLIC_URL, as with docker-compose.yml: Vite serves the web app on PORT and proxies the
+# API. The repository is bind-mounted, so edits on the host show up right away; the dependencies
+# live in named volumes so the Linux (musl) builds of native packages such as sharp never mix
+# with the ones on the host.
+
+x-dev: &dev
+  build:
+    context: .
+    dockerfile: Dockerfile.dev
+  volumes:
+    - .:/app:z
+    - node_modules:/app/node_modules
+    - server_node_modules:/app/server/node_modules
+    - shared_node_modules:/app/shared/node_modules
+    - web_node_modules:/app/web/node_modules
+    - block_ui_node_modules:/app/block-ui/node_modules
+    - bun_cache:/home/bun/.bun/install/cache
+    - ./data:/data:z
+
+services:
+  # Runs on every `up`, so the volumes follow bun.lock after a pull; quick when nothing changed.
+  install:
+    <<: *dev
+    command: ["bun", "install", "--frozen-lockfile", "--network-concurrency=16"]
+
+  api:
+    <<: *dev
+    command: ["bun", "--watch", "server/src/index.ts"]
+    depends_on:
+      install:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    # Not published: Vite proxies the API, so everything is reached through it. Published, it
+    # would also serve the last `bun run build` from web/dist, which goes stale.
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATA_DIR: /data
+
+  web:
+    <<: *dev
+    command: ["bun", "run", "--cwd", "web", "dev", "--host", "0.0.0.0", "--port", "3000", "--strictPort"]
+    depends_on:
+      install:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${PORT:-3000}:3000"
+    environment:
+      BACKEND_URL: http://api:3000
+
+volumes:
+  node_modules:
+  server_node_modules:
+  shared_node_modules:
+  web_node_modules:
+  block_ui_node_modules:
+  bun_cache:
