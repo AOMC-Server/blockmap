@@ -1,21 +1,25 @@
 FROM oven/bun:1-alpine AS deps
 WORKDIR /app
+# Bun's default of many parallel downloads stalls behind Docker's bridge network (minutes for
+# the dev install, which looks stuck); fewer at a time finishes in seconds.
+ARG BUN_NETWORK_CONCURRENCY=16
 COPY package.json bun.lock ./
 COPY server/package.json server/
 COPY shared/package.json shared/
 COPY web/package.json web/
 COPY block-ui/package.json block-ui/
-RUN bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile --production --network-concurrency=$BUN_NETWORK_CONCURRENCY
 
 FROM oven/bun:1-alpine AS web
 WORKDIR /app
+ARG BUN_NETWORK_CONCURRENCY=16
 COPY package.json bun.lock ./
 COPY server/package.json server/
 COPY shared/package.json shared/
 COPY web/package.json web/
 # The UI library is a git submodule and a workspace package.
 COPY block-ui block-ui
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --network-concurrency=$BUN_NETWORK_CONCURRENCY
 COPY tsconfig.base.json ./
 COPY shared shared
 COPY web web
