@@ -4,6 +4,7 @@ import {
 	type LineGeometry,
 	linePaths,
 	type Point,
+	TYPE_LABEL,
 } from "@blockmap/shared/features";
 import type { CurveKind } from "@blockmap/shared/spline";
 
@@ -11,11 +12,7 @@ import { polylineArea, polylineLength, smoothShape } from "./map/smooth";
 import { graphFromPaths, lineLength } from "./tools/lineGraph";
 import { pathLength, polygonArea } from "./tools/measureMath";
 
-export const TYPE_LABEL: Record<FeatureType, string> = {
-	pin: "Pin",
-	line: "Line",
-	polygon: "Area",
-};
+export { TYPE_LABEL };
 
 export const featureTitle = (f: { name: string; type: FeatureType }) =>
 	f.name || TYPE_LABEL[f.type];

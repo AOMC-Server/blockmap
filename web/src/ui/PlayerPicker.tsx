@@ -13,9 +13,11 @@ type Option =
 	| { kind: "new"; text: string };
 
 /** A text field that searches the players of the map as you type and ends with "New player…". */
-function PlayerSearch(props: {
+export function PlayerSearch(props: {
 	label: string;
 	placeholder: string;
+	/** Offer "New player…" for a name that is not found (default true); off where only known players make sense. */
+	allowNew?: boolean;
 	/** Players that are not offered (already chosen). */
 	exclude?: number[];
 	onPick: (player: Player) => void;
@@ -66,7 +68,9 @@ function PlayerSearch(props: {
 			.filter((p) => !props.exclude?.includes(p.id))
 			.slice(0, SUGGESTIONS)
 			.map((player): Option => ({ kind: "player", player })),
-		...(exact ? [] : [{ kind: "new", text: typed } as Option]),
+		...(exact || props.allowNew === false
+			? []
+			: [{ kind: "new", text: typed } as Option]),
 	];
 	const settled = showRecent || (query === typed && !state.loading);
 
@@ -101,6 +105,7 @@ function PlayerSearch(props: {
 				setOpen(true);
 				return;
 			}
+			if (options.length === 0) return;
 			const step = e.key === "ArrowDown" ? 1 : -1;
 			setActive((active + step + options.length) % options.length);
 		} else if (e.key === "Enter" && open) {
@@ -168,8 +173,13 @@ function PlayerSearch(props: {
 					{state.error && (
 						<div class="player-option-note error-text">{state.error}</div>
 					)}
-					{!state.error && !settled && options.length === 1 && (
-						<div class="player-option-note muted">Searching…</div>
+					{!state.error &&
+						!settled &&
+						!options.some((o) => o.kind === "player") && (
+							<div class="player-option-note muted">Searching…</div>
+						)}
+					{!state.error && settled && options.length === 0 && (
+						<div class="player-option-note muted">No players found.</div>
 					)}
 				</div>
 			)}

@@ -83,6 +83,16 @@ export const playerSearchQuerySchema = z.object({
 			50,
 		)
 		.check(z.describe("Most players to return, at most 500, default 50")),
+	sort: z._default(
+		z
+			.enum(["name", "owned", "built"])
+			.check(
+				z.describe(
+					"Order: by name (names that start with `q` first), or most features owned or built first; default name",
+				),
+			),
+		"name",
+	),
 });
 
 export const createPlayerSchema = z.object({

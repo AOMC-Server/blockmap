@@ -4,6 +4,8 @@ import { lookupHeadUrl, playerHeadUrl, playerPageUrl } from "../players";
 export function PlayerHead(props: {
 	player: { id: number; name: string };
 	size?: number;
+	/** The tooltip; default: the player's name. */
+	title?: string;
 }) {
 	const size = props.size ?? 20;
 	return (
@@ -11,7 +13,7 @@ export function PlayerHead(props: {
 			class="player-head"
 			src={playerHeadUrl(props.player.id)}
 			alt={props.player.name}
-			title={props.player.name}
+			title={props.title ?? props.player.name}
 			width={size}
 			height={size}
 		/>

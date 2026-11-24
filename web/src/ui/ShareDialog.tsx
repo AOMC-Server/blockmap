@@ -5,6 +5,7 @@ import { useEffect, useState } from "preact/hooks";
 import { api, attempt } from "../api";
 import { copyText } from "../clipboard";
 import { mapView } from "../controller";
+import { activeFilter } from "../filter";
 import { currentMap, dimSlug, isLayerHidden, layersData, rev } from "../state";
 
 export const shareOpen = signal(false);
@@ -15,6 +16,7 @@ function currentView(includeLayers: boolean): ShareView | null {
 	const dim = dimSlug.value;
 	if (!mv || !dim) return null;
 	const v = mv.getView();
+	const filter = activeFilter.value?.text;
 	return {
 		dim,
 		x: Math.round(v.centerX),
@@ -28,6 +30,7 @@ function currentView(includeLayers: boolean): ShareView | null {
 						.map((l) => l.id),
 				}
 			: {}),
+		...(filter === undefined ? {} : { filter }),
 	};
 }
 
@@ -36,9 +39,10 @@ type LinkState =
 	| { phase: "ready"; url: string }
 	| { phase: "failed"; error: string };
 
-/** Makes a short link to the view on screen: the place, zoom, dimension, revision and layers. */
+/** Makes a short link to the view on screen: the place, zoom, dimension, revision, layers and filter. */
 export function ShareDialog() {
 	const [includeLayers, setIncludeLayers] = useState(true);
+	const [includeFilter, setIncludeFilter] = useState(true);
 	// The view as it was when the dialog opened; panning behind it changes nothing.
 	const [snapshot] = useState(() => currentView(true));
 	const [link, setLink] = useState<LinkState>({ phase: "making" });
@@ -49,6 +53,7 @@ export function ShareDialog() {
 	const view: ShareView | null = snapshot && {
 		...snapshot,
 		layers: includeLayers ? snapshot.layers : undefined,
+		filter: includeFilter ? snapshot.filter : undefined,
 	};
 	const key = JSON.stringify(view);
 
@@ -74,6 +79,7 @@ export function ShareDialog() {
 		(d) => d.slug === view.dim,
 	);
 	const shown = snapshot?.layers?.length ?? 0;
+	const filter = snapshot?.filter;
 	const total = layersData.value.length;
 
 	return (
@@ -97,6 +103,12 @@ export function ShareDialog() {
 				<dd>
 					{includeLayers ? `${shown} of ${total} shown` : "Default visibility"}
 				</dd>
+				{filter !== undefined && (
+					<>
+						<dt>Filter</dt>
+						<dd>{includeFilter ? filter : "None"}</dd>
+					</>
+				)}
 			</dl>
 			<Toggle
 				inline
@@ -104,6 +116,14 @@ export function ShareDialog() {
 				onChange={setIncludeLayers}
 				label="Include my current layer visibility"
 			/>
+			{filter !== undefined && (
+				<Toggle
+					inline
+					checked={includeFilter}
+					onChange={setIncludeFilter}
+					label="Include the feature filter"
+				/>
+			)}
 			<div class="copy-row share-link">
 				<input
 					type="text"

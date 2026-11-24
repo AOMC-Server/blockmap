@@ -12,6 +12,7 @@ import { useEffect, useState } from "preact/hooks";
 import { showNotice } from "../api";
 import { goToFeature, mapView, revealLayer } from "../controller";
 import { featureTitle, pointsOf, TYPE_LABEL } from "../featureInfo";
+import { activeFilter, passesFilter } from "../filter";
 import { type LayerMatch, searchLayers } from "../layerSearch";
 import {
 	createLayer,
@@ -328,6 +329,11 @@ function LayerRow(props: {
 	const maxFeatures = currentMap.value?.limits.maxFeaturesPerLayer;
 	const full = isLayerFull(l);
 	const hidden = isLayerHidden(l);
+	const filtered = activeFilter.value !== null;
+	// With a filter on, the count is of the listed features that it lets through.
+	const shownCount = filtered
+		? features.filter(passesFilter).length
+		: features.length;
 	const homeFeatures = l.features.filter((f) => f.layerId === l.id);
 	// A search shows only some of the features, so their order cannot be changed meanwhile.
 	const featureOrder =
@@ -401,9 +407,16 @@ function LayerRow(props: {
 							private
 						</span>
 					)}
-					<span class="count">
-						{props.filtering
-							? `${features.length}/${l.features.length}`
+					<span
+						class="count"
+						title={
+							filtered
+								? `${shownCount} of ${l.features.length} ${props.filtering ? "match your search and filter" : "shown by your filter"}`
+								: undefined
+						}
+					>
+						{props.filtering || filtered
+							? `${shownCount}/${l.features.length}`
 							: l.features.length}
 					</span>
 					<span class="chevron" aria-hidden="true">
@@ -476,9 +489,12 @@ function LayerRow(props: {
 								const linked = f.layerId !== l.id;
 								const home = layersData.value.find((h) => h.id === f.layerId);
 								const homeEditable = !!home && home.canEdit && canEditMap.value;
+								const filteredOut = filtered && !passesFilter(f);
 								return (
 									<li
 										key={f.id}
+										class={filteredOut ? "filtered-out" : undefined}
+										title={filteredOut ? "Hidden by your filter" : undefined}
 										onMouseEnter={() => hoverFeature(f.id)}
 										onMouseLeave={() => hoverFeature(null)}
 									>

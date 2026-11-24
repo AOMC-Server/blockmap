@@ -6,6 +6,7 @@ import {
 	type StyleId,
 } from "@aomc-server/block-ui/theme";
 import { createWidthStore } from "@aomc-server/block-ui/width";
+import { MAX_FILTER_LENGTH } from "@blockmap/shared/featureFilter";
 import type { Player } from "@blockmap/shared/players";
 import type { View } from "@blockmap/shared/view";
 import { signal } from "@preact/signals";
@@ -323,6 +324,20 @@ export const loadLayerChoices = () => parseLayerChoices(read(LAYERS_KEY));
 export function saveLayerChoices(choices: ReadonlyMap<number, boolean>) {
 	const kept = [...choices].slice(-MAX_LAYER_CHOICES);
 	write(LAYERS_KEY, JSON.stringify(Object.fromEntries(kept)));
+}
+
+const FILTER_KEY = "blockmap.filter";
+
+/** The feature filter text of an earlier visit, from storage; "" when there is none or it is not usable. */
+export function parseStoredFilter(raw: string | null): string {
+	return raw !== null && raw.length <= MAX_FILTER_LENGTH ? raw : "";
+}
+
+export const loadFilterText = () => parseStoredFilter(read(FILTER_KEY));
+
+/** Remembers your own feature filter for the next visit; an empty one is forgotten. */
+export function saveFilterText(text: string) {
+	write(FILTER_KEY, text.trim() === "" ? null : text);
 }
 
 /** Width in pixels of the right-hand side panel, which can be dragged wider or narrower. */

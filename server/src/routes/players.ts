@@ -22,7 +22,7 @@ import {
 	players,
 	users,
 } from "../db/schema";
-import { latestRevision } from "../features";
+import { latestRevision, playerIdsOf } from "../features";
 import {
 	defaultHead,
 	headFromSkin,
@@ -37,7 +37,7 @@ import {
 	canViewLayer,
 	effectiveLayerRole,
 } from "../permissions";
-import { addPlayer, refreshPlayer, toPlayer } from "../players";
+import { addPlayer, playersById, refreshPlayer, toPlayer } from "../players";
 import type { AppEnv } from "../types";
 import { validate } from "../validate";
 import { parseId } from "./util";
@@ -140,44 +140,74 @@ export function playerRoutes(mojang: Mojang) {
 				tag: "Players",
 				summary: "List players",
 				description:
-					"Players whose name contains `q`, with how many of the features you can see they own and helped build.",
+					"Players whose name contains `q`, with how many of the features you can see they own and helped build. `total` is how many players match, which can be more than `limit`.",
 				fails: [400],
 			}),
 			validate("query", playerSearchQuerySchema),
 			(c) => {
 				const { db, user, role } = c.var;
-				const { q, limit } = c.req.valid("query");
+				const { q, limit, sort } = c.req.valid("query");
 				const escaped = q.replaceAll(/[\\%_]/g, (m) => `\\${m}`);
 				const pattern = `%${escaped}%`;
-				const rows = db
+				const where =
+					q === ""
+						? undefined
+						: or(
+								sql`${players.name} LIKE ${pattern} ESCAPE '\\'`,
+								isUuid(q) ? eq(players.uuid, normalizeUuid(q)) : undefined,
+							);
+				const query = db
 					.select({ id: players.id, uuid: players.uuid, name: players.name })
 					.from(players)
-					.where(
-						q === ""
-							? undefined
-							: or(
-									sql`${players.name} LIKE ${pattern} ESCAPE '\\'`,
-									isUuid(q) ? eq(players.uuid, normalizeUuid(q)) : undefined,
-								),
-					)
+					.where(where)
 					// Names that start with what was typed first.
 					.orderBy(
 						sql`${players.name} NOT LIKE ${`${escaped}%`} ESCAPE '\\'`,
 						asc(sql`lower(${players.name})`),
-					)
-					.limit(limit)
-					.all();
-				const counts = attributionCounts(
-					db,
-					visibleLayerIds(db, user, role),
-					rows.map((r) => r.id),
-				);
+					);
+				const total =
+					db
+						.select({ n: sql<number>`count(*)` })
+						.from(players)
+						.where(where)
+						.get()?.n ?? 0;
+				const layerIds = visibleLayerIds(db, user, role);
+				let rows: { id: number; uuid: string; name: string }[];
+				let counts: ReturnType<typeof attributionCounts>;
+				if (sort === "name") {
+					rows = query.limit(limit).all();
+					counts = attributionCounts(
+						db,
+						layerIds,
+						rows.map((r) => r.id),
+					);
+				} else {
+					// The counts of everyone, to take the top of the whole list and not of one page of names.
+					counts = attributionCounts(db, layerIds);
+					const of = (id: number) => counts.get(id) ?? { owned: 0, built: 0 };
+					const [first, second] =
+						sort === "owned"
+							? (["owned", "built"] as const)
+							: (["built", "owned"] as const);
+					rows = query
+						.all()
+						.map((r, i) => ({ r, i }))
+						.sort(
+							(a, b) =>
+								of(b.r.id)[first] - of(a.r.id)[first] ||
+								of(b.r.id)[second] - of(a.r.id)[second] ||
+								a.i - b.i,
+						)
+						.slice(0, limit)
+						.map(({ r }) => r);
+				}
 				return c.json({
 					players: rows.map((r) => ({
 						...toPlayer(r),
 						owned: counts.get(r.id)?.owned ?? 0,
 						built: counts.get(r.id)?.built ?? 0,
 					})),
+					total,
 				});
 			},
 		)
@@ -307,7 +337,7 @@ export function playerRoutes(mojang: Mojang) {
 				tag: "Players",
 				summary: "Get a player and their features",
 				description:
-					"`owned` and `built` are the features you can see that they own and helped build now; `ownership` lists the changes of owner that involved them, newest first.",
+					"`owned` and `built` are the features you can see that they own and helped build now, each with its layer (its home, or a layer it is also shown in when you cannot see the home), its owner and builders; `ownership` lists the changes of owner that involved them, newest first. `players` has every player these mention.",
 				params: { id: "Player id or UUID" },
 				fails: [404],
 			}),
@@ -332,6 +362,7 @@ export function playerRoutes(mojang: Mojang) {
 				if (!row) return c.json({ error: "not found" }, 404);
 
 				const layerIds = visibleLayerIds(db, user, role);
+				const visible = new Set(layerIds);
 				const current =
 					layerIds.length === 0
 						? []
@@ -339,14 +370,9 @@ export function playerRoutes(mojang: Mojang) {
 								.select({
 									role: featurePlayers.role,
 									featureId: features.id,
-									layerId: layers.id,
-									layerName: layers.name,
-									dimension: dimensions.slug,
 								})
 								.from(featurePlayers)
 								.innerJoin(features, eq(features.id, featurePlayers.featureId))
-								.innerJoin(layers, eq(layers.id, features.layerId))
-								.innerJoin(dimensions, eq(dimensions.id, layers.dimensionId))
 								.where(
 									and(
 										eq(featurePlayers.playerId, row.id),
@@ -354,19 +380,57 @@ export function playerRoutes(mojang: Mojang) {
 									),
 								)
 								.all();
+				const latest = new Map(
+					[...new Set(current.map((r) => r.featureId))].flatMap((id) => {
+						const rev = latestRevision(db, id);
+						return rev ? [[id, rev] as const] : [];
+					}),
+				);
+				const layerRows = new Map(
+					latest.size === 0
+						? []
+						: db
+								.select({
+									id: layers.id,
+									name: layers.name,
+									color: layers.color,
+									dimension: dimensions.slug,
+								})
+								.from(layers)
+								.innerJoin(dimensions, eq(dimensions.id, layers.dimensionId))
+								.where(
+									inArray(
+										layers.id,
+										[...latest.values()]
+											.flatMap((r) => [r.layerId, ...r.alsoIn])
+											.filter((id) => visible.has(id)),
+									),
+								)
+								.all()
+								.map((l) => [l.id, l]),
+				);
 				const summarize = (r: (typeof current)[number]) => {
-					const rev = latestRevision(db, r.featureId);
+					const rev = latest.get(r.featureId);
 					if (!rev) return [];
+					// Listed under its home layer, or under one it is also shown in when the home is hidden from you.
+					const layer = [rev.layerId, ...rev.alsoIn]
+						.map((id) => layerRows.get(id))
+						.find((l) => l !== undefined);
+					if (!layer) return [];
 					return [
 						{
 							id: r.featureId,
-							layerId: r.layerId,
-							layerName: r.layerName,
-							dimension: r.dimension,
+							layerId: layer.id,
+							layerName: layer.name,
+							/** The layer's colour, which the feature has unless it sets its own. */
+							layerColor: layer.color,
+							dimension: layer.dimension,
 							type: rev.type,
 							name: rev.name,
 							color: rev.color,
 							center: centerOf(rev.type, rev.geometry),
+							ownerId: rev.ownerId,
+							builderIds: rev.builderIds,
 						},
 					];
 				};
@@ -374,7 +438,6 @@ export function playerRoutes(mojang: Mojang) {
 					a.name.localeCompare(b.name);
 
 				// Every revision of the features this player has ever owned, to find the changes of owner.
-				const visible = new Set(layerIds);
 				const revs = db
 					.select({
 						featureId: featureRevisions.featureId,
@@ -428,19 +491,12 @@ export function playerRoutes(mojang: Mojang) {
 					prev = r;
 				}
 				ownership.sort((a, b) => b.revisionId - a.revisionId);
-				const others = db
-					.select({ id: players.id, uuid: players.uuid, name: players.name })
-					.from(players)
-					.where(
-						inArray(players.id, [
-							...new Set(
-								ownership.flatMap((o) =>
-									[o.from, o.to].filter((id): id is number => id !== null),
-								),
-							),
-						]),
-					)
-					.all();
+				const others = playersById(db, [
+					...ownership.flatMap((o) =>
+						[o.from, o.to].filter((id): id is number => id !== null),
+					),
+					...[...latest.values()].flatMap(playerIdsOf),
+				]);
 
 				return c.json({
 					player: toPlayer(row),
@@ -455,8 +511,8 @@ export function playerRoutes(mojang: Mojang) {
 						.flatMap(summarize)
 						.sort(byName),
 					ownership,
-					/** The players `ownership` mentions, by id. */
-					players: Object.fromEntries(others.map((p) => [p.id, toPlayer(p)])),
+					/** The players `ownership` and the features' owners and builders mention, by id. */
+					players: Object.fromEntries(others),
 				});
 			},
 		)

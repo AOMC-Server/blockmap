@@ -2,13 +2,16 @@ import { canManage } from "@blockmap/shared/roles";
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { setRev } from "../controller";
+import { activeFilter, clearFilter, filterCounts } from "../filter";
 import { setMaintenance } from "../sharing";
 import {
 	currentMap,
+	editor,
 	effectiveRev,
 	isolatedUpload,
 	rev,
 	revisionsData,
+	sidePanel,
 } from "../state";
 import { formatEventTime } from "./format";
 
@@ -18,6 +21,8 @@ function BossBar(props: {
 	color: "yellow" | "purple" | "maintenance";
 	action?: string;
 	onAction?: () => void;
+	/** More buttons, after `action`. */
+	actions?: ComponentChildren;
 }) {
 	return (
 		<div class={`bossbar ${props.color}`} role="status">
@@ -32,6 +37,7 @@ function BossBar(props: {
 					{props.action}
 				</button>
 			)}
+			{props.actions}
 		</div>
 	);
 }
@@ -71,13 +77,41 @@ function MaintenanceBar() {
 	);
 }
 
-/** The bars at the top of the map: maintenance, and what point in time is shown. */
+/** The bars at the top of the map: maintenance, what point in time is shown, and the feature filter. */
 export function Banners() {
 	return (
 		<div class="bossbar-wrap">
 			<MaintenanceBar />
 			<HistoryBanner />
+			<FilterBanner />
 		</div>
+	);
+}
+
+/** Visible while a filter is hiding features, so it is clear the map is not showing everything. The filter panel shows the same itself. */
+function FilterBanner() {
+	if (!activeFilter.value) return null;
+	if (sidePanel.value === "filter" && !editor.value) return null;
+	const { shown, total } = filterCounts.value;
+	return (
+		<BossBar
+			color="yellow"
+			fill={total ? shown / total : 0}
+			title={
+				<>
+					<b>Filter:</b> {shown} of {total} feature{total === 1 ? "" : "s"}
+				</>
+			}
+			action="Edit"
+			onAction={() => {
+				sidePanel.value = "filter";
+			}}
+			actions={
+				<button type="button" class="btn small" onClick={clearFilter}>
+					Clear
+				</button>
+			}
+		/>
 	);
 }
 

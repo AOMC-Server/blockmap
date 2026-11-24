@@ -1,12 +1,26 @@
-import { Empty, ErrorBox, Loading } from "@aomc-server/block-ui";
+import {
+	Badge,
+	Count,
+	Empty,
+	ErrorBox,
+	Loading,
+	Segmented,
+} from "@aomc-server/block-ui";
 import { formatTime } from "@aomc-server/block-ui/format";
 import { useAsync } from "@aomc-server/block-ui/hooks";
 import type { Dye } from "@blockmap/shared/colors";
+import type { Player } from "@blockmap/shared/players";
 import { useState } from "preact/hooks";
 import { api, attempt } from "../api";
 import { copyText } from "../clipboard";
 import { TYPE_LABEL } from "../featureInfo";
-import { featureMapUrl, playerPageUrl } from "../players";
+import {
+	featureMapUrl,
+	groupPlayerFeatures,
+	type PlayerFeature,
+	type PlayerFeatureSort,
+	playerPageUrl,
+} from "../players";
 import { currentMap, isModerator, readOnly } from "../state";
 import { Banner } from "./icons";
 import { LoadFailed, Page, usePageLoad } from "./Page";
@@ -16,37 +30,143 @@ import { PlayerHead } from "./PlayerHead";
 export const playerKeyFromPath = (path: string) =>
 	/^\/players\/([^/]+)\/?$/.exec(path)?.[1] ?? null;
 
-function FeatureList(props: {
-	features: {
-		id: number;
-		layerName: string;
-		dimension: string;
-		type: "pin" | "line" | "polygon";
-		name: string;
-		color: string | null;
-		center: [number, number];
-	}[];
-	empty: string;
+const SORT_NAMES: Record<PlayerFeatureSort, string> = {
+	owned: "Most owned",
+	built: "Most built",
+	name: "Name",
+};
+
+/** The features a player owns or built, searchable, in groups by layer. */
+function PlayerFeatures(props: {
+	playerId: number;
+	owned: PlayerFeature[];
+	built: PlayerFeature[];
+	players: ReadonlyMap<number, Player>;
 }) {
+	const [text, setText] = useState("");
+	const [sort, setSort] = useState<PlayerFeatureSort>("owned");
+	const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
 	const dimensions = currentMap.value?.dimensions ?? [];
-	if (props.features.length === 0) return <Empty>{props.empty}</Empty>;
+	const dimensionName = (slug: string) =>
+		dimensions.find((d) => d.slug === slug)?.name ?? slug;
+	const query = text.trim();
+	const groups = groupPlayerFeatures({
+		playerId: props.playerId,
+		owned: props.owned,
+		built: props.built,
+		players: props.players,
+		query,
+		sort,
+		dimensionName,
+	});
+	const total = new Set([...props.owned, ...props.built].map((f) => f.id)).size;
+	const toggle = (id: number) =>
+		setCollapsed((c) => {
+			const next = new Set(c);
+			if (!next.delete(id)) next.add(id);
+			return next;
+		});
+
+	if (total === 0)
+		return (
+			<Empty>
+				Doesn't own and hasn't helped build any features you can see.
+			</Empty>
+		);
 	return (
-		<ul class="player-features">
-			{props.features.map((f) => (
-				<li key={f.id}>
-					<a class="player-feature" href={featureMapUrl(f)}>
-						<Banner dye={(f.color ?? "white") as Dye} />
-						<span class="type">{TYPE_LABEL[f.type]}</span>
-						<span class="feature-name">{f.name || <em>unnamed</em>}</span>
-						<span class="muted player-feature-where">
-							{f.layerName} ·{" "}
-							{dimensions.find((d) => d.slug === f.dimension)?.name ??
-								f.dimension}
-						</span>
-					</a>
-				</li>
-			))}
-		</ul>
+		<>
+			<div class="toolbar players-tools">
+				<input
+					type="search"
+					value={text}
+					placeholder="Search features, layers and players"
+					aria-label="Search features, layers and players"
+					autocomplete="off"
+					spellcheck={false}
+					onInput={(e) => setText(e.currentTarget.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Escape" && text) {
+							e.stopPropagation();
+							setText("");
+						}
+					}}
+				/>
+				<Segmented
+					small
+					label="Sort by"
+					value={sort}
+					options={["owned", "built", "name"] as const}
+					names={SORT_NAMES}
+					onChange={setSort}
+				/>
+			</div>
+			{groups.length === 0 && <Empty>No features match “{query}”.</Empty>}
+			<ul class="layers">
+				{groups.map((g) => {
+					const layerDye = g.layerColor as Dye;
+					// Searching opens every layer with a match.
+					const open = query !== "" || !collapsed.has(g.layerId);
+					return (
+						<li key={g.layerId} class={`layer ${open ? "open" : ""}`}>
+							<div class="layer-head">
+								<Banner dye={layerDye} />
+								<button
+									type="button"
+									class="plain layer-name"
+									aria-expanded={open}
+									onClick={() => toggle(g.layerId)}
+								>
+									<span class="layer-title">{g.layerName}</span>
+									<span class="badge">{dimensionName(g.dimension)}</span>
+									<span class="player-layer-counts">
+										{g.owned > 0 && <Count>{g.owned} owned</Count>}
+										{g.built > 0 && <Count>{g.built} built</Count>}
+									</span>
+									<span class="chevron" aria-hidden="true">
+										{open ? "▼" : "▶"}
+									</span>
+								</button>
+							</div>
+							{open && (
+								<div class="layer-body">
+									<ul class="features">
+										{g.features.map((f) => (
+											<li key={f.id}>
+												<a class="feature-link" href={featureMapUrl(f)}>
+													<Banner dye={(f.color ?? layerDye) as Dye} />
+													<span class="type">{TYPE_LABEL[f.type]}</span>
+													<span class="feature-name">
+														{f.name || <em>unnamed</em>}
+													</span>
+													{f.owns && <Badge>owner</Badge>}
+													{f.built && <Badge>builder</Badge>}
+												</a>
+												{f.others.length > 0 && (
+													<span class="player-feature-others">
+														{f.others.map((o) => (
+															<a
+																key={`${o.role}:${o.player.id}`}
+																href={playerPageUrl(o.player)}
+															>
+																<PlayerHead
+																	player={o.player}
+																	size={18}
+																	title={`${o.role === "owner" ? "Owner" : "Builder"}: ${o.player.name}`}
+																/>
+															</a>
+														))}
+													</span>
+												)}
+											</li>
+										))}
+									</ul>
+								</div>
+							)}
+						</li>
+					);
+				})}
+			</ul>
+		</>
 	);
 }
 
@@ -177,18 +297,12 @@ export function PlayerPage(props: { playerKey: string }) {
 					</div>
 
 					<section class="page-section">
-						<h2>Owns ({data.owned.length})</h2>
-						<FeatureList
-							features={data.owned}
-							empty="Doesn't own any features you can see."
-						/>
-					</section>
-
-					<section class="page-section">
-						<h2>Built ({data.built.length})</h2>
-						<FeatureList
-							features={data.built}
-							empty="Hasn't built any features you can see."
+						<h2>Features</h2>
+						<PlayerFeatures
+							playerId={player.id}
+							owned={data.owned}
+							built={data.built}
+							players={names}
 						/>
 					</section>
 

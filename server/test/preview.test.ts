@@ -215,6 +215,7 @@ describe("snapParams", () => {
 		rev: 1,
 		featuresAt: null,
 		layers: null,
+		filter: null,
 		epoch: 0,
 	};
 

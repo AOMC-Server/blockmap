@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { MAX_FILTER_LENGTH } from "@blockmap/shared/featureFilter";
 import {
 	DEFAULT_SETTINGS,
 	mapOutlineScales,
@@ -6,6 +7,7 @@ import {
 	parseLayerChoices,
 	parsePosition,
 	parseSettings,
+	parseStoredFilter,
 	shapeCacheEnabled,
 	transitionFactor,
 } from "./settings";
@@ -219,5 +221,20 @@ describe("remembered layers", () => {
 		expect([...parseLayerChoices(raw)]).toEqual([[5, true]]);
 		for (const bad of [null, "", "nope", "[true]", "5", "null"])
 			expect(parseLayerChoices(bad).size).toBe(0);
+	});
+});
+
+describe("remembered filter", () => {
+	test("reads the stored text as it is", () => {
+		expect(parseStoredFilter("type:area owner:Notch")).toBe(
+			"type:area owner:Notch",
+		);
+		expect(parseStoredFilter("type:pin ")).toBe("type:pin ");
+	});
+
+	test("nothing, or too much, is no filter", () => {
+		expect(parseStoredFilter(null)).toBe("");
+		expect(parseStoredFilter("a".repeat(MAX_FILTER_LENGTH + 1))).toBe("");
+		expect(parseStoredFilter("a".repeat(MAX_FILTER_LENGTH))).not.toBe("");
 	});
 });

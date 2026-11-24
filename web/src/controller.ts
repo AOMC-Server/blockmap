@@ -1,9 +1,10 @@
 import { convertView, type View } from "@blockmap/shared/view";
-import { effect, signal } from "@preact/signals";
+import { batch, effect, signal } from "@preact/signals";
 import type { InferResponseType } from "hono/client";
 import { api, showNotice } from "./api";
 import { subscribe } from "./events";
 import { pointsOf } from "./featureInfo";
+import { drawFilter, exemptFromFilter, setSharedFilter } from "./filter";
 import { loadLayers } from "./layers";
 import { boundsOf } from "./map/geometry";
 import { MapView } from "./map/MapView";
@@ -217,7 +218,11 @@ export function goToFeature(f: FeatureData) {
 				f.layerId,
 		);
 	mv.fitBounds(boundsOf(pointsOf(f)), { padding: 140 });
-	openFeaturePopup(f);
+	// A feature the filter hides is drawn anyway while its popup is open.
+	batch(() => {
+		exemptFromFilter(f);
+		openFeaturePopup(f);
+	});
 }
 
 /** Starts the app: loads the map, builds the canvas, and wires URL sync and head polling. */
@@ -251,6 +256,8 @@ export async function boot(container: HTMLElement) {
 	dimSlug.value = startDim;
 	if (initial.layers && startDim === initial.dim)
 		sharedLayers.value = new Set(initial.layers);
+	// The filter is not tied to a dimension, so a link's filter stays when you switch.
+	if (initial.filter !== null) setSharedFilter(initial.filter);
 	const startView = saved && saved.dim === startDim ? saved.view : initial.view;
 	setRev(initial.rev);
 
@@ -399,7 +406,13 @@ export async function boot(container: HTMLElement) {
 
 	// Draw the layers the user has switched on.
 	effect(() => {
-		mv.setFeatures(buildRenderLayers(layersData.value, isLayerHidden));
+		mv.setFeatures(
+			buildRenderLayers(
+				layersData.value,
+				isLayerHidden,
+				drawFilter.value ?? undefined,
+			),
+		);
 	});
 
 	let urlTimer: ReturnType<typeof setTimeout> | undefined;

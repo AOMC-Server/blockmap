@@ -1,4 +1,4 @@
-import { Empty, ErrorBox, Loading, SortTh } from "@aomc-server/block-ui";
+import { Count, Empty, ErrorBox, Loading, SortTh } from "@aomc-server/block-ui";
 import { useAsync, useDebounced } from "@aomc-server/block-ui/hooks";
 import { useState } from "preact/hooks";
 import { api, attempt } from "../api";
@@ -10,31 +10,49 @@ import { PlayerHead } from "./PlayerHead";
 
 type SortKey = "name" | "owned" | "built";
 
+/** Most players listed at once. */
+const LIMIT = 500;
+
+/** A count in the table: zero is muted, so the players who have something stand out. */
+const CountCell = (props: { n: number }) => (
+	<td class={`num ${props.n === 0 ? "faint" : ""}`}>{props.n}</td>
+);
+
 /** /players: the Minecraft players that features are attributed to. */
 export function PlayersPage() {
 	const { status, retry } = usePageLoad();
 	const [text, setText] = useState("");
 	const [sort, setSort] = useState<{ col: SortKey; dir: "asc" | "desc" }>({
-		col: "name",
-		dir: "asc",
+		col: "owned",
+		dir: "desc",
 	});
 	const [adding, setAdding] = useState(false);
 	const q = useDebounced(text.trim(), 250);
+	// The server picks which players make the list (the top ones for this column); the direction
+	// only orders them.
 	const state = useAsync(async () => {
 		const res = await attempt(() =>
-			api.api.players.$get({ query: { q, limit: "500" } }),
+			api.api.players.$get({
+				query: { q, limit: String(LIMIT), sort: sort.col },
+			}),
 		);
 		if (!res.ok) throw new Error(res.error);
-		return res.body.players;
-	}, [q]);
+		return res.body;
+	}, [q, sort.col]);
 
-	const rows = [...(state.data ?? [])].sort((a, b) => {
+	const rows = [...(state.data?.players ?? [])].sort((a, b) => {
+		const byName = a.name.localeCompare(b.name, undefined, {
+			sensitivity: "base",
+		});
 		const by =
 			sort.col === "name"
-				? a.name.localeCompare(b.name)
-				: a[sort.col] - b[sort.col];
-		return (sort.dir === "asc" ? by : -by) || a.name.localeCompare(b.name);
+				? byName
+				: a[sort.col] - b[sort.col] ||
+					a[sort.col === "owned" ? "built" : "owned"] -
+						b[sort.col === "owned" ? "built" : "owned"];
+		return (sort.dir === "asc" ? by : -by) || byName;
 	});
+	const total = state.data?.total ?? 0;
 	const onSort = (col: string) =>
 		setSort((s) =>
 			s.col === col
@@ -46,21 +64,27 @@ export function PlayersPage() {
 		<Page title="Players">
 			{status === "failed" && <LoadFailed retry={retry} />}
 			{status !== "failed" && (
-				<>
+				<section class="page-section">
+					<h2>Players {state.data && <Count>{total}</Count>}</h2>
 					<p class="muted">
 						Minecraft players that features are attributed to, as owners or
 						builders. Counts only include features you can see.
 					</p>
-					<div class="players-tools">
+					<div class="toolbar players-tools">
 						<input
-							type="text"
-							class="players-search"
+							type="search"
 							value={text}
 							placeholder="Search by name or UUID"
 							aria-label="Search players"
 							autocomplete="off"
 							spellcheck={false}
 							onInput={(e) => setText(e.currentTarget.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Escape" && text) {
+									e.stopPropagation();
+									setText("");
+								}
+							}}
 						/>
 						{user.value && canEditMap.value && (
 							<button
@@ -88,7 +112,7 @@ export function PlayersPage() {
 					)}
 					{rows.length > 0 && (
 						<div class={`table-wrap flush ${state.loading ? "fade" : ""}`}>
-							<table class="table plain compact">
+							<table class="table middle compact players-table">
 								<thead>
 									<tr>
 										<SortTh
@@ -105,7 +129,7 @@ export function PlayersPage() {
 											dir={sort.dir}
 											onSort={onSort}
 											num
-											hint="Features owned"
+											hint="Features they own"
 										/>
 										<SortTh
 											label="Built"
@@ -114,28 +138,42 @@ export function PlayersPage() {
 											dir={sort.dir}
 											onSort={onSort}
 											num
-											hint="Features built"
+											hint="Features they helped build"
 										/>
 									</tr>
 								</thead>
 								<tbody>
 									{rows.map((p) => (
-										<tr key={p.id}>
+										<tr
+											key={p.id}
+											class="click"
+											onClick={(e) => {
+												// The name is a link of its own (new tabs, keyboard).
+												if (!(e.target as Element).closest("a"))
+													location.href = playerPageUrl(p);
+											}}
+										>
 											<td>
 												<a class="player-name" href={playerPageUrl(p)}>
 													<PlayerHead player={p} size={24} />
 													<span class="player-label">{p.name}</span>
 												</a>
 											</td>
-											<td class="num">{p.owned}</td>
-											<td class="num">{p.built}</td>
+											<CountCell n={p.owned} />
+											<CountCell n={p.built} />
 										</tr>
 									))}
 								</tbody>
 							</table>
 						</div>
 					)}
-				</>
+					{rows.length > 0 && total > rows.length && (
+						<p class="hint">
+							Showing {rows.length} of {total} players. Search to find the
+							others.
+						</p>
+					)}
+				</section>
 			)}
 			{adding && (
 				<NewPlayerDialog

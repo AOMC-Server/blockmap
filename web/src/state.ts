@@ -58,7 +58,7 @@ export function layerOfFeature(
 	);
 }
 
-export type SidePanelName = "layers" | "history";
+export type SidePanelName = "layers" | "filter" | "history";
 
 export type Tool = "none" | "measure";
 

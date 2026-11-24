@@ -303,6 +303,13 @@ export const featureInputSchema = z.discriminatedUnion("type", [
 export type FeatureInput = z.infer<typeof featureInputSchema>;
 export type FeatureType = FeatureInput["type"];
 
+/** What a feature type is called to people: also what a filter or search word matches. */
+export const TYPE_LABEL: Record<FeatureType, string> = {
+	pin: "Pin",
+	line: "Line",
+	polygon: "Area",
+};
+
 /** Partial update; the merged result is validated with featureInputSchema. */
 export const featurePatchSchema = z.object({
 	baseRevisionId: z.optional(

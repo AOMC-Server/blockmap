@@ -3,6 +3,7 @@ import type { DimensionTheme } from "@blockmap/shared/schemas";
 
 const ICONS = {
 	layers: "layers.png",
+	filter: "filter.png",
 	history: "history.png",
 	measure: "measure.png",
 	upload: "upload.png",

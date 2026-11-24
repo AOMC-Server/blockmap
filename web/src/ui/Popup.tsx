@@ -3,6 +3,7 @@ import { curveOf, resolveStyle } from "@blockmap/shared/featureStyle";
 import { copyText } from "../clipboard";
 import { mapView } from "../controller";
 import { featureStats, featureTitle, TYPE_LABEL } from "../featureInfo";
+import { passesFilter } from "../filter";
 import { deleteFeature } from "../layers";
 import { featureMapUrl, playerPageUrl } from "../players";
 import {
@@ -49,6 +50,10 @@ export function Popup() {
 	const dye = feature.color ?? layer.color;
 	const editable = !!home && home.canEdit && canEditMap.value;
 	const spot = p.at;
+	const soleBuilderIsOwner =
+		!!feature.owner &&
+		feature.builders.length === 1 &&
+		feature.builders[0]?.id === feature.owner.id;
 	const stats = featureStats(
 		feature,
 		curveOf(
@@ -95,15 +100,18 @@ export function Popup() {
 						{spot.x}, {spot.z}
 					</button>
 				</div>
+				{!passesFilter(feature) && (
+					<p class="popup-note">Hidden by your filter</p>
+				)}
 				{(feature.owner || feature.builders.length > 0) && (
 					<div class="popup-players">
 						{feature.owner && (
 							<span class="popup-owner">
-								Owned by{" "}
+								{soleBuilderIsOwner ? "Owned/built by" : "Owned by"}{" "}
 								<PlayerLink player={feature.owner} newTab={embed.value} />
 							</span>
 						)}
-						{feature.builders.length > 0 && (
+						{feature.builders.length > 0 && !soleBuilderIsOwner && (
 							<span class="popup-builders">
 								Built by
 								{feature.builders.map((b) => (

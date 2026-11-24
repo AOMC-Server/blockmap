@@ -261,6 +261,36 @@ describe("features in /api/preview.png", () => {
 		expect(bogus(450, 315)).toEqual(BACKGROUND);
 	});
 
+	test("the filter draws only the features it matches", async () => {
+		const t = await bootTiles();
+		await layerWith(t, {}, LINE);
+		await layerWith(
+			t,
+			{ color: "green" },
+			{ type: "pin", name: "Home", geometry: [-300, -100] },
+		);
+		const lineOnly = await decode(
+			await t.app.request(`${URL}&filter=${encodeURIComponent("type:line")}`),
+		);
+		expect(lineOnly(450, 315)).toEqual([73, 82, 204, 255]);
+		const pinOnly = await decode(
+			await t.app.request(`${URL}&filter=${encodeURIComponent("type:pin")}`),
+		);
+		expect(pinOnly(450, 315)).toEqual(BACKGROUND);
+		const pin = [pinOnly(300, 205), pinOnly(300, 210), pinOnly(300, 195)];
+		expect(pin.some((p) => p.join() !== BACKGROUND.join())).toBe(true);
+		expect(cacheFiles(t)).toHaveLength(2);
+	});
+
+	test("a filter that does not parse is ignored", async () => {
+		const t = await bootTiles();
+		await layerWith(t, {}, LINE);
+		const at = await decode(
+			await t.app.request(`${URL}&filter=${encodeURIComponent("type:(")}`),
+		);
+		expect(at(450, 315)).toEqual([73, 82, 204, 255]);
+	});
+
 	test("private layers are never drawn, even when asked for", async () => {
 		const t = await bootTiles();
 		const secret = await layerWith(t, { visibility: "private" }, LINE);

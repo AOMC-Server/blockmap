@@ -32,6 +32,12 @@ describe("featureMatches", () => {
 		expect(featureMatches(f, "dinnerbone")).toBe(false);
 	});
 
+	test("looks in the given layer names", () => {
+		const f = feature(1, "Farm");
+		expect(featureMatches(f, "roads", ["Main Roads"])).toBe(true);
+		expect(featureMatches(f, "roads")).toBe(false);
+	});
+
 	test("an empty query matches everything", () => {
 		expect(featureMatches(feature(1, "x"), "")).toBe(true);
 		expect(featureMatches(feature(1, "x"), "   ")).toBe(true);

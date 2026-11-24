@@ -25,7 +25,7 @@ function randomCode(): string {
 /**
  * The query string the web app reads for a view. The same view always gives the same string,
  * so it gets the same link: layers are sorted and deduplicated and the zoom is rounded the way
- * the app writes it in the address bar. A revision is kept as the `seq` of its upload, so the
+ * the app writes it in the address bar. A filter is kept as written (trimmed), so other spellings of it get other links. A revision is kept as the `seq` of its upload, so the
  * link keeps its moment when uploads are added before it or deleted.
  */
 export function viewQuery(v: ShareView, seq?: number): string {
@@ -37,6 +37,7 @@ export function viewQuery(v: ShareView, seq?: number): string {
 	if (seq !== undefined) q.set("seq", String(seq));
 	if (v.layers !== undefined)
 		q.set("layers", [...new Set(v.layers)].sort((a, b) => a - b).join(","));
+	if (v.filter !== undefined) q.set("filter", v.filter);
 	return q.toString();
 }
 
@@ -70,7 +71,7 @@ export const linkRoutes = new Hono<AppEnv>().post(
 		tag: "Map",
 		summary: "Make a short link to a view",
 		description:
-			"Saves a view (dimension, position, zoom, optionally a revision and the layers shown) and answers a short `url` that opens it. A revision is kept as the upload it names, so the link keeps its moment when revision numbers shift. The same view always gets the same link. Anyone may make links, a limited number per minute.",
+			"Saves a view (dimension, position, zoom, optionally a revision, the layers shown and a feature filter) and answers a short `url` that opens it. A revision is kept as the upload it names, so the link keeps its moment when revision numbers shift. The same view always gets the same link. Anyone may make links, a limited number per minute.",
 		ok: { 200: "The view already had a link", 201: "Link created" },
 		fails: [400, 429],
 	}),

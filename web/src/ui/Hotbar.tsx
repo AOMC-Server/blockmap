@@ -1,5 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
+import { activeFilter } from "../filter";
 import { isTyping } from "../map/input";
 import {
 	activeTool,
@@ -71,6 +72,17 @@ export function Hotbar() {
 		{
 			key: "2",
 			secondary: true,
+			icon: "filter",
+			label: "Filter",
+			hint: "Show only the features you want",
+			active: sidePanel.value === "filter" || activeFilter.value !== null,
+			// A filter is hiding features while its panel is closed: remind that the map is not showing everything.
+			warn: sidePanel.value !== "filter" && activeFilter.value !== null,
+			run: () => toggle("filter"),
+		},
+		{
+			key: "3",
+			secondary: true,
 			icon: "history",
 			label: "History",
 			hint: "Browse past map revisions",
@@ -80,7 +92,7 @@ export function Hotbar() {
 			run: () => toggle("history"),
 		},
 		{
-			key: "3",
+			key: "4",
 			icon: "measure",
 			label: "Measure",
 			hint: "Measure distances and areas",
@@ -90,7 +102,7 @@ export function Hotbar() {
 			},
 		},
 		{
-			key: "4",
+			key: "5",
 			secondary: true,
 			icon: "upload",
 			label: busy ? "Uploading…" : "Upload",
@@ -102,7 +114,7 @@ export function Hotbar() {
 			extra: busy && <DurabilityBar value={uploadProgress()} />,
 		},
 		{
-			key: "5",
+			key: "6",
 			secondary: true,
 			icon: "share",
 			label: "Share",
@@ -113,7 +125,7 @@ export function Hotbar() {
 			},
 		},
 		{
-			key: "6",
+			key: "7",
 			secondary: true,
 			icon: "files",
 			label: "Files",
@@ -124,7 +136,7 @@ export function Hotbar() {
 	];
 	if (isModerator.value)
 		slots.push({
-			key: "7",
+			key: "8",
 			secondary: true,
 			icon: "manage",
 			label: "Manage",

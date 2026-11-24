@@ -136,6 +136,19 @@ describe("share tags on /v2/", () => {
 		expect(html).not.toContain("junk");
 	});
 
+	test("the feature filter goes into the preview image and the link", async () => {
+		const t = bootPage();
+		const html = await (
+			await t.app.request("/v2/?dim=overworld&filter=type%3Aline+-color%3Ared")
+		).text();
+		expect(meta(html, "og:image")).toBe(
+			"https://map.example.com/api/preview.png?dim=overworld&amp;x=0&amp;z=0&amp;zoom=2&amp;filter=type%3Aline+-color%3Ared",
+		);
+		expect(meta(html, "og:url")).toBe(
+			"https://map.example.com/v2/?dim=overworld&amp;x=0&amp;z=0&amp;zoom=2&amp;filter=type%3Aline+-color%3Ared",
+		);
+	});
+
 	test("a map name cannot break out of the markup", async () => {
 		const t = bootPage();
 		await t.db

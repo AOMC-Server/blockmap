@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { MAX_FILTER_LENGTH } from "@blockmap/shared/featureFilter";
 import { createApiToken } from "../src/auth/tokens";
 import { SHORT_LINK_RATE_LIMIT } from "../src/ratelimit";
 import { viewQuery } from "../src/routes/links";
@@ -105,6 +106,47 @@ describe("short links", () => {
 		).toBe(3);
 		const open = await t.app.request(`/s/${none.body.code}`);
 		expect(open.headers.get("Location")).toEndWith("&layers=");
+	});
+
+	test("a filter is part of the link, the same filter gets the same link", async () => {
+		const t = makeTestApp();
+		const a = await call(t, null, "POST", "/api/links", {
+			...view,
+			filter: "type:area owner:Notch",
+		});
+		expect(a.status).toBe(201);
+		const open = await t.app.request(`/s/${a.body.code}`);
+		expect(open.headers.get("Location")).toBe(
+			"/v2/?dim=overworld&x=120&z=-40&zoom=1.5&filter=type%3Aarea+owner%3ANotch",
+		);
+		const again = await call(t, null, "POST", "/api/links", {
+			...view,
+			filter: "type:area owner:Notch",
+		});
+		expect(again.status).toBe(200);
+		expect(again.body.code).toBe(a.body.code);
+
+		const other = await call(t, null, "POST", "/api/links", {
+			...view,
+			filter: "-color:red",
+		});
+		const none = await call(t, null, "POST", "/api/links", view);
+		expect(new Set([a.body.code, other.body.code, none.body.code]).size).toBe(
+			3,
+		);
+	});
+
+	test("a filter that is too long, or empty, is rejected", async () => {
+		const t = makeTestApp();
+		for (const filter of ["x".repeat(MAX_FILTER_LENGTH + 1), "   "])
+			expect(
+				(await call(t, null, "POST", "/api/links", { ...view, filter })).status,
+			).toBe(400);
+		const longest = await call(t, null, "POST", "/api/links", {
+			...view,
+			filter: "x".repeat(MAX_FILTER_LENGTH),
+		});
+		expect(longest.status).toBe(201);
 	});
 
 	test("views are validated", async () => {

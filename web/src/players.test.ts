@@ -3,7 +3,9 @@ import {
 	type Attribution,
 	attributionChange,
 	featureMapUrl,
+	groupPlayerFeatures,
 	MAX_RECENT_PLAYERS,
+	type PlayerFeature,
 	parseRecentPlayers,
 	withRecentPlayer,
 } from "./players";
@@ -92,5 +94,90 @@ describe("recent players", () => {
 				JSON.stringify([A, { id: "x" }, null, 3, { ...A, name: 4 }, A, B]),
 			),
 		).toEqual([A, B]);
+	});
+});
+
+describe("groupPlayerFeatures", () => {
+	const feature = (
+		id: number,
+		layerId: number,
+		extra: Partial<PlayerFeature> = {},
+	): PlayerFeature => ({
+		id,
+		layerId,
+		layerName: `Layer ${layerId}`,
+		layerColor: "red",
+		dimension: "overworld",
+		type: "pin",
+		name: `Feature ${id}`,
+		color: null,
+		center: [0, 0],
+		ownerId: A.id,
+		builderIds: [],
+		...extra,
+	});
+	const players = new Map([A, B, C].map((p) => [p.id, p]));
+
+	test("one row per feature, grouped by layer, the layers with most owned first", () => {
+		const shared = feature(3, 20, { builderIds: [A.id] });
+		const groups = groupPlayerFeatures({
+			playerId: A.id,
+			owned: [feature(1, 10), shared, feature(4, 20)],
+			built: [shared, feature(2, 10, { ownerId: B.id, builderIds: [A.id] })],
+			players,
+		});
+		expect(groups.map((g) => [g.layerId, g.owned, g.built])).toEqual([
+			[20, 2, 1],
+			[10, 1, 1],
+		]);
+		expect(groups[0]?.features.map((f) => [f.id, f.owns, f.built])).toEqual([
+			[3, true, true],
+			[4, true, false],
+		]);
+		expect(
+			groupPlayerFeatures({
+				playerId: A.id,
+				owned: [feature(1, 10), shared, feature(4, 20)],
+				built: [shared, feature(2, 10, { ownerId: B.id, builderIds: [A.id] })],
+				players,
+				sort: "name",
+			}).map((g) => g.layerId),
+		).toEqual([10, 20]);
+	});
+
+	test("the others are the owner, then the builders, without the player", () => {
+		const [group] = groupPlayerFeatures({
+			playerId: A.id,
+			owned: [],
+			built: [
+				feature(1, 10, { ownerId: B.id, builderIds: [A.id, B.id, C.id] }),
+			],
+			players,
+		});
+		expect(group?.features[0]?.others).toEqual([
+			{ player: B, role: "owner" },
+			{ player: C, role: "builder" },
+		]);
+	});
+
+	test("search: a matching layer whole, else matching features or players", () => {
+		const opts = {
+			playerId: A.id,
+			owned: [
+				feature(1, 10, { name: "Castle" }),
+				feature(2, 10, { name: "Farm", builderIds: [C.id] }),
+				feature(3, 20, { name: "Tower" }),
+			],
+			built: [],
+			players,
+		};
+		const ids = (query: string) =>
+			groupPlayerFeatures({ ...opts, query }).flatMap((g) =>
+				g.features.map((f) => f.id),
+			);
+		expect(ids("cast")).toEqual([1]);
+		expect(ids("cyd")).toEqual([2]);
+		expect(ids("layer 20")).toEqual([3]);
+		expect(ids("nothing")).toEqual([]);
 	});
 });

@@ -1,3 +1,4 @@
+import { MAX_FILTER_LENGTH } from "@blockmap/shared/featureFilter";
 import { blockCoord } from "@blockmap/shared/schemas";
 import { MIN_ZOOM } from "@blockmap/shared/view";
 import { z } from "zod";
@@ -44,6 +45,14 @@ export const viewQuerySchema = z.object({
 		.optional()
 		.describe(
 			"Ids of the layers to show, comma-separated; empty shows none (default: each layer's default)",
+		),
+	/** Feature filter text, as the viewer's `filter`; text that does not parse is ignored. */
+	filter: z
+		.string()
+		.max(MAX_FILTER_LENGTH)
+		.optional()
+		.describe(
+			"Feature filter text: only the features it matches are drawn (default: all features)",
 		),
 });
 export type ViewQuery = z.infer<typeof viewQuerySchema>;
@@ -96,6 +105,7 @@ export async function resolvePreviewTarget(
 			rev,
 			featuresAt: timeOfRev(db, map.headRev, rev) ?? null,
 			layers: parseLayerIds(q.layers),
+			filter: q.filter ?? null,
 			epoch: map.epoch,
 		},
 	};

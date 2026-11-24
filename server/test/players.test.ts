@@ -354,6 +354,77 @@ describe("attribution", () => {
 		expect(list.body.players).toEqual([{ ...jeb, owned: 1, built: 0 }]);
 	});
 
+	test("the list sorts by most owned or built across everyone, and gives the total", async () => {
+		const t = await boot();
+		const notch = await addPlayer(t, NOTCH);
+		const jeb = await addPlayer(t, JEB);
+		const layer = await makeLayer(t);
+		for (const extra of [
+			{ owner: jeb.id },
+			{ owner: jeb.id, builders: [notch.id] },
+			{ builders: [notch.id] },
+		])
+			await call(
+				t,
+				t.editor,
+				"POST",
+				`/api/layers/${layer}/features`,
+				pin(extra),
+			);
+		const names = async (query: string) => {
+			const res = await call(t, null, "GET", `/api/players?${query}`);
+			return {
+				names: res.body.players.map((p: { name: string }) => p.name),
+				total: res.body.total,
+			};
+		};
+		expect(await names("")).toEqual({ names: ["jeb_", "Notch"], total: 2 });
+		expect(await names("sort=owned&limit=1")).toEqual({
+			names: ["jeb_"],
+			total: 2,
+		});
+		expect(await names("sort=built&limit=1")).toEqual({
+			names: ["Notch"],
+			total: 2,
+		});
+		expect((await call(t, null, "GET", "/api/players?sort=nope")).status).toBe(
+			400,
+		);
+	});
+
+	test("the player page gives each feature's layer colour and other players", async () => {
+		const t = await boot();
+		const notch = await addPlayer(t, NOTCH);
+		const jeb = await addPlayer(t, JEB);
+		const layer = await makeLayer(t);
+		const created = await call(
+			t,
+			t.editor,
+			"POST",
+			`/api/layers/${layer}/features`,
+			pin({ owner: notch.id, builders: [notch.id, jeb.id] }),
+		);
+		const id = created.body.feature.id;
+		const layers = await call(t, null, "GET", "/api/layers");
+		const page = await call(t, null, "GET", `/api/players/${jeb.id}`);
+		expect(page.body.built).toEqual([
+			{
+				id,
+				layerId: layer,
+				layerName: "Bases",
+				layerColor: layers.body.layers[0].color,
+				dimension: "overworld",
+				type: "pin",
+				name: "Base",
+				color: null,
+				center: [10, 20],
+				ownerId: notch.id,
+				builderIds: [notch.id, jeb.id],
+			},
+		]);
+		expect(page.body.players).toEqual({ [notch.id]: notch, [jeb.id]: jeb });
+	});
+
 	test("the owner is not made a builder", async () => {
 		const t = await boot();
 		const notch = await addPlayer(t, NOTCH);

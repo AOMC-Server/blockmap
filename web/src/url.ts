@@ -1,3 +1,4 @@
+import { MAX_FILTER_LENGTH } from "@blockmap/shared/featureFilter";
 import type { View } from "@blockmap/shared/view";
 
 export type UrlState = {
@@ -9,6 +10,8 @@ export type UrlState = {
 	layers: number[] | null;
 	/** A feature to go to once the layers have loaded (links from a player's page). */
 	feature: number | null;
+	/** The feature filter a shared link carries, or null. Never written back to the address bar. */
+	filter: string | null;
 };
 
 const num = (value: string | null): number | undefined => {
@@ -26,6 +29,11 @@ function parseLayers(value: string | null): number[] | null {
 		.filter(
 			(n): n is number => n !== undefined && Number.isInteger(n) && n > 0,
 		);
+}
+
+function parseFilter(value: string | null): string | null {
+	const text = value?.trim() ?? "";
+	return text === "" || text.length > MAX_FILTER_LENGTH ? null : text;
 }
 
 export function parseUrl(search: string): UrlState {
@@ -46,6 +54,7 @@ export function parseUrl(search: string): UrlState {
 			feature !== undefined && Number.isInteger(feature) && feature > 0
 				? feature
 				: null,
+		filter: parseFilter(q.get("filter")),
 	};
 }
 

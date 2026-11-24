@@ -52,6 +52,8 @@ export function staticRoutes(distDir: string) {
 		if (query.data.rev !== undefined) view.set("rev", String(rev));
 		if (query.data.layers !== undefined)
 			view.set("layers", (target.params.layers ?? []).join(","));
+		if (query.data.filter !== undefined)
+			view.set("filter", target.params.filter ?? "");
 		const withBase = (path: string) => {
 			const url = new URL(path, env.PUBLIC_URL);
 			url.search = view.toString();

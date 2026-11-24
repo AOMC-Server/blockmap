@@ -14,6 +14,7 @@ import { ContextMenu } from "./ContextMenu";
 import { DeleteUploadDialog, deleteUploadFor } from "./DeleteUploadDialog";
 import { FeatureEditor } from "./FeatureEditor";
 import { FeatureHistory, featureHistoryFor } from "./FeatureHistory";
+import { FilterPanel } from "./FilterPanel";
 import { HistoryPanel } from "./HistoryPanel";
 import { Hotbar } from "./Hotbar";
 import { LayerPanel } from "./LayerPanel";
@@ -39,6 +40,8 @@ function SidePanel() {
 	switch (sidePanel.value) {
 		case "layers":
 			return <LayerPanel />;
+		case "filter":
+			return <FilterPanel />;
 		case "history":
 			return <HistoryPanel />;
 		default:

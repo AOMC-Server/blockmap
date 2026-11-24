@@ -224,9 +224,13 @@ export const updateDimensionSchema = z
 /** Most layers a shared view can list. */
 export const MAX_SHARED_LAYERS = 500;
 
+/** Longest feature filter text accepted (also the limit for shared links). */
+export const MAX_FILTER_LENGTH = 500;
+
 /**
  * A view saved behind a short link: where the camera is, in which dimension, as of which
- * revision (none: the latest), and which layers are shown (none listed: each layer's default).
+ * revision (none: the latest), which layers are shown (none listed: each layer's default), and
+ * which feature filter applies (none: all features).
  */
 export const shareViewSchema = z.object({
 	dim: slugSchema.check(z.describe("Slug of the dimension")),
@@ -258,6 +262,18 @@ export const shareViewSchema = z.object({
 				z.maxLength(MAX_SHARED_LAYERS),
 				z.describe(
 					"Ids of the layers shown; omitted: each layer's default, empty: none",
+				),
+			),
+	),
+	filter: z.optional(
+		z
+			.string()
+			.check(
+				z.trim(),
+				z.minLength(1),
+				z.maxLength(MAX_FILTER_LENGTH),
+				z.describe(
+					"Feature filter text, as typed in the map's Filter panel; omitted: no filter",
 				),
 			),
 	),

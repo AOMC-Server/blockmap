@@ -8,6 +8,11 @@ import {
 	type Point,
 } from "@blockmap/shared";
 import {
+	type FilterContext,
+	type FilterFeature,
+	parseFeatureFilter,
+} from "@blockmap/shared/featureFilter";
+import {
 	curveOf,
 	dashPattern,
 	resolveStyle,
@@ -50,13 +55,15 @@ const dyeOf = (name: string | null | undefined, fallback: string): Dye => {
 
 /**
  * The public layers of a dimension that a preview shows, with their features as of `at` (unix
- * ms, null for now). `wanted` lists layer ids; without it each layer's default decides.
+ * ms, null for now). `wanted` lists layer ids; without it each layer's default decides. Only the
+ * features that `filter` (feature filter text) matches are kept; text that does not parse keeps all.
  */
 export function loadOverlayLayers(
 	db: Db,
 	dimensionId: number,
 	at: number | null,
 	wanted: number[] | null,
+	filter: string | null,
 ): OverlayLayer[] {
 	const rows = db
 		.select()
@@ -93,12 +100,31 @@ export function loadOverlayLayers(
 			.all()
 			.map((l) => [l.id, l]),
 	);
+	const parsed = filter === null ? null : parseFeatureFilter(filter);
+	const active = parsed?.ok ? parsed.filter : null;
+	const ctx: FilterContext = {
+		layerOf: (id) => {
+			const layer = owners.get(id);
+			return layer
+				? { name: layer.name, color: dyeOf(layer.color, "red") }
+				: undefined;
+		},
+		now: Date.now(),
+	};
 	const seen = new Set<number>();
 	const drawn = new Map<number, OverlayLayer["features"]>();
 	for (const l of rows)
 		for (const feature of byLayer.get(l.id) ?? []) {
 			if (seen.has(feature.id)) continue;
 			seen.add(feature.id);
+			if (
+				active &&
+				!active.test(
+					{ ...feature, color: feature.color as Dye | null } as FilterFeature,
+					ctx,
+				)
+			)
+				continue;
 			const owner = owners.get(feature.layerId) ?? l;
 			drawn.set(owner.id, [...(drawn.get(owner.id) ?? []), feature]);
 		}

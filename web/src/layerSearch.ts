@@ -1,23 +1,16 @@
-import { TYPE_LABEL } from "./featureInfo";
+import { featureTextMatches } from "@blockmap/shared/featureFilter";
 import type { FeatureData, LayerData } from "./state";
 
 const normalize = (s: string) => s.trim().toLowerCase();
 
-/** A feature matches when the query is in its name, its popup text, its type (pin, line, area) or the name of its owner or a builder. */
+/** A feature matches when the query is in its name, its popup text, its type (pin, line, area), the name of its owner or a builder, or of a layer it is in (`layerNames`). */
 export function featureMatches(
 	f: Pick<FeatureData, "name" | "popup" | "type"> &
 		Partial<Pick<FeatureData, "owner" | "builders">>,
 	query: string,
+	layerNames: readonly string[] = [],
 ): boolean {
-	const q = normalize(query);
-	if (!q) return true;
-	return [
-		f.name,
-		f.popup,
-		TYPE_LABEL[f.type],
-		...(f.owner ? [f.owner.name] : []),
-		...(f.builders ?? []).map((b) => b.name),
-	].some((text) => text.toLowerCase().includes(q));
+	return featureTextMatches(f, layerNames, query);
 }
 
 export type LayerMatch = { layer: LayerData; features: FeatureData[] };

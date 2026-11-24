@@ -34,6 +34,8 @@ export type PreviewParams = {
 	featuresAt: number | null;
 	/** Layers to show; null for each layer's default. */
 	layers: number[] | null;
+	/** Feature filter text; null for all features. */
+	filter: string | null;
 	/** Changes when history is rewritten; see `map_info.epoch`. */
 	epoch: number;
 };
@@ -142,7 +144,13 @@ async function overlayFor(
 	view: View,
 	iconDirs: string[],
 ): Promise<string | null> {
-	const layers = loadOverlayLayers(db, p.dimensionId, p.featuresAt, p.layers);
+	const layers = loadOverlayLayers(
+		db,
+		p.dimensionId,
+		p.featuresAt,
+		p.layers,
+		p.filter,
+	);
 	if (layers.length === 0) return null;
 	const icons = await loadIcons(iconDirs);
 	return buildOverlay(layers, view, SIZE, (dye) => icons.get(dye));

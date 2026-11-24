@@ -797,6 +797,13 @@ img.banner,
 	display: flex;
 }
 
+/* On phones and touch screens a tap is the only "hover", and the page it opens covers the tip. */
+@media (max-width: 640px), (hover: none) {
+	.hotbar-slot:is(:hover, :focus-visible) .slot-tip {
+		display: none;
+	}
+}
+
 .tooltip {
 	position: absolute;
 	z-index: 7;
@@ -2550,12 +2557,6 @@ img.banner,
 		height: 44px;
 	}
 
-	.slot-tip {
-		left: auto;
-		right: -4px;
-		transform: none;
-	}
-
 	.debug {
 		bottom: calc(var(--safe-bottom) + 8px);
 		max-width: calc(100% - var(--hotbar-w, 240px) - 24px);
@@ -3011,7 +3012,8 @@ img.banner,
 }
 
 .admin-controls .segmented-set,
-.admin-toolbar .segmented-set {
+.admin-toolbar .segmented-set,
+.page-section .toolbar .segmented-set {
 	margin: 0;
 }
 
@@ -3519,17 +3521,33 @@ a.player-name:hover .player-label {
 	align-self: center;
 }
 
-/* Player pages */
+/* Player pages. In their toolbars the search takes the room the buttons leave; they stay on the
+   right, even when wrapped. */
 .players-tools {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin-bottom: 12px;
+	margin-bottom: 4px;
 }
 
-.players-search {
+.players-tools input[type="search"] {
 	flex: 1 1 200px;
 	width: auto;
+}
+
+.players-tools > :not(input) {
+	margin-left: auto;
+}
+
+.toolbar.players-tools .segmented-set {
+	margin: 0 0 0 auto;
+}
+
+.page-section h2 .count {
+	vertical-align: middle;
+	font-family: var(--sans);
+}
+
+/* A block link, so the name lines up with the numbers of the row. */
+.players-table .player-name {
+	display: flex;
 }
 
 .player-card {
@@ -3550,42 +3568,36 @@ a.player-name:hover .player-label {
 	overflow-wrap: anywhere;
 }
 
-.player-features,
 .player-changes {
 	list-style: none;
 	margin: 0;
 	padding: 0;
 }
 
-.player-feature {
+/* A player's features reuse the layer cards of the layers panel; rows are links to the map. */
+.player-layer-counts {
 	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 5px 4px;
-	text-decoration: none;
-	color: inherit;
-}
-
-.player-feature:hover {
-	background: var(--s2);
-}
-
-.player-feature .type {
-	border-radius: var(--radius-sm);
-	flex: none;
-	padding: 1px 5px;
-	font-size: 10px;
-	font-weight: 700;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--muted);
-	background: var(--well);
-}
-
-.player-feature-where {
+	gap: 4px;
 	margin-left: auto;
-	padding-left: 8px;
-	font-size: 13px;
+}
+
+.features a.feature-link {
+	color: inherit;
+	text-decoration: none;
+}
+
+.features a.feature-link:hover .feature-name {
+	text-decoration: underline;
+}
+
+.player-feature-others {
+	display: flex;
+	flex: none;
+	gap: 3px;
+}
+
+.player-feature-others > * {
+	display: inline-flex;
 }
 
 .player-changes li {
@@ -3698,4 +3710,135 @@ a.player-name:hover .player-label {
 .layer-option-note {
 	padding: 4px 8px;
 	font-size: 13px;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * Feature filter: its panel, rows it hides in the layer list, the note in a popup
+ * ------------------------------------------------------------------------------------------- */
+.filter-tools {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.filter-tools .hint,
+.filter-tools .error-text {
+	margin: 0;
+}
+
+.filter-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.filter-input {
+	flex: 1;
+	min-width: 0;
+}
+
+.filter-quick {
+	min-width: 0;
+	margin: 20px 0 0;
+	padding: 0;
+	border: 0;
+}
+
+.filter-quick legend {
+	margin-bottom: 8px;
+	padding: 0;
+}
+
+.filter-quick .hint {
+	margin: 6px 0 0;
+}
+
+.filter-edited input[type="number"] {
+	width: 5.5em;
+}
+
+.filter-quick .player-chips,
+.filter-quick .player-search {
+	margin-top: 8px;
+}
+
+.filter-quick:disabled .dye-picker {
+	opacity: 0.5;
+}
+
+.filter-quick-foot {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+	font-size: 13px;
+}
+
+.filter-quick-foot .hint {
+	margin: 4px 0 0;
+}
+
+.filter-quick-foot .link {
+	flex: none;
+	margin: 0;
+}
+
+.filter-help {
+	margin-top: 20px;
+}
+
+.filter-help summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.filter-help code {
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+.filter-fields {
+	margin: 8px 0 0;
+	font-size: 13px;
+}
+
+.filter-fields div {
+	margin-bottom: 6px;
+}
+
+.filter-fields dd {
+	margin: 0;
+	color: var(--muted);
+}
+
+.filter-examples {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.filter-examples li {
+	margin-bottom: 6px;
+}
+
+.filter-examples .link {
+	text-align: left;
+	overflow-wrap: anywhere;
+}
+
+.filter-examples .hint {
+	display: block;
+	margin: 0;
+}
+
+.features li.filtered-out .feature-link {
+	opacity: 0.45;
+}
+
+.popup-note {
+	margin: 0;
+	padding: 6px 12px 0;
+	font-size: 13px;
+	color: var(--muted);
 }

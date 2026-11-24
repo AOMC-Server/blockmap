@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { MAX_FILTER_LENGTH } from "@blockmap/shared/featureFilter";
 import { formatUrl, parseUrl } from "./url";
 
 describe("url state", () => {
@@ -10,6 +11,7 @@ describe("url state", () => {
 			embed: true,
 			layers: null,
 			feature: null,
+			filter: null,
 		});
 	});
 
@@ -21,6 +23,7 @@ describe("url state", () => {
 			embed: false,
 			layers: null,
 			feature: null,
+			filter: null,
 		});
 	});
 
@@ -34,6 +37,34 @@ describe("url state", () => {
 		expect(parseUrl("?dim=overworld&feature=42").feature).toBe(42);
 		expect(parseUrl("?feature=x").feature).toBeNull();
 		expect(parseUrl("?feature=-3").feature).toBeNull();
+	});
+
+	test("parses the feature filter of a shared link", () => {
+		expect(parseUrl("?filter=type%3Aarea+owner%3ANotch").filter).toBe(
+			"type:area owner:Notch",
+		);
+		expect(parseUrl("?filter=%20%20type:pin%20").filter).toBe("type:pin");
+		expect(parseUrl("?filter=").filter).toBeNull();
+		expect(parseUrl("?filter=%20%20").filter).toBeNull();
+		expect(parseUrl("?dim=nether").filter).toBeNull();
+	});
+
+	test("a filter that is too long is ignored", () => {
+		const long = "a".repeat(MAX_FILTER_LENGTH + 1);
+		expect(parseUrl(`?filter=${long}`).filter).toBeNull();
+		const fits = "a".repeat(MAX_FILTER_LENGTH);
+		expect(parseUrl(`?filter=${fits}`).filter).toBe(fits);
+	});
+
+	test("the filter is never put in the address bar", () => {
+		const state = {
+			dim: "nether",
+			view: { centerX: 0, centerZ: 0, zoom: 1 },
+			rev: null,
+			embed: false,
+			filter: "type:pin",
+		};
+		expect(formatUrl(state)).not.toContain("filter");
 	});
 
 	test("ignores the old map parameter", () => {
