@@ -16,11 +16,26 @@ export type ResizeResult = {
 	blobsSplit: number;
 };
 
+/** How often the progress line is printed, and how long without a finished image is worth a warning. */
+const PROGRESS_MS = 5_000;
+const STALL_MS = 30_000;
+
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+const duration = (ms: number) => {
+	const s = Math.round(ms / 1000);
+	return s < 60
+		? `${s}s`
+		: `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s`;
+};
+
 /**
  * Changes the map's tile size to a divisor of it (1024 to 512, say). Every upload's patches are
  * cut into pieces of the new size (fully transparent pieces are dropped), the tile history is
  * cleared, and a rebuild from the new patches is queued for the next server start. Nothing is
  * resampled, so no detail is lost.
+ *
+ * Nothing in the database changes until the very end, in one transaction: stopping it before
+ * then only leaves new image files that nothing points to, which the blob cleanup removes.
  *
  * Run with the server stopped. The old patch images stay on disk until the blob cleanup
  * (Manage → Statistics) removes them.
@@ -30,10 +45,17 @@ export async function resizeTiles(opts: {
 	to: number;
 	concurrency?: number;
 	dryRun?: boolean;
-	onProgress?: (done: number, total: number) => void;
+	log?: (message: string) => void;
+	/** Called once the database has been changed; from then on the run must not be interrupted. */
+	onCommitting?: () => void;
 }): Promise<ResizeResult> {
+	const started = Date.now();
+	const log = (message: string) =>
+		opts.log?.(`[${seconds(Date.now() - started)}] ${message}`);
+
 	const dbFile = paths.dbFile(opts.dataDir);
 	if (!existsSync(dbFile)) throw new Error(`no database at ${dbFile}`);
+	log(`opening ${dbFile}`);
 	const db = new Database(dbFile, { strict: true });
 	try {
 		db.run("PRAGMA foreign_keys = ON");
@@ -69,6 +91,7 @@ export async function resizeTiles(opts: {
 			.get() as { n: number };
 		if (unpublished.n > 0)
 			throw new Error(`${unpublished.n} upload(s) are still being processed`);
+		log(`tile size ${from} → ${to}; no jobs or uploads in progress`);
 
 		const patches = db
 			.query(
@@ -77,6 +100,9 @@ export async function resizeTiles(opts: {
 			.all() as { revisionId: number; x: number; y: number; hash: string }[];
 		const k = from / to;
 		const hashes = [...new Set(patches.map((p) => p.hash))];
+		log(
+			`${patches.length} patches use ${hashes.length} distinct images; each becomes up to ${k * k} pieces`,
+		);
 		if (opts.dryRun) {
 			return {
 				from,
@@ -87,36 +113,79 @@ export async function resizeTiles(opts: {
 			};
 		}
 
-		const insertBlob = db.prepare(
-			"INSERT INTO blobs (hash, bytes, created_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
-		);
-		const blobs = createBlobStore(paths.blobsDir(opts.dataDir), (hash, bytes) =>
-			insertBlob.run(hash, bytes, Date.now()),
+		// Recorded in the final transaction rather than one write (and disk sync) per image.
+		const stored = new Map<string, number>();
+		const blobsDir = paths.blobsDir(opts.dataDir);
+		const blobs = createBlobStore(blobsDir, (hash, bytes) =>
+			stored.set(hash, bytes),
 		);
 
 		// Each image is cut once, however many patches share it: piece (i, j) is at index j * k + i.
 		const pieces = new Map<string, (string | null)[]>();
+		const concurrency =
+			opts.concurrency ?? Math.min(availableParallelism(), 16);
+		const inFlight = new Map<string, { since: number; step: string }>();
 		let done = 0;
-		await mapLimit(
-			hashes,
-			opts.concurrency ?? Math.min(availableParallelism(), 16),
-			async (hash) => {
-				const src = await loadTile(blobs, hash, from);
+		let kept = 0;
+		let empty = 0;
+		let lastDone = Date.now();
+		const splitStart = Date.now();
+		log(`splitting images into ${blobsDir} (${concurrency} at a time)`);
+
+		const report = () => {
+			const elapsed = Date.now() - splitStart;
+			const rate = done / (elapsed / 1000);
+			const left = rate > 0 ? ((hashes.length - done) / rate) * 1000 : 0;
+			log(
+				`split ${done}/${hashes.length} images (${((done / hashes.length) * 100).toFixed(1)}%), ` +
+					`${rate.toFixed(1)}/s, ~${duration(left)} left; ${kept} pieces stored, ${empty} empty`,
+			);
+			const idle = Date.now() - lastDone;
+			if (idle >= STALL_MS && inFlight.size > 0) {
+				log(`no image finished for ${duration(idle)}; working on:`);
+				for (const [hash, f] of inFlight)
+					log(
+						`  ${blobs.path(hash)}: ${f.step} for ${duration(Date.now() - f.since)}`,
+					);
+			}
+		};
+		const timer = setInterval(report, PROGRESS_MS);
+		try {
+			await mapLimit(hashes, concurrency, async (hash) => {
+				const state = { since: Date.now(), step: "reading" };
+				inFlight.set(hash, state);
+				let src: Buffer;
+				try {
+					src = await loadTile(blobs, hash, from);
+				} catch (err) {
+					throw new Error(
+						`cannot read ${blobs.path(hash)}: ${err instanceof Error ? err.message : err}`,
+					);
+				}
 				const out: (string | null)[] = [];
 				for (let j = 0; j < k; j++) {
 					for (let i = 0; i < k; i++) {
+						state.step = `writing piece ${j * k + i + 1}/${k * k}`;
 						const piece = emptyTile(to);
 						for (let y = 0; y < to; y++) {
 							const s = ((j * to + y) * from + i * to) * 4;
 							src.copy(piece, y * to * 4, s, s + to * 4);
 						}
-						out.push(await storeTile(blobs, piece, to));
+						const h = await storeTile(blobs, piece, to);
+						if (h) kept++;
+						else empty++;
+						out.push(h);
 					}
 				}
 				pieces.set(hash, out);
-				opts.onProgress?.(++done, hashes.length);
-			},
-		);
+				inFlight.delete(hash);
+				done++;
+				lastDone = Date.now();
+			});
+		} finally {
+			clearInterval(timer);
+		}
+		report();
 
 		const rows: [number, number, number, string][] = [];
 		for (const p of patches) {
@@ -129,8 +198,15 @@ export async function resizeTiles(opts: {
 			}
 		}
 
+		log(
+			`writing ${rows.length} patches and ${stored.size} image records to the database`,
+		);
+		opts.onCommitting?.();
 		const insertPatch = db.prepare(
 			"INSERT INTO upload_patches (revision_id, tile_x, tile_y, blob_hash) VALUES (?, ?, ?, ?)",
+		);
+		const insertBlob = db.prepare(
+			"INSERT INTO blobs (hash, bytes, created_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
 		);
 		db.transaction(() => {
 			const now = db
@@ -139,6 +215,8 @@ export async function resizeTiles(opts: {
 				tileSize: number;
 			};
 			if (now.tileSize !== from) throw new Error("the map changed meanwhile");
+			const at = Date.now();
+			for (const [hash, bytes] of stored) insertBlob.run(hash, bytes, at);
 			db.run("DELETE FROM upload_patches");
 			for (const r of rows) insertPatch.run(...r);
 			// The old versions are of the old size; the rebuild queued on boot makes the new ones.
@@ -149,7 +227,9 @@ export async function resizeTiles(opts: {
 				[to],
 			);
 		})();
+		log("committed; checkpointing the database");
 		db.run("PRAGMA wal_checkpoint(TRUNCATE)");
+		log("done");
 
 		return {
 			from,
@@ -191,26 +271,41 @@ if (import.meta.main) {
 					}),
 				);
 	const dryRun = !values.yes;
+
+	// Until the final transaction nothing in the database has changed, so stopping is harmless.
+	let committing = false;
+	const onSignal = (signal: string) => {
+		if (committing) {
+			console.error(
+				`${signal}: the database is being written, which takes a few seconds; letting it finish`,
+			);
+			return;
+		}
+		console.error(
+			`${signal}: stopped before changing the database; the map is as it was. ` +
+				"The images written so far are unused and go with the next blob cleanup. Run the script again to start over.",
+		);
+		process.exit(130);
+	};
+	process.on("SIGINT", () => onSignal("SIGINT"));
+	process.on("SIGTERM", () => onSignal("SIGTERM"));
+
 	try {
 		const result = await resizeTiles({
 			dataDir: values.data as string,
 			to,
 			concurrency,
 			dryRun,
-			onProgress: (done, total) => {
-				if (done % 100 === 0 || done === total)
-					process.stdout.write(`\rsplitting images: ${done}/${total}`);
+			log: (message) => console.log(message),
+			onCommitting: () => {
+				committing = true;
 			},
 		});
 		if (dryRun) {
 			console.log(
-				`tile size ${result.from} → ${result.to}: ${result.patchesBefore} patches (${result.blobsSplit} images) to split`,
-			);
-			console.log(
 				"dry run; stop the server, back up (bun run backup <dir>), then pass --yes",
 			);
 		} else {
-			console.log();
 			console.log(
 				`tile size ${result.from} → ${result.to}: ${result.patchesBefore} patches became ${result.patchesAfter}`,
 			);
