@@ -10,6 +10,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { queueRebuildIfPending } from "../server/src/jobs/rebuildHistory";
 import { classifyBlobFile } from "../server/src/tiles/blobstore";
 import {
 	bootTiles,
@@ -21,11 +22,14 @@ import {
 	png,
 	RED,
 	solid,
+	T,
+	type TileApp,
 	upload,
 } from "../server/test/helpers";
 import { positiveNumber } from "./args";
 import { backup } from "./backup";
 import { runImport, xaeroStamp } from "./import-v1";
+import { resizeTiles } from "./resize-tiles";
 
 afterAll(cleanupTempDirs);
 
@@ -659,5 +663,84 @@ describe("import-v1", () => {
 		});
 		expect(r.uploaded).toBe(1);
 		expect(limited).toBe(true);
+	});
+});
+
+describe("resize-tiles", () => {
+	/** The tiles of a zoom level as one raw RGBA image of `n` x `n` tiles, from tile (x0, y0) on. */
+	async function stitch(
+		t: TileApp,
+		size: number,
+		zoom: number,
+		x0: number,
+		y0: number,
+		n: number,
+	) {
+		const w = size * n;
+		const out = Buffer.alloc(w * w * 4);
+		for (let j = 0; j < n; j++) {
+			for (let i = 0; i < n; i++) {
+				const res = await t.app.request(
+					`/api/dimensions/overworld/tiles/${zoom}/${x0 + i}/${y0 + j}`,
+				);
+				if (res.status === 204) continue;
+				const blob = await t.app.request(res.headers.get("location") as string);
+				const { data, width } = await decodeRgba(
+					new Uint8Array(await blob.arrayBuffer()),
+				);
+				expect(width).toBe(size);
+				for (let y = 0; y < size; y++)
+					data.copy(
+						out,
+						((j * size + y) * w + i * size) * 4,
+						y * size * 4,
+						(y + 1) * size * 4,
+					);
+			}
+		}
+		return out;
+	}
+
+	test("cuts the patches into smaller tiles and rebuilds the same map from them", async () => {
+		const t = await bootTiles();
+		const pattern = await png(24, 20, (x, y) => [
+			x * 10,
+			y * 12,
+			(x + y) % 7 === 0 ? 0 : 90,
+		]);
+		await upload(t, pattern, -4, 2);
+		await upload(t, await solid(6, 6, RED), 3, 5);
+
+		const before0 = await stitch(t, T, 0, -1, 0, 2);
+		const before1 = await stitch(t, T, 1, -1, 0, 2);
+
+		const dry = await resizeTiles({
+			dataDir: t.env.DATA_DIR,
+			to: 8,
+			dryRun: true,
+		});
+		expect(dry.from).toBe(T);
+		expect((await (await t.app.request("/api/map")).json()).map.tileSize).toBe(
+			T,
+		);
+
+		const r = await resizeTiles({ dataDir: t.env.DATA_DIR, to: 8 });
+		expect(r.patchesAfter).toBeGreaterThan(r.patchesBefore);
+		expect(queueRebuildIfPending(t.db)).toBe(true);
+		await t.services.worker.run();
+
+		expect((await (await t.app.request("/api/map")).json()).map.tileSize).toBe(
+			8,
+		);
+		expect(await stitch(t, 8, 0, -2, 0, 4)).toEqual(before0);
+		expect(await stitch(t, 8, 1, -2, 0, 4)).toEqual(before1);
+	});
+
+	test("refuses sizes that do not divide the current one", async () => {
+		const t = await bootTiles();
+		for (const to of [T, 6, 32])
+			await expect(
+				resizeTiles({ dataDir: t.env.DATA_DIR, to }),
+			).rejects.toThrow();
 	});
 });

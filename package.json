@@ -17,6 +17,7 @@
 		"backup": "bun scripts/backup.ts",
 		"import-v1": "bun scripts/import-v1.ts",
 		"import-xlsx": "bun scripts/import-xlsx.ts",
+		"resize-tiles": "bun scripts/resize-tiles.ts",
 		"db:generate": "bun run --cwd server db:generate"
 	},
 	"devDependencies": {

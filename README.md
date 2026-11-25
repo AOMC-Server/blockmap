@@ -266,6 +266,18 @@ This writes a consistent `db-<UTC timestamp>.sqlite` (SQLite's `VACUUM INTO`, sa
 
 Failed jobs and deleted uploads can leave images that nothing references. **Manage → Statistics → Clean up now** (owners) queues a job that deletes them, together with their copies in other [tile formats](#tile-formats) and leftover unfinished writes; the _Waiting for cleanup_ figure beside the button says how much that frees. It keeps everything a tile version or an upload patch points to. Like uploads and deletions it runs from the job queue, one job at a time, which is what makes it safe: jobs are the only writers of images. Storage history gets a point when it is done. The same is available as `POST /api/admin/storage/cleanup` (owners; 409 while one is queued or running).
 
+### Changing the tile size
+
+`DEFAULT_TILE_SIZE` only applies when the map is created. To make an existing map's tiles smaller (to any even divisor, e.g. 1024 → 512):
+
+```bash
+bun run resize-tiles --to 512 --data ./data          # dry run: what would be split
+# stop the server and take a backup, then:
+bun run resize-tiles --to 512 --data ./data --yes
+```
+
+It cuts every upload's patches into pieces of the new size (nothing is resampled, so the map looks exactly the same), clears the tile history and marks it for a rebuild, which runs when the server next starts. The map is empty until that finishes. It refuses to run while jobs are queued or running. Afterwards run [the blob cleanup](#cleaning-up-blobs) to delete the old images, and consider raising `MAX_ZOOM` by one per halving so the map still zooms out as far.
+
 ### Importing the old (v1) map
 
 The importer uses only the public API, so it works against any running server. v1 stored tiles as `<dimension>/<zoom>/<x>_<z>.png` where x and z are the block coordinates of the tile's top-left corner; only zoom 0 is imported (the other levels are rebuilt by the server).
