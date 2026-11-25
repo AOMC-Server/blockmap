@@ -142,6 +142,11 @@ export function composeParent(
 	return canvas;
 }
 
+/** Versions and settings of the image library, for diagnostics. */
+export function imageLibrary(): string {
+	return `sharp ${sharp.versions.sharp}, libvips ${sharp.versions.vips}, ${sharp.concurrency()} libvips threads`;
+}
+
 /** Decodes to raw RGBA. Images larger than `maxDim` x `maxDim` pixels are refused. */
 export async function decodeRaw(
 	input: Buffer | string,

@@ -5,7 +5,12 @@ import { parseArgs } from "node:util";
 import { mapLimit } from "../server/src/concurrency";
 import * as paths from "../server/src/paths";
 import { createBlobStore } from "../server/src/tiles/blobstore";
-import { emptyTile, loadTile, storeTile } from "../server/src/tiles/compose";
+import {
+	decodeRaw,
+	emptyTile,
+	encodeTile,
+	imageLibrary,
+} from "../server/src/tiles/compose";
 import { orExit, positiveNumber } from "./args";
 
 export type ResizeResult = {
@@ -46,6 +51,8 @@ export async function resizeTiles(opts: {
 	concurrency?: number;
 	dryRun?: boolean;
 	log?: (message: string) => void;
+	/** Logs every step of every image too. */
+	verbose?: boolean;
 	/** Called once the database has been changed; from then on the run must not be interrupted. */
 	onCommitting?: () => void;
 }): Promise<ResizeResult> {
@@ -131,6 +138,8 @@ export async function resizeTiles(opts: {
 		let lastDone = Date.now();
 		const splitStart = Date.now();
 		log(`splitting images into ${blobsDir} (${concurrency} at a time)`);
+		const trace = opts.verbose ? log : () => {};
+		trace(`image library: ${imageLibrary()}`);
 
 		const report = () => {
 			const elapsed = Date.now() - splitStart;
@@ -154,29 +163,48 @@ export async function resizeTiles(opts: {
 			await mapLimit(hashes, concurrency, async (hash) => {
 				const state = { since: Date.now(), step: "reading" };
 				inFlight.set(hash, state);
+				const file = blobs.path(hash);
+				const step = (name: string) => {
+					state.step = name;
+					trace(`${hash.slice(0, 12)}: ${name}`);
+				};
 				let src: Buffer;
 				try {
-					src = await loadTile(blobs, hash, from);
+					step(`reading ${file}`);
+					const data = await blobs.read(hash);
+					step(`decoding ${data.length} bytes`);
+					const img = await decodeRaw(data, from);
+					if (img.width !== from || img.height !== from)
+						throw new Error(
+							`it is ${img.width}x${img.height}, expected ${from}x${from}`,
+						);
+					src = img.data;
 				} catch (err) {
 					throw new Error(
-						`cannot read ${blobs.path(hash)}: ${err instanceof Error ? err.message : err}`,
+						`cannot read ${file}: ${err instanceof Error ? err.message : err}`,
 					);
 				}
 				const out: (string | null)[] = [];
 				for (let j = 0; j < k; j++) {
 					for (let i = 0; i < k; i++) {
-						state.step = `writing piece ${j * k + i + 1}/${k * k}`;
+						const n = `${j * k + i + 1}/${k * k}`;
 						const piece = emptyTile(to);
 						for (let y = 0; y < to; y++) {
 							const s = ((j * to + y) * from + i * to) * 4;
 							src.copy(piece, y * to * 4, s, s + to * 4);
 						}
-						const h = await storeTile(blobs, piece, to);
-						if (h) kept++;
-						else empty++;
+						step(`encoding piece ${n}`);
+						const webp = await encodeTile(piece, to);
+						let h: string | null = null;
+						if (webp) {
+							step(`writing piece ${n} (${webp.length} bytes)`);
+							h = await blobs.put(webp);
+							kept++;
+						} else empty++;
 						out.push(h);
 					}
 				}
+				trace(`${hash.slice(0, 12)}: done`);
 				pieces.set(hash, out);
 				inFlight.delete(hash);
 				done++;
@@ -250,12 +278,13 @@ if (import.meta.main) {
 			data: { type: "string", default: process.env.DATA_DIR ?? "./data" },
 			to: { type: "string" },
 			concurrency: { type: "string" },
+			verbose: { type: "boolean", default: false },
 			yes: { type: "boolean", default: false },
 		},
 	});
 	if (!values.to) {
 		console.error(
-			"usage: bun scripts/resize-tiles.ts --to 512 [--data ./data] [--concurrency N] [--yes]",
+			"usage: bun scripts/resize-tiles.ts --to 512 [--data ./data] [--concurrency N] [--verbose] [--yes]",
 		);
 		process.exit(2);
 	}
@@ -296,6 +325,7 @@ if (import.meta.main) {
 			to,
 			concurrency,
 			dryRun,
+			verbose: values.verbose as boolean,
 			log: (message) => console.log(message),
 			onCommitting: () => {
 				committing = true;
